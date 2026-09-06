@@ -1,0 +1,11 @@
+{
+  "name": "Remix v3 Remix Vending Machine Fleet \u0026 Maintenance Platform",
+  "description": "Centralized Vending Machine Fleet Management, Maintenance Ticketing, Inventory, and Excel Import/Normalization Platform.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
