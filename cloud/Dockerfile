@@ -1,22 +1,31 @@
 # ==============================================================================
-# Production Dockerfile for KSU Vending Cloud API Service (Phase 5)
-# Deployable to Google Cloud Run / Managed Containers
+# Production Dockerfile for KSU Vending Cloud API Service
+# Render / Google Cloud Run compatible
 # ==============================================================================
 
-# Build Stage
+
+# ------------------------------------------------------------------------------
+# 1. BUILD STAGE
+# ------------------------------------------------------------------------------
+
 FROM node:20-alpine AS builder
 
+# Working directory inside the build container
 WORKDIR /app
 
-# Install build dependencies
-COPY package.json package-lock.json* ./
+# Copy dependency manifests first to improve Docker layer caching
+COPY package.json package-lock.json ./
+
+# Install all dependencies required for TypeScript/esbuild compilation
 RUN npm ci --ignore-scripts
 
-# Copy application source (excluding fleet_data via .dockerignore)
+# Copy TypeScript configuration
 COPY tsconfig*.json ./
+
+# Copy ONLY the standalone cloud service source
 COPY cloud ./cloud
 
-# Bundle Cloud Server into a standalone CommonJS bundle
+# Build the standalone Cloud API bundle
 RUN npx esbuild cloud/src/server.ts \
     --bundle \
     --platform=node \
@@ -25,33 +34,91 @@ RUN npx esbuild cloud/src/server.ts \
     --sourcemap \
     --outfile=dist/cloud-server.cjs
 
-# Production Runtime Stage
+
+# ------------------------------------------------------------------------------
+# 2. PRODUCTION RUNTIME STAGE
+# ------------------------------------------------------------------------------
+
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# Production dependency behavior inside the container.
+# Render may override NODE_ENV with its Environment Variable configuration.
 ENV NODE_ENV=production
-# Managed container PORT environment variable (defaults to 3001)
-ENV PORT=3001
 
-# Run with non-root user for security
+# IMPORTANT:
+# Do NOT set ENV PORT here.
+# Render / Cloud Run supply process.env.PORT dynamically.
+
+
+# ------------------------------------------------------------------------------
+# 3. INSTALL PRODUCTION DEPENDENCIES
+# ------------------------------------------------------------------------------
+
+# Still running as root during IMAGE BUILD.
+# This prevents the previous EACCES /app/node_modules error.
+COPY package.json package-lock.json ./
+
+RUN npm ci --omit=dev --ignore-scripts \
+    && npm cache clean --force
+
+
+# ------------------------------------------------------------------------------
+# 4. COPY BUILT CLOUD APPLICATION
+# ------------------------------------------------------------------------------
+
+COPY --from=builder \
+    /app/dist/cloud-server.cjs \
+    ./dist/cloud-server.cjs
+
+COPY --from=builder \
+    /app/dist/cloud-server.cjs.map \
+    ./dist/cloud-server.cjs.map
+
+
+# ------------------------------------------------------------------------------
+# 5. COPY DATABASE MIGRATIONS
+# ------------------------------------------------------------------------------
+
+COPY cloud/src/db/migrations \
+    ./cloud/src/db/migrations
+
+
+# ------------------------------------------------------------------------------
+# 6. NON-ROOT RUNTIME SECURITY
+# ------------------------------------------------------------------------------
+
+# Give the runtime user ownership of application files
+RUN chown -R node:node /app
+
+# IMPORTANT:
+# Switch to the non-root user ONLY AFTER npm ci has completed.
 USER node
 
-# Copy package manifests and install only production dependencies
-COPY --chown=node:node package.json package-lock.json* ./
-RUN npm ci --omit=dev --ignore-scripts
 
-# Copy compiled cloud bundle and SQL schema migrations
-COPY --chown=node:node --from=builder /app/dist/cloud-server.cjs ./dist/cloud-server.cjs
-COPY --chown=node:node --from=builder /app/dist/cloud-server.cjs.map ./dist/cloud-server.cjs.map
-COPY --chown=node:node cloud/src/db/migrations ./cloud/src/db/migrations
+# ------------------------------------------------------------------------------
+# 7. CONTAINER PORT
+# ------------------------------------------------------------------------------
 
-# Expose container ingress port
+# Documentation/default local container port.
+# Render/Cloud Run use their supplied PORT at runtime.
 EXPOSE 3001
 
-# Health check using the lightweight /health endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:${PORT}/health || exit 1
 
-# Launch the compiled Cloud API server
+# ------------------------------------------------------------------------------
+# 8. HEALTH CHECK
+# ------------------------------------------------------------------------------
+
+HEALTHCHECK --interval=30s \
+    --timeout=5s \
+    --start-period=5s \
+    --retries=3 \
+    CMD wget -qO- http://localhost:${PORT:-3001}/health || exit 1
+
+
+# ------------------------------------------------------------------------------
+# 9. START CLOUD API
+# ------------------------------------------------------------------------------
+
 CMD ["node", "dist/cloud-server.cjs"]
