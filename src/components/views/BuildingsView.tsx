@@ -19,8 +19,10 @@ import { ConfirmActionModal } from '../common/ConfirmActionModal';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
-import { Building, Floor, Location, Machine, NavigationTab } from '../../types';
+import { Building, Floor, Location, Machine, NavigationTab, LocationSource } from '../../types';
 import { api } from '../../services/api';
+import { GeoLocationFormSection } from '../common/GeoLocationFormSection';
+import { GeoLocationMapPicker } from '../common/GeoLocationMapPicker';
 
 interface BuildingsViewProps {
   onNavigate: (tab: NavigationTab, id?: string) => void;
@@ -43,9 +45,16 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
   const [bldNameAr, setBldNameAr] = useState('');
   const [bldCode, setBldCode] = useState('');
   const [bldAddress, setBldAddress] = useState('');
+  const [bldLat, setBldLat] = useState<number | null>(null);
+  const [bldLng, setBldLng] = useState<number | null>(null);
+  const [bldSource, setBldSource] = useState<LocationSource>('NONE');
+  const [bldNote, setBldNote] = useState('');
 
   // Edit Building Modal
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
+
+  // View Building on Map
+  const [viewingBuildingMap, setViewingBuildingMap] = useState<Building | null>(null);
 
   // Add Floor Modal
   const [isAddFloorOpen, setIsAddFloorOpen] = useState(false);
@@ -141,7 +150,11 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
         name: bldName.trim(),
         nameAr: bldNameAr.trim(),
         code: bldCode.trim() || `BLD-${Date.now().toString().slice(-3)}`,
-        address: bldAddress.trim()
+        address: bldAddress.trim(),
+        latitude: bldLat,
+        longitude: bldLng,
+        locationSource: bldSource,
+        locationNote: bldNote.trim()
       });
       setBuildings(prev => [...prev, newBld]);
       showToast(t('success'), `Building ${newBld.name} added!`, 'success');
@@ -150,6 +163,10 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
       setBldNameAr('');
       setBldCode('');
       setBldAddress('');
+      setBldLat(null);
+      setBldLng(null);
+      setBldSource('NONE');
+      setBldNote('');
     } catch (err: any) {
       showToast(t('error'), err.message || 'Failed to create building', 'error');
     }
@@ -164,7 +181,11 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
         name: editingBuilding.name,
         nameAr: editingBuilding.nameAr,
         code: editingBuilding.code,
-        address: editingBuilding.address
+        address: editingBuilding.address,
+        latitude: editingBuilding.latitude ?? null,
+        longitude: editingBuilding.longitude ?? null,
+        locationSource: editingBuilding.locationSource ?? 'NONE',
+        locationNote: editingBuilding.locationNote?.trim() || ''
       });
       setBuildings(prev => prev.map(b => (b.id === updated.id ? updated : b)));
       showToast(t('success'), `Building ${updated.name} updated successfully!`, 'success');
@@ -390,6 +411,24 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
                       <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono text-[10px]">
                         {bld.code}
                       </span>
+                      {/* Compact GPS Status Indicator (Section 12) */}
+                      {bld.latitude !== null && bld.latitude !== undefined && bld.longitude !== null && bld.longitude !== undefined ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-mono text-[10px] border border-emerald-500/30"
+                          title={`GPS: ${Number(bld.latitude).toFixed(4)}, ${Number(bld.longitude).toFixed(4)} (${bld.locationSource || 'MANUAL'})`}
+                        >
+                          <MapPin className="w-2.5 h-2.5 text-emerald-400" />
+                          <span>GPS Configured</span>
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 font-mono text-[10px] border border-slate-700/60"
+                          title="GPS Not Configured"
+                        >
+                          <MapPin className="w-2.5 h-2.5 text-slate-500" />
+                          <span>GPS Not Configured</span>
+                        </span>
+                      )}
                       {bld.isActive === false && (
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-mono text-[10px] border border-amber-500/30">
                           Inactive
@@ -446,6 +485,119 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
               {/* Expandable Floor & Location Hierarchy */}
               {isExpanded && (
                 <div className="px-5 pb-5 pt-2 border-t border-slate-800/80 bg-slate-950/40 space-y-4">
+                  {/* Building Location & GPS Card (Section 13) */}
+                  <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-indigo-400" />
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-200">
+                            الموقع الجغرافي للمبنى / Building GPS & Reference
+                          </h4>
+                          <p className="text-[11px] text-slate-400">
+                            النقطة المرجعية الجغرافية للمبنى وتمركز الخرائط للماكينات التابعة
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        {bld.latitude !== null && bld.latitude !== undefined && bld.longitude !== null && bld.longitude !== undefined ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            ✓ GPS_CONFIGURED
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            ⚠ LOCATION_NOT_CONFIGURED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">خط العرض / Latitude</span>
+                        <span className="text-slate-200 font-bold">
+                          {bld.latitude !== null && bld.latitude !== undefined ? Number(bld.latitude).toFixed(6) : '—'}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">خط الطول / Longitude</span>
+                        <span className="text-slate-200 font-bold">
+                          {bld.longitude !== null && bld.longitude !== undefined ? Number(bld.longitude).toFixed(6) : '—'}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">المصدر / Source</span>
+                        <span className="text-indigo-400 font-bold text-[11px]">
+                          {bld.locationSource || 'NONE'}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">آخر تحديث / Last Updated</span>
+                        <span className="text-slate-300 text-[11px]">
+                          {bld.locationUpdatedAt ? new Date(bld.locationUpdatedAt).toLocaleDateString() : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {bld.locationNote && (
+                      <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="text-[10px] text-slate-500 font-semibold block">وصف الموقع / Location Note:</span>
+                          <span>{bld.locationNote}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="text-[11px] text-slate-400">
+                        {bld.locationUpdatedByActorName && (
+                          <span>تم التوثيق بواسطة: <strong className="text-slate-300">{bld.locationUpdatedByActorName}</strong></span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {bld.latitude !== null && bld.latitude !== undefined && bld.longitude !== null && bld.longitude !== undefined ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            icon={MapPin}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingBuildingMap(bld);
+                            }}
+                            className="text-xs text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/10"
+                          >
+                            🗺 عرض على الخريطة
+                          </Button>
+                        ) : (
+                          canEditMachines && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              icon={MapPin}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingBuilding({ ...bld });
+                              }}
+                              className="text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+                            >
+                              🗺 تحديد الموقع على الخريطة
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {bldFloors.map(flr => {
                       const flrLocations = bldLocations.filter(l => l.floorId === flr.id);
@@ -558,7 +710,7 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
         onClose={() => setIsAddBuildingOpen(false)}
         title={t('addBuilding')}
         subtitle="Register campus complex or administrative facility"
-        maxWidth="md"
+        maxWidth="lg"
       >
         <form onSubmit={handleCreateBuilding} className="space-y-4">
           <div>
@@ -616,6 +768,22 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
             </div>
           </div>
 
+          {/* Geographic Location / GPS Section (Section 4) */}
+          <GeoLocationFormSection
+            latitude={bldLat}
+            longitude={bldLng}
+            locationSource={bldSource}
+            locationNote={bldNote}
+            entityType="building"
+            entityTitle={bldNameAr || bldName || 'مبنى جديد'}
+            onCoordinatesChange={({ latitude, longitude, source }) => {
+              setBldLat(latitude);
+              setBldLng(longitude);
+              setBldSource(source);
+            }}
+            onLocationNoteChange={setBldNote}
+          />
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsAddBuildingOpen(false)}>
               {t('cancel')}
@@ -634,7 +802,7 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
           onClose={() => setEditingBuilding(null)}
           title="Edit Building Details"
           subtitle={`Modify parameters for ${editingBuilding.name}`}
-          maxWidth="md"
+          maxWidth="lg"
         >
           <form onSubmit={handleUpdateBuilding} className="space-y-4">
             <div>
@@ -688,6 +856,31 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
               </div>
             </div>
 
+            {/* Geographic Location / GPS Section (Section 5) */}
+            <GeoLocationFormSection
+              latitude={editingBuilding.latitude ?? null}
+              longitude={editingBuilding.longitude ?? null}
+              locationSource={editingBuilding.locationSource ?? 'NONE'}
+              locationNote={editingBuilding.locationNote ?? ''}
+              entityType="building"
+              entityTitle={editingBuilding.nameAr || editingBuilding.name}
+              onCoordinatesChange={({ latitude, longitude, source }) => {
+                setEditingBuilding({
+                  ...editingBuilding,
+                  latitude,
+                  longitude,
+                  locationSource: source,
+                  locationStatus: latitude !== null && longitude !== null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED'
+                });
+              }}
+              onLocationNoteChange={(note) => {
+                setEditingBuilding({
+                  ...editingBuilding,
+                  locationNote: note
+                });
+              }}
+            />
+
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setEditingBuilding(null)}>
                 {t('cancel')}
@@ -698,6 +891,20 @@ export const BuildingsView: React.FC<BuildingsViewProps> = ({ onNavigate }) => {
             </div>
           </form>
         </Modal>
+      )}
+
+      {/* View Building Location Map Modal */}
+      {viewingBuildingMap && (
+        <GeoLocationMapPicker
+          isOpen={!!viewingBuildingMap}
+          onClose={() => setViewingBuildingMap(null)}
+          initialLatitude={viewingBuildingMap.latitude}
+          initialLongitude={viewingBuildingMap.longitude}
+          entityTitle={viewingBuildingMap.nameAr || viewingBuildingMap.name}
+          entityType="building"
+          isReadOnly={true}
+          onConfirm={() => {}}
+        />
       )}
 
       {/* Add Floor Modal */}

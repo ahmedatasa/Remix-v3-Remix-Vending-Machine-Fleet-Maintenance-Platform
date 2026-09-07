@@ -234,8 +234,24 @@ export class TicketService {
       throw new Error('MACHINE_NOT_FOUND: رمز الماكينة غير صالح أو غير مرتبط بسجل معتمد.');
     }
 
+    // Check for pre-authorized field exception if GPS validation needs it
+    let effectiveManualException = manualException;
+    let consumedApprovalId: string | undefined;
+
+    if (!effectiveManualException) {
+      const activeApproval = await repo.fieldExceptions.findValidForTicketAndMachine(ticketId, machine.integrationMachineId);
+      if (activeApproval) {
+        effectiveManualException = {
+          approvedBy: activeApproval.approvedByActorName,
+          reason: activeApproval.reason,
+          approverRole: 'SUPERVISOR'
+        };
+        consumedApprovalId = activeApproval.id;
+      }
+    }
+
     // Authoritative Backend GPS Validation
-    const validation = GpsService.validateFieldPresence(coordinates, machine, manualException);
+    const validation = GpsService.validateFieldPresence(coordinates, machine, effectiveManualException);
 
     if (!validation.verified) {
       await repo.audit.log({
@@ -256,6 +272,18 @@ export class TicketService {
       throw new Error(`GPS_VALIDATION_FAILED: ${validation.message}`);
     }
 
+    // If an approved field exception was consumed, mark it used in database
+    if (consumedApprovalId) {
+      await repo.fieldExceptions.consumeApproval(consumedApprovalId);
+      await repo.syncEvents.pushEvent('FIELD_EXCEPTION_USED', ticketId, {
+        exceptionId: consumedApprovalId,
+        ticketId,
+        machineId: machine.integrationMachineId,
+        technicianId,
+        technicianName
+      });
+    }
+
     const now = new Date().toISOString();
     const checkinRecord = {
       id: `chk-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
@@ -269,10 +297,11 @@ export class TicketService {
       distanceMeters: validation.distanceMeters,
       verified: true,
       status: validation.status,
-      manualException: manualException ? {
-        approvedBy: manualException.approvedBy,
-        reason: manualException.reason,
-        approverRole: manualException.approverRole || 'SUPERVISOR',
+      fieldExceptionId: consumedApprovalId,
+      manualException: effectiveManualException ? {
+        approvedBy: effectiveManualException.approvedBy,
+        reason: effectiveManualException.reason,
+        approverRole: effectiveManualException.approverRole || 'SUPERVISOR',
         timestamp: now
       } : undefined
     };

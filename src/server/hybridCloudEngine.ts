@@ -93,14 +93,17 @@ export function initHybridFleetMigration(store: any, saveStore: (data: any) => v
       tokensGenerated++;
     }
 
-    if (m.machineLatitude === undefined || m.machineLatitude === null) {
-      const num = parseInt(m.machineNumber, 10) || idx + 1;
-      // Riyadh campus base location with stable dispersion
-      m.machineLatitude = Number((24.7136 + ((num % 40) * 0.00035)).toFixed(6));
-      m.machineLongitude = Number((46.6753 + (((num * 7) % 40) * 0.00035)).toFixed(6));
-      m.latitude = m.machineLatitude;
-      m.longitude = m.machineLongitude;
-      coordsAssigned++;
+    // Safe location initialization without fabricating coordinates
+    if (m.latitude === undefined || m.latitude === null) {
+      m.latitude = null;
+      m.longitude = null;
+      m.machineLatitude = null as any;
+      m.machineLongitude = null as any;
+      m.locationSource = m.locationSource || 'NONE';
+      m.locationStatus = 'LOCATION_NOT_CONFIGURED';
+    } else {
+      m.locationSource = m.locationSource || 'MANUAL_ENTRY';
+      m.locationStatus = 'GPS_CONFIGURED';
     }
   });
 

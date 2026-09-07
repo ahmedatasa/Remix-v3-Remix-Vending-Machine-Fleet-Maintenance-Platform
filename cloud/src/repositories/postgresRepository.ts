@@ -8,7 +8,9 @@ import {
   ISessionRepository,
   ISyncEventRepository,
   IAuditRepository,
-  IIdempotencyRepository
+  IIdempotencyRepository,
+  IMachineLocationProposalRepository,
+  IFieldExceptionApprovalRepository
 } from './interfaces';
 import type {
   SanitizedCloudMachine,
@@ -21,7 +23,10 @@ import type {
   CloudTechnicianAccount,
   CloudTechnicianSession,
   CloudSyncEvent,
-  CloudSyncEventType
+  CloudSyncEventType,
+  MachineLocationProposal,
+  FieldExceptionApproval,
+  LocationSource
 } from '../db/cloudDb';
 
 function toIsoDate(d: any): string {
@@ -29,6 +34,29 @@ function toIsoDate(d: any): string {
   if (d instanceof Date) return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
   const parsed = new Date(d);
   return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function mapMachineRow(r: any): SanitizedCloudMachine {
+  return {
+    integrationMachineId: r.integration_machine_id,
+    publicQrToken: r.public_qr_token,
+    machineNumber: r.machine_number,
+    model: r.model,
+    machineType: r.machine_type,
+    publicDisplayName: r.public_display_name,
+    buildingPublicName: r.building_public_name,
+    locationPublicName: r.location_public_name,
+    latitude: r.latitude !== null && r.latitude !== undefined ? parseFloat(r.latitude) : null,
+    longitude: r.longitude !== null && r.longitude !== undefined ? parseFloat(r.longitude) : null,
+    locationSource: (r.location_source as LocationSource) || 'NONE',
+    locationNote: r.location_note || undefined,
+    locationUpdatedAt: r.location_updated_at ? toIsoDate(r.location_updated_at) : undefined,
+    locationUpdatedByActorId: r.location_updated_by_actor_id || undefined,
+    locationUpdatedByActorName: r.location_updated_by_actor_name || undefined,
+    active: r.active,
+    lastSyncedAt: toIsoDate(r.last_synced_at),
+    version: r.version
+  };
 }
 
 export class PostgresCloudMachineRepository implements ICloudMachineRepository {
@@ -40,29 +68,16 @@ export class PostgresCloudMachineRepository implements ICloudMachineRepository {
     const query = `
       SELECT integration_machine_id, public_qr_token, machine_number, model, machine_type,
              public_display_name, building_public_name, location_public_name,
-             latitude, longitude, active, last_synced_at, version
+             latitude, longitude, location_source, location_note, location_updated_at,
+             location_updated_by_actor_id, location_updated_by_actor_name,
+             active, last_synced_at, version
       FROM cloud_machines
       WHERE UPPER(public_qr_token) = $1
       LIMIT 1;
     `;
     const res = await this.pool.query(query, [clean]);
     if (res.rows.length === 0) return null;
-    const r = res.rows[0];
-    return {
-      integrationMachineId: r.integration_machine_id,
-      publicQrToken: r.public_qr_token,
-      machineNumber: r.machine_number,
-      model: r.model,
-      machineType: r.machine_type,
-      publicDisplayName: r.public_display_name,
-      buildingPublicName: r.building_public_name,
-      locationPublicName: r.location_public_name,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      active: r.active,
-      lastSyncedAt: r.last_synced_at.toISOString(),
-      version: r.version
-    };
+    return mapMachineRow(res.rows[0]);
   }
 
   async findByIntegrationId(id: string): Promise<SanitizedCloudMachine | null> {
@@ -70,29 +85,16 @@ export class PostgresCloudMachineRepository implements ICloudMachineRepository {
     const query = `
       SELECT integration_machine_id, public_qr_token, machine_number, model, machine_type,
              public_display_name, building_public_name, location_public_name,
-             latitude, longitude, active, last_synced_at, version
+             latitude, longitude, location_source, location_note, location_updated_at,
+             location_updated_by_actor_id, location_updated_by_actor_name,
+             active, last_synced_at, version
       FROM cloud_machines
       WHERE integration_machine_id = $1
       LIMIT 1;
     `;
     const res = await this.pool.query(query, [id]);
     if (res.rows.length === 0) return null;
-    const r = res.rows[0];
-    return {
-      integrationMachineId: r.integration_machine_id,
-      publicQrToken: r.public_qr_token,
-      machineNumber: r.machine_number,
-      model: r.model,
-      machineType: r.machine_type,
-      publicDisplayName: r.public_display_name,
-      buildingPublicName: r.building_public_name,
-      locationPublicName: r.location_public_name,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      active: r.active,
-      lastSyncedAt: r.last_synced_at.toISOString(),
-      version: r.version
-    };
+    return mapMachineRow(res.rows[0]);
   }
 
   async bootstrapRegistry(machines: SanitizedCloudMachine[]): Promise<{ updated: number; total: number }> {
@@ -108,8 +110,8 @@ export class PostgresCloudMachineRepository implements ICloudMachineRepository {
           INSERT INTO cloud_machines (
             integration_machine_id, public_qr_token, machine_number, model,
             machine_type, public_display_name, building_public_name, location_public_name,
-            latitude, longitude, active, version, last_synced_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            latitude, longitude, location_source, location_note, active, version, last_synced_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           ON CONFLICT (integration_machine_id) DO UPDATE SET
             public_qr_token = EXCLUDED.public_qr_token,
             machine_number = COALESCE(EXCLUDED.machine_number, cloud_machines.machine_number),
@@ -118,8 +120,13 @@ export class PostgresCloudMachineRepository implements ICloudMachineRepository {
             public_display_name = EXCLUDED.public_display_name,
             building_public_name = EXCLUDED.building_public_name,
             location_public_name = EXCLUDED.location_public_name,
-            latitude = EXCLUDED.latitude,
-            longitude = EXCLUDED.longitude,
+            latitude = COALESCE(EXCLUDED.latitude, cloud_machines.latitude),
+            longitude = COALESCE(EXCLUDED.longitude, cloud_machines.longitude),
+            location_source = CASE
+              WHEN EXCLUDED.latitude IS NOT NULL THEN EXCLUDED.location_source
+              ELSE cloud_machines.location_source
+            END,
+            location_note = COALESCE(EXCLUDED.location_note, cloud_machines.location_note),
             active = EXCLUDED.active,
             version = cloud_machines.version + 1,
             last_synced_at = CURRENT_TIMESTAMP,
@@ -136,6 +143,8 @@ export class PostgresCloudMachineRepository implements ICloudMachineRepository {
           m.locationPublicName,
           m.latitude ?? null,
           m.longitude ?? null,
+          m.locationSource || 'NONE',
+          m.locationNote || null,
           m.active ?? true
         ]);
         updated++;
@@ -154,6 +163,89 @@ export class PostgresCloudMachineRepository implements ICloudMachineRepository {
 
   async upsertMachine(machine: SanitizedCloudMachine): Promise<void> {
     await this.bootstrapRegistry([machine]);
+  }
+
+  async updateLocation(
+    idOrToken: string,
+    params: {
+      latitude: number | null;
+      longitude: number | null;
+      locationSource: LocationSource;
+      locationNote?: string;
+      actorId: string;
+      actorName: string;
+    }
+  ): Promise<SanitizedCloudMachine> {
+    const { latitude, longitude, locationSource, locationNote, actorId, actorName } = params;
+
+    // Consistency check: both null or both valid numbers
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+      if (latitude !== longitude) {
+        throw new Error('INVALID_COORDINATES: يجب تحديد كل من خط العرض وخط الطول معاً أو تركهما كلاهما فارغين.');
+      }
+    } else {
+      if (typeof latitude !== 'number' || isNaN(latitude) || latitude < -90 || latitude > 90) {
+        throw new Error(`INVALID_LATITUDE: خط العرض غير صالح (${latitude}). يجب أن يكون بين -90 و 90.`);
+      }
+      if (typeof longitude !== 'number' || isNaN(longitude) || longitude < -180 || longitude > 180) {
+        throw new Error(`INVALID_LONGITUDE: خط الطول غير صالح (${longitude}). يجب أن يكون بين -180 و 180.`);
+      }
+    }
+
+    const query = `
+      UPDATE cloud_machines
+      SET latitude = $1,
+          longitude = $2,
+          location_source = $3,
+          location_note = COALESCE($4, location_note),
+          location_updated_at = CURRENT_TIMESTAMP,
+          location_updated_by_actor_id = $5,
+          location_updated_by_actor_name = $6,
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE integration_machine_id = $7 OR UPPER(public_qr_token) = UPPER($7)
+      RETURNING *;
+    `;
+    const res = await this.pool.query(query, [
+      latitude ?? null,
+      longitude ?? null,
+      locationSource,
+      locationNote || null,
+      actorId,
+      actorName,
+      idOrToken
+    ]);
+
+    if (res.rows.length === 0) {
+      throw new Error(`MACHINE_NOT_FOUND: الماكينة المطلوبة (${idOrToken}) غير موجودة.`);
+    }
+
+    return mapMachineRow(res.rows[0]);
+  }
+
+  async clearLocation(
+    idOrToken: string,
+    actor: { id: string; name: string }
+  ): Promise<SanitizedCloudMachine> {
+    const query = `
+      UPDATE cloud_machines
+      SET latitude = NULL,
+          longitude = NULL,
+          location_source = 'NONE',
+          location_note = NULL,
+          location_updated_at = CURRENT_TIMESTAMP,
+          location_updated_by_actor_id = $1,
+          location_updated_by_actor_name = $2,
+          version = version + 1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE integration_machine_id = $3 OR UPPER(public_qr_token) = UPPER($3)
+      RETURNING *;
+    `;
+    const res = await this.pool.query(query, [actor.id, actor.name, idOrToken]);
+    if (res.rows.length === 0) {
+      throw new Error(`MACHINE_NOT_FOUND: الماكينة المطلوبة (${idOrToken}) غير موجودة.`);
+    }
+    return mapMachineRow(res.rows[0]);
   }
 
   async removeMachine(idOrToken: string): Promise<boolean> {
@@ -686,10 +778,289 @@ export class PostgresIdempotencyRepository implements IIdempotencyRepository {
   }
 }
 
+export class PostgresMachineLocationProposalRepository implements IMachineLocationProposalRepository {
+  constructor(private pool: Pool) {}
+
+  async submitProposal(proposal: MachineLocationProposal): Promise<MachineLocationProposal> {
+    const query = `
+      INSERT INTO machine_location_proposals (
+        id, integration_machine_id, public_qr_token, ticket_id,
+        technician_id, technician_name, latitude, longitude,
+        accuracy_meters, captured_at, status, submitted_ip,
+        created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *;
+    `;
+    const res = await this.pool.query(query, [
+      proposal.id,
+      proposal.integrationMachineId,
+      proposal.publicQrToken,
+      proposal.ticketId || null,
+      proposal.technicianId,
+      proposal.technicianName,
+      proposal.latitude,
+      proposal.longitude,
+      proposal.accuracyMeters,
+      proposal.capturedAt,
+      proposal.status || 'PENDING',
+      proposal.submittedIp || null
+    ]);
+    return this.mapRowToProposal(res.rows[0]);
+  }
+
+  async findById(id: string): Promise<MachineLocationProposal | null> {
+    const res = await this.pool.query(
+      'SELECT * FROM machine_location_proposals WHERE id = $1 LIMIT 1;',
+      [id]
+    );
+    if (res.rows.length === 0) return null;
+    return this.mapRowToProposal(res.rows[0]);
+  }
+
+  async findPendingByMachineId(machineId: string): Promise<MachineLocationProposal[]> {
+    const res = await this.pool.query(
+      'SELECT * FROM machine_location_proposals WHERE integration_machine_id = $1 AND status = $2 ORDER BY created_at DESC;',
+      [machineId, 'PENDING']
+    );
+    return res.rows.map(r => this.mapRowToProposal(r));
+  }
+
+  async listPending(limit = 50): Promise<MachineLocationProposal[]> {
+    const res = await this.pool.query(
+      'SELECT * FROM machine_location_proposals WHERE status = $1 ORDER BY created_at DESC LIMIT $2;',
+      ['PENDING', limit]
+    );
+    return res.rows.map(r => this.mapRowToProposal(r));
+  }
+
+  async approveProposal(
+    proposalId: string,
+    approver: { id: string; name: string }
+  ): Promise<{ proposal: MachineLocationProposal; machine: SanitizedCloudMachine }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const propRes = await client.query(
+        'SELECT * FROM machine_location_proposals WHERE id = $1 FOR UPDATE;',
+        [proposalId]
+      );
+      if (propRes.rows.length === 0) {
+        throw new Error(`PROPOSAL_NOT_FOUND: مقترح الموقع رقم ${proposalId} غير موجود.`);
+      }
+      const proposal = this.mapRowToProposal(propRes.rows[0]);
+      if (proposal.status !== 'PENDING') {
+        throw new Error(`PROPOSAL_NOT_PENDING: لا يمكن اعتماد المقترح لأن حالته الحالية هي: ${proposal.status}`);
+      }
+
+      // Update machine coordinates transactionally
+      const machineUpdateRes = await client.query(
+        `UPDATE cloud_machines
+         SET latitude = $1,
+             longitude = $2,
+             location_source = 'TECHNICIAN_PROPOSAL_APPROVED',
+             location_updated_at = CURRENT_TIMESTAMP,
+             location_updated_by_actor_id = $3,
+             location_updated_by_actor_name = $4,
+             version = version + 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE integration_machine_id = $5
+         RETURNING *;`,
+        [proposal.latitude, proposal.longitude, approver.id, approver.name, proposal.integrationMachineId]
+      );
+      if (machineUpdateRes.rows.length === 0) {
+        throw new Error(`MACHINE_NOT_FOUND: الماكينة ${proposal.integrationMachineId} غير موجودة في قاعدة البيانات.`);
+      }
+
+      // Mark proposal APPROVED
+      const updatePropRes = await client.query(
+        `UPDATE machine_location_proposals
+         SET status = 'APPROVED',
+             approved_by_actor_id = $1,
+             approved_by_actor_name = $2,
+             approved_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3
+         RETURNING *;`,
+        [approver.id, approver.name, proposalId]
+      );
+
+      // Mark any other pending proposals for this machine as SUPERSEDED
+      await client.query(
+        `UPDATE machine_location_proposals
+         SET status = 'SUPERSEDED',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE integration_machine_id = $1 AND id != $2 AND status = 'PENDING';`,
+        [proposal.integrationMachineId, proposalId]
+      );
+
+      await client.query('COMMIT');
+
+      const updatedProp = this.mapRowToProposal(updatePropRes.rows[0]);
+      const updatedMachine = mapMachineRow(machineUpdateRes.rows[0]);
+      return { proposal: updatedProp, machine: updatedMachine };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async rejectProposal(
+    proposalId: string,
+    actor: { id: string; name: string },
+    reason?: string
+  ): Promise<MachineLocationProposal> {
+    const res = await this.pool.query(
+      `UPDATE machine_location_proposals
+       SET status = 'REJECTED',
+           rejected_by_actor_id = $1,
+           rejected_by_actor_name = $2,
+           rejected_at = CURRENT_TIMESTAMP,
+           rejection_reason = $3,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND status = 'PENDING'
+       RETURNING *;`,
+      [actor.id, actor.name, reason || 'Rejected by management', proposalId]
+    );
+    if (res.rows.length === 0) {
+      const existing = await this.findById(proposalId);
+      if (!existing) throw new Error(`PROPOSAL_NOT_FOUND: المقترح غير موجود.`);
+      throw new Error(`PROPOSAL_NOT_PENDING: لا يمكن رفض المقترح لأن حالته: ${existing.status}`);
+    }
+    return this.mapRowToProposal(res.rows[0]);
+  }
+
+  async countPending(): Promise<number> {
+    const res = await this.pool.query(
+      "SELECT COUNT(*) as cnt FROM machine_location_proposals WHERE status = 'PENDING';"
+    );
+    return parseInt(res.rows[0].cnt, 10);
+  }
+
+  private mapRowToProposal(r: any): MachineLocationProposal {
+    return {
+      id: r.id,
+      integrationMachineId: r.integration_machine_id,
+      publicQrToken: r.public_qr_token,
+      ticketId: r.ticket_id || null,
+      technicianId: r.technician_id,
+      technicianName: r.technician_name,
+      latitude: parseFloat(r.latitude),
+      longitude: parseFloat(r.longitude),
+      accuracyMeters: parseFloat(r.accuracy_meters),
+      capturedAt: toIsoDate(r.captured_at),
+      status: r.status,
+      submittedIp: r.submitted_ip || null,
+      approvedByActorId: r.approved_by_actor_id || null,
+      approvedByActorName: r.approved_by_actor_name || null,
+      approvedAt: r.approved_at ? toIsoDate(r.approved_at) : null,
+      rejectedByActorId: r.rejected_by_actor_id || null,
+      rejectedByActorName: r.rejected_by_actor_name || null,
+      rejectedAt: r.rejected_at ? toIsoDate(r.rejected_at) : null,
+      rejectionReason: r.rejection_reason || null,
+      createdAt: toIsoDate(r.created_at),
+      updatedAt: toIsoDate(r.updated_at)
+    };
+  }
+}
+
+export class PostgresFieldExceptionApprovalRepository implements IFieldExceptionApprovalRepository {
+  constructor(private pool: Pool) {}
+
+  async createApproval(approval: FieldExceptionApproval): Promise<FieldExceptionApproval> {
+    const query = `
+      INSERT INTO field_exception_approvals (
+        id, ticket_id, integration_machine_id, technician_id,
+        reason, status, approved_by_actor_id, approved_by_actor_name,
+        approved_at, expires_at, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *;
+    `;
+    const res = await this.pool.query(query, [
+      approval.id,
+      approval.ticketId,
+      approval.integrationMachineId,
+      approval.technicianId || null,
+      approval.reason,
+      approval.status || 'APPROVED',
+      approval.approvedByActorId,
+      approval.approvedByActorName,
+      approval.approvedAt || new Date().toISOString(),
+      approval.expiresAt || null
+    ]);
+    return this.mapRow(res.rows[0]);
+  }
+
+  async findById(id: string): Promise<FieldExceptionApproval | null> {
+    const res = await this.pool.query(
+      'SELECT * FROM field_exception_approvals WHERE id = $1 LIMIT 1;',
+      [id]
+    );
+    if (res.rows.length === 0) return null;
+    return this.mapRow(res.rows[0]);
+  }
+
+  async findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null> {
+    const query = `
+      SELECT * FROM field_exception_approvals
+      WHERE ticket_id = $1
+        AND integration_machine_id = $2
+        AND status = 'APPROVED'
+        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `;
+    const res = await this.pool.query(query, [ticketId, machineId]);
+    if (res.rows.length === 0) return null;
+    return this.mapRow(res.rows[0]);
+  }
+
+  async consumeApproval(id: string): Promise<FieldExceptionApproval> {
+    const res = await this.pool.query(
+      `UPDATE field_exception_approvals
+       SET status = 'USED',
+           used_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status = 'APPROVED'
+       RETURNING *;`,
+      [id]
+    );
+    if (res.rows.length === 0) {
+      const existing = await this.findById(id);
+      if (!existing) {
+        throw new Error('EXCEPTION_APPROVAL_NOT_FOUND: تصريح الاستثناء غير موجود.');
+      }
+      throw new Error(`EXCEPTION_APPROVAL_INVALID: لا يمكن استخدام التصريح لأن حالته الحالية: ${existing.status}`);
+    }
+    return this.mapRow(res.rows[0]);
+  }
+
+  private mapRow(r: any): FieldExceptionApproval {
+    return {
+      id: r.id,
+      ticketId: r.ticket_id,
+      integrationMachineId: r.integration_machine_id,
+      technicianId: r.technician_id,
+      reason: r.reason,
+      status: r.status,
+      approvedByActorId: r.approved_by_actor_id,
+      approvedByActorName: r.approved_by_actor_name,
+      approvedAt: toIsoDate(r.approved_at),
+      expiresAt: r.expires_at ? toIsoDate(r.expires_at) : null,
+      usedAt: r.used_at ? toIsoDate(r.used_at) : null,
+      createdAt: toIsoDate(r.created_at),
+      updatedAt: toIsoDate(r.updated_at)
+    };
+  }
+}
+
 export class PostgresCloudRepositoryManager implements ICloudRepositoryManager {
   public providerType: 'POSTGRES' = 'POSTGRES';
   public machines: ICloudMachineRepository;
   public tickets: ICloudTicketRepository;
+  public locationProposals: IMachineLocationProposalRepository;
+  public fieldExceptions: IFieldExceptionApprovalRepository;
   public technicians: ITechnicianRepository;
   public sessions: ISessionRepository;
   public syncEvents: ISyncEventRepository;
@@ -699,6 +1070,8 @@ export class PostgresCloudRepositoryManager implements ICloudRepositoryManager {
   constructor(private pool: Pool) {
     this.machines = new PostgresCloudMachineRepository(pool);
     this.tickets = new PostgresCloudTicketRepository(pool);
+    this.locationProposals = new PostgresMachineLocationProposalRepository(pool);
+    this.fieldExceptions = new PostgresFieldExceptionApprovalRepository(pool);
     this.technicians = new PostgresTechnicianRepository(pool);
     this.sessions = new PostgresSessionRepository(pool);
     this.syncEvents = new PostgresSyncEventRepository(pool);

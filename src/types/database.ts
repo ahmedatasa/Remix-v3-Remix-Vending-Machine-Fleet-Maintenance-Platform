@@ -139,6 +139,14 @@ export interface Building {
   street?: string;
   streetAr?: string;
   floors?: Floor[];
+  latitude?: number | null;
+  longitude?: number | null;
+  locationSource?: LocationSource;
+  locationStatus?: LocationStatus;
+  locationNote?: string;
+  locationUpdatedAt?: string;
+  locationUpdatedByActorId?: string;
+  locationUpdatedByActorName?: string;
   isActive?: boolean;
   isDeleted?: boolean;
   deletedAt?: string;
@@ -215,6 +223,28 @@ export interface ChronicFailureConfig {
   criticalTicketsThreshold: number; // e.g. 2
 }
 
+export type LocationSource =
+  | 'NONE'
+  | 'MANUAL_ENTRY'
+  | 'MAP_PICKER'
+  | 'DEVICE_GPS'
+  | 'TECHNICIAN_PROPOSAL_APPROVED'
+  | 'BUILDING_LOCATION_REFERENCE'
+  | 'IMPORT'
+  | 'API'
+  | 'FUTURE_DEVICE';
+
+export type LocationStatus =
+  | 'LOCATION_NOT_CONFIGURED'
+  | 'GPS_CONFIGURED'
+  | 'GPS_VERIFIED'
+  | 'GPS_FAILED_DISTANCE'
+  | 'GPS_FAILED_ACCURACY'
+  | 'COORDINATES_MISSING'
+  | 'QR_CONFIRMED_GPS_UNAVAILABLE'
+  | 'PENDING_LOCATION_APPROVAL'
+  | 'MANUAL_EXCEPTION_APPROVED';
+
 export interface Machine {
   id: string;
   publicId: string;
@@ -245,6 +275,12 @@ export interface Machine {
   machineLongitude?: number;
   latitude?: number;
   longitude?: number;
+  locationSource?: LocationSource;
+  locationStatus?: LocationStatus;
+  locationNote?: string;
+  locationUpdatedAt?: string;
+  locationUpdatedByActorId?: string;
+  locationUpdatedByActorName?: string;
   qrCodeUrl?: string;
   qrGeneratedAt?: string;
   notes?: string;

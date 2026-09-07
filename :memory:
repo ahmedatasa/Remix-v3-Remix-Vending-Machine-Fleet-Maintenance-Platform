@@ -1,0 +1,1507 @@
+{
+  "cloud_machine_registry": [
+    {
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "machineType": "SNACK_VENDING",
+      "status": "ACTIVE",
+      "buildingPublicName": "كلية الهندسة",
+      "locationPublicName": "الدور الأرضي - المدخل الرئيسي",
+      "latitude": null,
+      "longitude": null,
+      "locationSource": "NONE",
+      "version": 16,
+      "lastSyncedAt": "2026-09-07T17:39:47.568Z",
+      "locationUpdatedAt": "2026-09-07T17:39:47.576Z",
+      "locationUpdatedByActorId": "ADMIN-1",
+      "locationUpdatedByActorName": "مدير الصيانة",
+      "publicDisplayName": "ماكينة كلية الهندسة 01",
+      "active": true,
+      "machineNumber": "ماكينة"
+    }
+  ],
+  "cloud_tickets": [
+    {
+      "id": "cld-tck-1788802787580-dbb8ca50",
+      "cloudReportId": "rpt-1788802787579-0d6d9712",
+      "trackingToken": "TRK-MTRIZSHN-E821E97C",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "category": "COIN_JAM",
+      "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "",
+      "reporterEmail": "",
+      "status": "IN_PROGRESS",
+      "syncStatus": "PENDING",
+      "createdAt": "2026-09-07T17:39:47.579Z",
+      "updatedAt": "2026-09-07T17:39:47.586Z",
+      "checkins": [
+        {
+          "id": "chk-1788802787585-2c8b18",
+          "ticketId": "cld-tck-1788802787580-dbb8ca50",
+          "technicianId": "TECH-101",
+          "technicianName": "فهد المهندس",
+          "timestamp": "2026-09-07T17:39:47.585Z",
+          "latitude": 0,
+          "longitude": 0,
+          "accuracyMeters": -1,
+          "distanceMeters": -1,
+          "verified": true,
+          "status": "MANUAL_EXCEPTION",
+          "fieldExceptionId": "fld-exp-1788802787583-4a04d3",
+          "manualException": {
+            "approvedBy": "مشرف الصيانة الميدانية",
+            "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+            "approverRole": "SUPERVISOR",
+            "timestamp": "2026-09-07T17:39:47.585Z"
+          }
+        }
+      ],
+      "actions": [],
+      "evidence": [],
+      "functionalTests": [],
+      "partRequests": []
+    },
+    {
+      "id": "cld-tck-1788801441123-6a439c13",
+      "cloudReportId": "rpt-1788801441123-1514bf13",
+      "trackingToken": "TRK-MTRI6XK3-ADCDF242",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "category": "COIN_JAM",
+      "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "",
+      "reporterEmail": "",
+      "status": "IN_PROGRESS",
+      "syncStatus": "PENDING",
+      "createdAt": "2026-09-07T17:17:21.123Z",
+      "updatedAt": "2026-09-07T17:17:21.129Z",
+      "checkins": [
+        {
+          "id": "chk-1788801441128-7301a6",
+          "ticketId": "cld-tck-1788801441123-6a439c13",
+          "technicianId": "TECH-101",
+          "technicianName": "فهد المهندس",
+          "timestamp": "2026-09-07T17:17:21.128Z",
+          "latitude": 0,
+          "longitude": 0,
+          "accuracyMeters": -1,
+          "distanceMeters": -1,
+          "verified": true,
+          "status": "MANUAL_EXCEPTION",
+          "fieldExceptionId": "fld-exp-1788801441126-78eacd",
+          "manualException": {
+            "approvedBy": "مشرف الصيانة الميدانية",
+            "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+            "approverRole": "SUPERVISOR",
+            "timestamp": "2026-09-07T17:17:21.128Z"
+          }
+        }
+      ],
+      "actions": [],
+      "evidence": [],
+      "functionalTests": [],
+      "partRequests": []
+    },
+    {
+      "id": "cld-tck-1788801424399-98d3ad37",
+      "cloudReportId": "rpt-1788801424399-2b63833a",
+      "trackingToken": "TRK-MTRI6KNJ-D1208C35",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "category": "COIN_JAM",
+      "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "",
+      "reporterEmail": "",
+      "status": "IN_PROGRESS",
+      "syncStatus": "PENDING",
+      "createdAt": "2026-09-07T17:17:04.399Z",
+      "updatedAt": "2026-09-07T17:17:04.404Z",
+      "checkins": [
+        {
+          "id": "chk-1788801424404-b8fb5e",
+          "ticketId": "cld-tck-1788801424399-98d3ad37",
+          "technicianId": "TECH-101",
+          "technicianName": "فهد المهندس",
+          "timestamp": "2026-09-07T17:17:04.404Z",
+          "latitude": 0,
+          "longitude": 0,
+          "accuracyMeters": -1,
+          "distanceMeters": -1,
+          "verified": true,
+          "status": "MANUAL_EXCEPTION",
+          "fieldExceptionId": "fld-exp-1788801424402-4e3c35",
+          "manualException": {
+            "approvedBy": "مشرف الصيانة الميدانية",
+            "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+            "approverRole": "SUPERVISOR",
+            "timestamp": "2026-09-07T17:17:04.404Z"
+          }
+        }
+      ],
+      "actions": [],
+      "evidence": [],
+      "functionalTests": [],
+      "partRequests": []
+    },
+    {
+      "id": "cld-tck-1788801414972-bca01183",
+      "cloudReportId": "rpt-1788801414972-ff00e83d",
+      "trackingToken": "TRK-MTRI6DDO-43F407A4",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "category": "COIN_JAM",
+      "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "",
+      "reporterEmail": "",
+      "status": "OPEN",
+      "syncStatus": "PENDING",
+      "createdAt": "2026-09-07T17:16:54.972Z",
+      "updatedAt": "2026-09-07T17:16:54.972Z",
+      "checkins": [],
+      "actions": [],
+      "evidence": [],
+      "functionalTests": [],
+      "partRequests": []
+    }
+  ],
+  "technician_accounts": [],
+  "technician_sessions": {},
+  "sync_events": [
+    {
+      "cursor": 1,
+      "eventId": "cld-evt-1788801414966-d3511901",
+      "eventType": "MACHINE_LOCATION_PROPOSED",
+      "createdAt": "2026-09-07T17:16:54.966Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788801414966-2a5b92",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 2,
+      "eventId": "cld-evt-1788801414969-5c1ab26a",
+      "eventType": "MACHINE_LOCATION_APPROVED",
+      "createdAt": "2026-09-07T17:16:54.969Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788801414966-2a5b92",
+        "machineId": "KSU-MCH-001",
+        "approverId": "MGR-001",
+        "approverName": "أحمد المشرف",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "locationSource": "TECHNICIAN_PROPOSAL_APPROVED"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 3,
+      "eventId": "cld-evt-1788801414970-4f1f7e2f",
+      "eventType": "MACHINE_LOCATION_MANUALLY_UPDATED",
+      "createdAt": "2026-09-07T17:16:54.970Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER",
+        "locationNote": "تحديد دقيق عبر الخريطة السحابية",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 4,
+      "eventId": "cld-evt-1788801414971-e73c4f9b",
+      "eventType": "MACHINE_LOCATION_CLEARED",
+      "createdAt": "2026-09-07T17:16:54.971Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 5,
+      "eventId": "cld-evt-1788801414973-9b0e9f33",
+      "eventType": "CUSTOMER_TICKET_CREATED",
+      "createdAt": "2026-09-07T17:16:54.973Z",
+      "entityId": "cld-tck-1788801414972-bca01183",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788801414972-bca01183",
+        "cloudReportId": "rpt-1788801414972-ff00e83d",
+        "trackingToken": "TRK-MTRI6DDO-43F407A4",
+        "integrationMachineId": "KSU-MCH-001",
+        "publicQrToken": "QR-KSU-001",
+        "category": "COIN_JAM",
+        "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+        "reporterName": "طالب جامعي",
+        "reporterPhone": "",
+        "reporterEmail": "",
+        "createdAt": "2026-09-07T17:16:54.972Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 6,
+      "eventId": "cld-evt-1788801424393-45077bc3",
+      "eventType": "MACHINE_LOCATION_PROPOSED",
+      "createdAt": "2026-09-07T17:17:04.393Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788801424392-1b1c94",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 7,
+      "eventId": "cld-evt-1788801424395-042e73a3",
+      "eventType": "MACHINE_LOCATION_APPROVED",
+      "createdAt": "2026-09-07T17:17:04.395Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788801424392-1b1c94",
+        "machineId": "KSU-MCH-001",
+        "approverId": "MGR-001",
+        "approverName": "أحمد المشرف",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "locationSource": "TECHNICIAN_PROPOSAL_APPROVED"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 8,
+      "eventId": "cld-evt-1788801424396-04815612",
+      "eventType": "MACHINE_LOCATION_MANUALLY_UPDATED",
+      "createdAt": "2026-09-07T17:17:04.396Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER",
+        "locationNote": "تحديد دقيق عبر الخريطة السحابية",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 9,
+      "eventId": "cld-evt-1788801424398-456f7501",
+      "eventType": "MACHINE_LOCATION_CLEARED",
+      "createdAt": "2026-09-07T17:17:04.398Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 10,
+      "eventId": "cld-evt-1788801424399-7647d305",
+      "eventType": "CUSTOMER_TICKET_CREATED",
+      "createdAt": "2026-09-07T17:17:04.399Z",
+      "entityId": "cld-tck-1788801424399-98d3ad37",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "cloudReportId": "rpt-1788801424399-2b63833a",
+        "trackingToken": "TRK-MTRI6KNJ-D1208C35",
+        "integrationMachineId": "KSU-MCH-001",
+        "publicQrToken": "QR-KSU-001",
+        "category": "COIN_JAM",
+        "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+        "reporterName": "طالب جامعي",
+        "reporterPhone": "",
+        "reporterEmail": "",
+        "createdAt": "2026-09-07T17:17:04.399Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 11,
+      "eventId": "cld-evt-1788801424402-6e8b4fc1",
+      "eventType": "FIELD_EXCEPTION_APPROVED",
+      "createdAt": "2026-09-07T17:17:04.402Z",
+      "entityId": "cld-tck-1788801424399-98d3ad37",
+      "version": 1,
+      "payload": {
+        "exceptionId": "fld-exp-1788801424402-4e3c35",
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "machineId": "KSU-MCH-001",
+        "approvedBy": "مشرف الصيانة الميدانية",
+        "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+        "expiresAt": "2026-09-07T19:17:04.402Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 12,
+      "eventId": "cld-evt-1788801424404-60d4f7ff",
+      "eventType": "FIELD_EXCEPTION_USED",
+      "createdAt": "2026-09-07T17:17:04.404Z",
+      "entityId": "cld-tck-1788801424399-98d3ad37",
+      "version": 1,
+      "payload": {
+        "exceptionId": "fld-exp-1788801424402-4e3c35",
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 13,
+      "eventId": "cld-evt-1788801424404-b759eb70",
+      "eventType": "TECHNICIAN_CHECKIN",
+      "createdAt": "2026-09-07T17:17:04.404Z",
+      "entityId": "cld-tck-1788801424399-98d3ad37",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "checkin": {
+          "id": "chk-1788801424404-b8fb5e",
+          "ticketId": "cld-tck-1788801424399-98d3ad37",
+          "technicianId": "TECH-101",
+          "technicianName": "فهد المهندس",
+          "timestamp": "2026-09-07T17:17:04.404Z",
+          "latitude": 0,
+          "longitude": 0,
+          "accuracyMeters": -1,
+          "distanceMeters": -1,
+          "verified": true,
+          "status": "MANUAL_EXCEPTION",
+          "fieldExceptionId": "fld-exp-1788801424402-4e3c35",
+          "manualException": {
+            "approvedBy": "مشرف الصيانة الميدانية",
+            "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+            "approverRole": "SUPERVISOR",
+            "timestamp": "2026-09-07T17:17:04.404Z"
+          }
+        },
+        "updatedAt": "2026-09-07T17:17:04.404Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 14,
+      "eventId": "cld-evt-1788801441105-a3eb7bd6",
+      "eventType": "MACHINE_LOCATION_PROPOSED",
+      "createdAt": "2026-09-07T17:17:21.105Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788801441104-847f2f",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 15,
+      "eventId": "cld-evt-1788801441108-ff8149d7",
+      "eventType": "MACHINE_LOCATION_APPROVED",
+      "createdAt": "2026-09-07T17:17:21.108Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788801441104-847f2f",
+        "machineId": "KSU-MCH-001",
+        "approverId": "MGR-001",
+        "approverName": "أحمد المشرف",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "locationSource": "TECHNICIAN_PROPOSAL_APPROVED"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 16,
+      "eventId": "cld-evt-1788801441120-d301d24b",
+      "eventType": "MACHINE_LOCATION_MANUALLY_UPDATED",
+      "createdAt": "2026-09-07T17:17:21.120Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER",
+        "locationNote": "تحديد دقيق عبر الخريطة السحابية",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 17,
+      "eventId": "cld-evt-1788801441121-9d4f8422",
+      "eventType": "MACHINE_LOCATION_CLEARED",
+      "createdAt": "2026-09-07T17:17:21.121Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 18,
+      "eventId": "cld-evt-1788801441124-581fb5d0",
+      "eventType": "CUSTOMER_TICKET_CREATED",
+      "createdAt": "2026-09-07T17:17:21.124Z",
+      "entityId": "cld-tck-1788801441123-6a439c13",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "cloudReportId": "rpt-1788801441123-1514bf13",
+        "trackingToken": "TRK-MTRI6XK3-ADCDF242",
+        "integrationMachineId": "KSU-MCH-001",
+        "publicQrToken": "QR-KSU-001",
+        "category": "COIN_JAM",
+        "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+        "reporterName": "طالب جامعي",
+        "reporterPhone": "",
+        "reporterEmail": "",
+        "createdAt": "2026-09-07T17:17:21.123Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 19,
+      "eventId": "cld-evt-1788801441126-2ee676e7",
+      "eventType": "FIELD_EXCEPTION_APPROVED",
+      "createdAt": "2026-09-07T17:17:21.126Z",
+      "entityId": "cld-tck-1788801441123-6a439c13",
+      "version": 1,
+      "payload": {
+        "exceptionId": "fld-exp-1788801441126-78eacd",
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "machineId": "KSU-MCH-001",
+        "approvedBy": "مشرف الصيانة الميدانية",
+        "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+        "expiresAt": "2026-09-07T19:17:21.126Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 20,
+      "eventId": "cld-evt-1788801441128-b4b09f6a",
+      "eventType": "FIELD_EXCEPTION_USED",
+      "createdAt": "2026-09-07T17:17:21.128Z",
+      "entityId": "cld-tck-1788801441123-6a439c13",
+      "version": 1,
+      "payload": {
+        "exceptionId": "fld-exp-1788801441126-78eacd",
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 21,
+      "eventId": "cld-evt-1788801441130-b818c6b2",
+      "eventType": "TECHNICIAN_CHECKIN",
+      "createdAt": "2026-09-07T17:17:21.130Z",
+      "entityId": "cld-tck-1788801441123-6a439c13",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "checkin": {
+          "id": "chk-1788801441128-7301a6",
+          "ticketId": "cld-tck-1788801441123-6a439c13",
+          "technicianId": "TECH-101",
+          "technicianName": "فهد المهندس",
+          "timestamp": "2026-09-07T17:17:21.128Z",
+          "latitude": 0,
+          "longitude": 0,
+          "accuracyMeters": -1,
+          "distanceMeters": -1,
+          "verified": true,
+          "status": "MANUAL_EXCEPTION",
+          "fieldExceptionId": "fld-exp-1788801441126-78eacd",
+          "manualException": {
+            "approvedBy": "مشرف الصيانة الميدانية",
+            "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+            "approverRole": "SUPERVISOR",
+            "timestamp": "2026-09-07T17:17:21.128Z"
+          }
+        },
+        "updatedAt": "2026-09-07T17:17:21.128Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 22,
+      "eventId": "cld-evt-1788802787570-f4fd89bc",
+      "eventType": "MACHINE_LOCATION_PROPOSED",
+      "createdAt": "2026-09-07T17:39:47.570Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788802787570-9872d7",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 23,
+      "eventId": "cld-evt-1788802787574-f42110c9",
+      "eventType": "MACHINE_LOCATION_APPROVED",
+      "createdAt": "2026-09-07T17:39:47.574Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "proposalId": "prop-1788802787570-9872d7",
+        "machineId": "KSU-MCH-001",
+        "approverId": "MGR-001",
+        "approverName": "أحمد المشرف",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "locationSource": "TECHNICIAN_PROPOSAL_APPROVED"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 24,
+      "eventId": "cld-evt-1788802787575-a9b6d934",
+      "eventType": "MACHINE_LOCATION_MANUALLY_UPDATED",
+      "createdAt": "2026-09-07T17:39:47.575Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER",
+        "locationNote": "تحديد دقيق عبر الخريطة السحابية",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 25,
+      "eventId": "cld-evt-1788802787578-6b3fde42",
+      "eventType": "MACHINE_LOCATION_CLEARED",
+      "createdAt": "2026-09-07T17:39:47.578Z",
+      "entityId": "KSU-MCH-001",
+      "version": 1,
+      "payload": {
+        "machineId": "KSU-MCH-001",
+        "actorId": "ADMIN-1",
+        "actorName": "مدير الصيانة"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 26,
+      "eventId": "cld-evt-1788802787580-ffb7c133",
+      "eventType": "CUSTOMER_TICKET_CREATED",
+      "createdAt": "2026-09-07T17:39:47.580Z",
+      "entityId": "cld-tck-1788802787580-dbb8ca50",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "cloudReportId": "rpt-1788802787579-0d6d9712",
+        "trackingToken": "TRK-MTRIZSHN-E821E97C",
+        "integrationMachineId": "KSU-MCH-001",
+        "publicQrToken": "QR-KSU-001",
+        "category": "COIN_JAM",
+        "description": "الماكينة عالقة بالعملات المعدنية بالدور السفلي",
+        "reporterName": "طالب جامعي",
+        "reporterPhone": "",
+        "reporterEmail": "",
+        "createdAt": "2026-09-07T17:39:47.579Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 27,
+      "eventId": "cld-evt-1788802787583-d18740ac",
+      "eventType": "FIELD_EXCEPTION_APPROVED",
+      "createdAt": "2026-09-07T17:39:47.583Z",
+      "entityId": "cld-tck-1788802787580-dbb8ca50",
+      "version": 1,
+      "payload": {
+        "exceptionId": "fld-exp-1788802787583-4a04d3",
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "machineId": "KSU-MCH-001",
+        "approvedBy": "مشرف الصيانة الميدانية",
+        "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+        "expiresAt": "2026-09-07T19:39:47.583Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 28,
+      "eventId": "cld-evt-1788802787585-a8cf5091",
+      "eventType": "FIELD_EXCEPTION_USED",
+      "createdAt": "2026-09-07T17:39:47.585Z",
+      "entityId": "cld-tck-1788802787580-dbb8ca50",
+      "version": 1,
+      "payload": {
+        "exceptionId": "fld-exp-1788802787583-4a04d3",
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "machineId": "KSU-MCH-001",
+        "technicianId": "TECH-101",
+        "technicianName": "فهد المهندس"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    },
+    {
+      "cursor": 29,
+      "eventId": "cld-evt-1788802787586-8cc44733",
+      "eventType": "TECHNICIAN_CHECKIN",
+      "createdAt": "2026-09-07T17:39:47.586Z",
+      "entityId": "cld-tck-1788802787580-dbb8ca50",
+      "version": 1,
+      "payload": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "checkin": {
+          "id": "chk-1788802787585-2c8b18",
+          "ticketId": "cld-tck-1788802787580-dbb8ca50",
+          "technicianId": "TECH-101",
+          "technicianName": "فهد المهندس",
+          "timestamp": "2026-09-07T17:39:47.585Z",
+          "latitude": 0,
+          "longitude": 0,
+          "accuracyMeters": -1,
+          "distanceMeters": -1,
+          "verified": true,
+          "status": "MANUAL_EXCEPTION",
+          "fieldExceptionId": "fld-exp-1788802787583-4a04d3",
+          "manualException": {
+            "approvedBy": "مشرف الصيانة الميدانية",
+            "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+            "approverRole": "SUPERVISOR",
+            "timestamp": "2026-09-07T17:39:47.585Z"
+          }
+        },
+        "updatedAt": "2026-09-07T17:39:47.585Z"
+      },
+      "status": "PENDING",
+      "acknowledgedAt": null
+    }
+  ],
+  "lastCursor": 29,
+  "idempotency_keys": {
+    "rpt-1788801414972-ff00e83d": {
+      "createdAt": "2026-09-07T17:16:54.972Z",
+      "response": {
+        "ticketId": "cld-tck-1788801414972-bca01183",
+        "trackingToken": "TRK-MTRI6DDO-43F407A4"
+      }
+    },
+    "rpt-1788801424399-2b63833a": {
+      "createdAt": "2026-09-07T17:17:04.399Z",
+      "response": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "trackingToken": "TRK-MTRI6KNJ-D1208C35"
+      }
+    },
+    "rpt-1788801441123-1514bf13": {
+      "createdAt": "2026-09-07T17:17:21.124Z",
+      "response": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "trackingToken": "TRK-MTRI6XK3-ADCDF242"
+      }
+    },
+    "rpt-1788802787579-0d6d9712": {
+      "createdAt": "2026-09-07T17:39:47.580Z",
+      "response": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "trackingToken": "TRK-MTRIZSHN-E821E97C"
+      }
+    }
+  },
+  "audit_events": [
+    {
+      "id": "cld-adt-1788802787587-847318",
+      "timestamp": "2026-09-07T17:39:47.587Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": -1,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "GPS_UNAVAILABLE: لم يتم استلام إحداثيات موقع دقيقة من جهاز الفني."
+        },
+        "coordinates": null
+      }
+    },
+    {
+      "id": "cld-adt-1788802787587-b841c9",
+      "timestamp": "2026-09-07T17:39:47.587Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_SUCCESS",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "status": "MANUAL_EXCEPTION",
+        "distanceMeters": -1
+      }
+    },
+    {
+      "id": "cld-adt-1788802787584-6c9aff",
+      "timestamp": "2026-09-07T17:39:47.584Z",
+      "actorType": "SYSTEM",
+      "actorId": "SUP-99",
+      "actorName": "مشرف الصيانة الميدانية",
+      "action": "CREATE_FIELD_EXCEPTION",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "exceptionId": "fld-exp-1788802787583-4a04d3",
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "machineId": "KSU-MCH-001",
+        "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS"
+      }
+    },
+    {
+      "id": "cld-adt-1788802787582-4c31b2",
+      "timestamp": "2026-09-07T17:39:47.582Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": 10,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "لم يتم ضبط الإحداثيات الجغرافية لهذه الماكينة في سجل الأسطول بعد. يلزم تسجيل استثناء معتمد لإتمام التحقق."
+        },
+        "coordinates": {
+          "latitude": 24.72,
+          "longitude": 46.68,
+          "accuracyMeters": 10
+        }
+      }
+    },
+    {
+      "id": "cld-adt-1788802787581-5907dd",
+      "timestamp": "2026-09-07T17:39:47.581Z",
+      "actorType": "CUSTOMER",
+      "actorId": "TRK-MTRIZSHN-E821E97C",
+      "actorName": "طالب جامعي",
+      "action": "CUSTOMER_TICKET_CREATED",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788802787580-dbb8ca50",
+        "machineId": "KSU-MCH-001",
+        "category": "COIN_JAM"
+      }
+    },
+    {
+      "id": "cld-adt-1788802787579-9ad291",
+      "timestamp": "2026-09-07T17:39:47.579Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "CLEAR_MACHINE_LOCATION",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001"
+      }
+    },
+    {
+      "id": "cld-adt-1788802787576-b1aba5",
+      "timestamp": "2026-09-07T17:39:47.576Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "UPDATE_MACHINE_LOCATION_MANUALLY",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER"
+      }
+    },
+    {
+      "id": "cld-adt-1788802787574-e11b32",
+      "timestamp": "2026-09-07T17:39:47.574Z",
+      "actorType": "SYSTEM",
+      "actorId": "MGR-001",
+      "actorName": "أحمد المشرف",
+      "action": "APPROVE_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788802787570-9872d7",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676
+      },
+      "ip": "10.0.0.1"
+    },
+    {
+      "id": "cld-adt-1788802787571-42531e",
+      "timestamp": "2026-09-07T17:39:47.571Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "SUBMIT_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788802787570-9872d7",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "ip": "192.168.1.50"
+    },
+    {
+      "id": "cld-adt-1788801441131-4c9048",
+      "timestamp": "2026-09-07T17:17:21.131Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": -1,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "GPS_UNAVAILABLE: لم يتم استلام إحداثيات موقع دقيقة من جهاز الفني."
+        },
+        "coordinates": null
+      }
+    },
+    {
+      "id": "cld-adt-1788801441130-b8b0ca",
+      "timestamp": "2026-09-07T17:17:21.130Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_SUCCESS",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "status": "MANUAL_EXCEPTION",
+        "distanceMeters": -1
+      }
+    },
+    {
+      "id": "cld-adt-1788801441127-d778ee",
+      "timestamp": "2026-09-07T17:17:21.127Z",
+      "actorType": "SYSTEM",
+      "actorId": "SUP-99",
+      "actorName": "مشرف الصيانة الميدانية",
+      "action": "CREATE_FIELD_EXCEPTION",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "exceptionId": "fld-exp-1788801441126-78eacd",
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "machineId": "KSU-MCH-001",
+        "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS"
+      }
+    },
+    {
+      "id": "cld-adt-1788801441125-549853",
+      "timestamp": "2026-09-07T17:17:21.125Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": 10,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "لم يتم ضبط الإحداثيات الجغرافية لهذه الماكينة في سجل الأسطول بعد. يلزم تسجيل استثناء معتمد لإتمام التحقق."
+        },
+        "coordinates": {
+          "latitude": 24.72,
+          "longitude": 46.68,
+          "accuracyMeters": 10
+        }
+      }
+    },
+    {
+      "id": "cld-adt-1788801441124-06188b",
+      "timestamp": "2026-09-07T17:17:21.124Z",
+      "actorType": "CUSTOMER",
+      "actorId": "TRK-MTRI6XK3-ADCDF242",
+      "actorName": "طالب جامعي",
+      "action": "CUSTOMER_TICKET_CREATED",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788801441123-6a439c13",
+        "machineId": "KSU-MCH-001",
+        "category": "COIN_JAM"
+      }
+    },
+    {
+      "id": "cld-adt-1788801441122-b247ae",
+      "timestamp": "2026-09-07T17:17:21.122Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "CLEAR_MACHINE_LOCATION",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001"
+      }
+    },
+    {
+      "id": "cld-adt-1788801441120-064320",
+      "timestamp": "2026-09-07T17:17:21.120Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "UPDATE_MACHINE_LOCATION_MANUALLY",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER"
+      }
+    },
+    {
+      "id": "cld-adt-1788801441109-04d33e",
+      "timestamp": "2026-09-07T17:17:21.109Z",
+      "actorType": "SYSTEM",
+      "actorId": "MGR-001",
+      "actorName": "أحمد المشرف",
+      "action": "APPROVE_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788801441104-847f2f",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676
+      },
+      "ip": "10.0.0.1"
+    },
+    {
+      "id": "cld-adt-1788801441105-b6e42c",
+      "timestamp": "2026-09-07T17:17:21.105Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "SUBMIT_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788801441104-847f2f",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "ip": "192.168.1.50"
+    },
+    {
+      "id": "cld-adt-1788801424405-cbeb2c",
+      "timestamp": "2026-09-07T17:17:04.405Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": -1,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "GPS_UNAVAILABLE: لم يتم استلام إحداثيات موقع دقيقة من جهاز الفني."
+        },
+        "coordinates": null
+      }
+    },
+    {
+      "id": "cld-adt-1788801424405-ac75ab",
+      "timestamp": "2026-09-07T17:17:04.405Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_SUCCESS",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "status": "MANUAL_EXCEPTION",
+        "distanceMeters": -1
+      }
+    },
+    {
+      "id": "cld-adt-1788801424403-9a8d0c",
+      "timestamp": "2026-09-07T17:17:04.403Z",
+      "actorType": "SYSTEM",
+      "actorId": "SUP-99",
+      "actorName": "مشرف الصيانة الميدانية",
+      "action": "CREATE_FIELD_EXCEPTION",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "exceptionId": "fld-exp-1788801424402-4e3c35",
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "machineId": "KSU-MCH-001",
+        "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS"
+      }
+    },
+    {
+      "id": "cld-adt-1788801424401-5cc45f",
+      "timestamp": "2026-09-07T17:17:04.401Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": 10,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "لم يتم ضبط الإحداثيات الجغرافية لهذه الماكينة في سجل الأسطول بعد. يلزم تسجيل استثناء معتمد لإتمام التحقق."
+        },
+        "coordinates": {
+          "latitude": 24.72,
+          "longitude": 46.68,
+          "accuracyMeters": 10
+        }
+      }
+    },
+    {
+      "id": "cld-adt-1788801424400-910a09",
+      "timestamp": "2026-09-07T17:17:04.400Z",
+      "actorType": "CUSTOMER",
+      "actorId": "TRK-MTRI6KNJ-D1208C35",
+      "actorName": "طالب جامعي",
+      "action": "CUSTOMER_TICKET_CREATED",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788801424399-98d3ad37",
+        "machineId": "KSU-MCH-001",
+        "category": "COIN_JAM"
+      }
+    },
+    {
+      "id": "cld-adt-1788801424398-d8b58e",
+      "timestamp": "2026-09-07T17:17:04.398Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "CLEAR_MACHINE_LOCATION",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001"
+      }
+    },
+    {
+      "id": "cld-adt-1788801424397-03030c",
+      "timestamp": "2026-09-07T17:17:04.397Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "UPDATE_MACHINE_LOCATION_MANUALLY",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER"
+      }
+    },
+    {
+      "id": "cld-adt-1788801424395-4d22e2",
+      "timestamp": "2026-09-07T17:17:04.396Z",
+      "actorType": "SYSTEM",
+      "actorId": "MGR-001",
+      "actorName": "أحمد المشرف",
+      "action": "APPROVE_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788801424392-1b1c94",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676
+      },
+      "ip": "10.0.0.1"
+    },
+    {
+      "id": "cld-adt-1788801424393-326972",
+      "timestamp": "2026-09-07T17:17:04.393Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "SUBMIT_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788801424392-1b1c94",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "ip": "192.168.1.50"
+    },
+    {
+      "id": "cld-adt-1788801414974-c01693",
+      "timestamp": "2026-09-07T17:16:54.974Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "TECHNICIAN_CHECKIN_FAILED",
+      "entity": "TICKET",
+      "result": "FAILURE",
+      "details": {
+        "ticketId": "cld-tck-1788801414972-bca01183",
+        "validation": {
+          "verified": false,
+          "status": "COORDINATES_MISSING",
+          "distanceMeters": -1,
+          "accuracyMeters": 10,
+          "allowedRadiusMeters": 100,
+          "maxAccuracyMeters": 100,
+          "message": "لم يتم ضبط الإحداثيات الجغرافية لهذه الماكينة في سجل الأسطول بعد. يلزم تسجيل استثناء معتمد لإتمام التحقق."
+        },
+        "coordinates": {
+          "latitude": 24.72,
+          "longitude": 46.68,
+          "accuracyMeters": 10
+        }
+      }
+    },
+    {
+      "id": "cld-adt-1788801414973-c29a65",
+      "timestamp": "2026-09-07T17:16:54.973Z",
+      "actorType": "CUSTOMER",
+      "actorId": "TRK-MTRI6DDO-43F407A4",
+      "actorName": "طالب جامعي",
+      "action": "CUSTOMER_TICKET_CREATED",
+      "entity": "TICKET",
+      "result": "SUCCESS",
+      "details": {
+        "ticketId": "cld-tck-1788801414972-bca01183",
+        "machineId": "KSU-MCH-001",
+        "category": "COIN_JAM"
+      }
+    },
+    {
+      "id": "cld-adt-1788801414971-1d72aa",
+      "timestamp": "2026-09-07T17:16:54.971Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "CLEAR_MACHINE_LOCATION",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001"
+      }
+    },
+    {
+      "id": "cld-adt-1788801414970-d86a25",
+      "timestamp": "2026-09-07T17:16:54.971Z",
+      "actorType": "SYSTEM",
+      "actorId": "ADMIN-1",
+      "actorName": "مدير الصيانة",
+      "action": "UPDATE_MACHINE_LOCATION_MANUALLY",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.72,
+        "longitude": 46.68,
+        "locationSource": "MAP_PICKER"
+      }
+    },
+    {
+      "id": "cld-adt-1788801414969-44a82f",
+      "timestamp": "2026-09-07T17:16:54.969Z",
+      "actorType": "SYSTEM",
+      "actorId": "MGR-001",
+      "actorName": "أحمد المشرف",
+      "action": "APPROVE_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788801414966-2a5b92",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676
+      },
+      "ip": "10.0.0.1"
+    },
+    {
+      "id": "cld-adt-1788801414967-e44fae",
+      "timestamp": "2026-09-07T17:16:54.967Z",
+      "actorType": "TECHNICIAN",
+      "actorId": "TECH-101",
+      "actorName": "فهد المهندس",
+      "action": "SUBMIT_LOCATION_PROPOSAL",
+      "entity": "MACHINE",
+      "result": "SUCCESS",
+      "details": {
+        "proposalId": "prop-1788801414966-2a5b92",
+        "machineId": "KSU-MCH-001",
+        "latitude": 24.715,
+        "longitude": 46.676,
+        "accuracyMeters": 12
+      },
+      "ip": "192.168.1.50"
+    }
+  ],
+  "machine_location_proposals": [
+    {
+      "id": "prop-1788802787570-9872d7",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "ticketId": "TCK-999",
+      "technicianId": "TECH-101",
+      "technicianName": "فهد المهندس",
+      "latitude": 24.715,
+      "longitude": 46.676,
+      "accuracyMeters": 12,
+      "capturedAt": "2026-09-07T17:39:47.570Z",
+      "status": "APPROVED",
+      "submittedIp": "192.168.1.50",
+      "createdAt": "2026-09-07T17:39:47.570Z",
+      "updatedAt": "2026-09-07T17:39:47.573Z",
+      "approvedByActorId": "MGR-001",
+      "approvedByActorName": "أحمد المشرف",
+      "approvedAt": "2026-09-07T17:39:47.573Z"
+    },
+    {
+      "id": "prop-1788801441104-847f2f",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "ticketId": "TCK-999",
+      "technicianId": "TECH-101",
+      "technicianName": "فهد المهندس",
+      "latitude": 24.715,
+      "longitude": 46.676,
+      "accuracyMeters": 12,
+      "capturedAt": "2026-09-07T17:17:21.104Z",
+      "status": "APPROVED",
+      "submittedIp": "192.168.1.50",
+      "createdAt": "2026-09-07T17:17:21.104Z",
+      "updatedAt": "2026-09-07T17:17:21.108Z",
+      "approvedByActorId": "MGR-001",
+      "approvedByActorName": "أحمد المشرف",
+      "approvedAt": "2026-09-07T17:17:21.108Z"
+    },
+    {
+      "id": "prop-1788801424392-1b1c94",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "ticketId": "TCK-999",
+      "technicianId": "TECH-101",
+      "technicianName": "فهد المهندس",
+      "latitude": 24.715,
+      "longitude": 46.676,
+      "accuracyMeters": 12,
+      "capturedAt": "2026-09-07T17:17:04.392Z",
+      "status": "APPROVED",
+      "submittedIp": "192.168.1.50",
+      "createdAt": "2026-09-07T17:17:04.392Z",
+      "updatedAt": "2026-09-07T17:17:04.395Z",
+      "approvedByActorId": "MGR-001",
+      "approvedByActorName": "أحمد المشرف",
+      "approvedAt": "2026-09-07T17:17:04.395Z"
+    },
+    {
+      "id": "prop-1788801414966-2a5b92",
+      "integrationMachineId": "KSU-MCH-001",
+      "publicQrToken": "QR-KSU-001",
+      "ticketId": "TCK-999",
+      "technicianId": "TECH-101",
+      "technicianName": "فهد المهندس",
+      "latitude": 24.715,
+      "longitude": 46.676,
+      "accuracyMeters": 12,
+      "capturedAt": "2026-09-07T17:16:54.966Z",
+      "status": "APPROVED",
+      "submittedIp": "192.168.1.50",
+      "createdAt": "2026-09-07T17:16:54.966Z",
+      "updatedAt": "2026-09-07T17:16:54.969Z",
+      "approvedByActorId": "MGR-001",
+      "approvedByActorName": "أحمد المشرف",
+      "approvedAt": "2026-09-07T17:16:54.969Z"
+    }
+  ],
+  "field_exception_approvals": [
+    {
+      "id": "fld-exp-1788802787583-4a04d3",
+      "ticketId": "cld-tck-1788802787580-dbb8ca50",
+      "integrationMachineId": "KSU-MCH-001",
+      "technicianId": "TECH-101",
+      "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+      "status": "USED",
+      "approvedByActorId": "SUP-99",
+      "approvedByActorName": "مشرف الصيانة الميدانية",
+      "approvedAt": "2026-09-07T17:39:47.583Z",
+      "expiresAt": "2026-09-07T19:39:47.583Z",
+      "createdAt": "2026-09-07T17:39:47.583Z",
+      "updatedAt": "2026-09-07T17:39:47.584Z",
+      "usedAt": "2026-09-07T17:39:47.584Z"
+    },
+    {
+      "id": "fld-exp-1788801441126-78eacd",
+      "ticketId": "cld-tck-1788801441123-6a439c13",
+      "integrationMachineId": "KSU-MCH-001",
+      "technicianId": "TECH-101",
+      "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+      "status": "USED",
+      "approvedByActorId": "SUP-99",
+      "approvedByActorName": "مشرف الصيانة الميدانية",
+      "approvedAt": "2026-09-07T17:17:21.126Z",
+      "expiresAt": "2026-09-07T19:17:21.126Z",
+      "createdAt": "2026-09-07T17:17:21.126Z",
+      "updatedAt": "2026-09-07T17:17:21.128Z",
+      "usedAt": "2026-09-07T17:17:21.128Z"
+    },
+    {
+      "id": "fld-exp-1788801424402-4e3c35",
+      "ticketId": "cld-tck-1788801424399-98d3ad37",
+      "integrationMachineId": "KSU-MCH-001",
+      "technicianId": "TECH-101",
+      "reason": "الماكينة في القبو السفلي المعزول ومعدومة التغطية اللاسلكية والـ GPS",
+      "status": "USED",
+      "approvedByActorId": "SUP-99",
+      "approvedByActorName": "مشرف الصيانة الميدانية",
+      "approvedAt": "2026-09-07T17:17:04.402Z",
+      "expiresAt": "2026-09-07T19:17:04.402Z",
+      "createdAt": "2026-09-07T17:17:04.402Z",
+      "updatedAt": "2026-09-07T17:17:04.403Z",
+      "usedAt": "2026-09-07T17:17:04.403Z"
+    }
+  ]
+}

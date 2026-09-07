@@ -10,7 +10,10 @@ import type {
   CloudTechnicianSession,
   CloudSyncEvent,
   CloudSyncEventType,
-  CloudAuditEvent
+  CloudAuditEvent,
+  MachineLocationProposal,
+  FieldExceptionApproval,
+  LocationSource
 } from '../db/cloudDb';
 
 export interface ICloudMachineRepository {
@@ -18,6 +21,21 @@ export interface ICloudMachineRepository {
   findByIntegrationId(id: string): Promise<SanitizedCloudMachine | null>;
   bootstrapRegistry(machines: SanitizedCloudMachine[]): Promise<{ updated: number; total: number }>;
   upsertMachine(machine: SanitizedCloudMachine): Promise<void>;
+  updateLocation(
+    idOrToken: string,
+    params: {
+      latitude: number | null;
+      longitude: number | null;
+      locationSource: LocationSource;
+      locationNote?: string;
+      actorId: string;
+      actorName: string;
+    }
+  ): Promise<SanitizedCloudMachine>;
+  clearLocation(
+    idOrToken: string,
+    actor: { id: string; name: string }
+  ): Promise<SanitizedCloudMachine>;
   removeMachine(idOrToken: string): Promise<boolean>;
   count(): Promise<number>;
 }
@@ -34,6 +52,30 @@ export interface ICloudTicketRepository {
   addPartRequest(request: CloudPartRequestRecord): Promise<void>;
   updateTicketStatus(ticketId: string, status: CloudTicket['status'], resolutionSummary?: string): Promise<void>;
   count(): Promise<number>;
+}
+
+export interface IMachineLocationProposalRepository {
+  submitProposal(proposal: MachineLocationProposal): Promise<MachineLocationProposal>;
+  findById(id: string): Promise<MachineLocationProposal | null>;
+  findPendingByMachineId(machineId: string): Promise<MachineLocationProposal[]>;
+  listPending(limit?: number): Promise<MachineLocationProposal[]>;
+  approveProposal(
+    proposalId: string,
+    approver: { id: string; name: string }
+  ): Promise<{ proposal: MachineLocationProposal; machine: SanitizedCloudMachine }>;
+  rejectProposal(
+    proposalId: string,
+    actor: { id: string; name: string },
+    reason?: string
+  ): Promise<MachineLocationProposal>;
+  countPending(): Promise<number>;
+}
+
+export interface IFieldExceptionApprovalRepository {
+  createApproval(approval: FieldExceptionApproval): Promise<FieldExceptionApproval>;
+  findById(id: string): Promise<FieldExceptionApproval | null>;
+  findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null>;
+  consumeApproval(id: string): Promise<FieldExceptionApproval>;
 }
 
 export interface ITechnicianRepository {
@@ -81,6 +123,8 @@ export interface ICloudRepositoryManager {
   providerType: 'POSTGRES' | 'JSON_DEV';
   machines: ICloudMachineRepository;
   tickets: ICloudTicketRepository;
+  locationProposals: IMachineLocationProposalRepository;
+  fieldExceptions: IFieldExceptionApprovalRepository;
   technicians: ITechnicianRepository;
   sessions: ISessionRepository;
   syncEvents: ISyncEventRepository;

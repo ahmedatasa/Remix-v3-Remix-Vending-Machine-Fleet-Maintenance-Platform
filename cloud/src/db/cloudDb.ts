@@ -3,6 +3,27 @@ import path from 'path';
 import crypto from 'crypto';
 import { cloudConfig } from '../config/cloudConfig';
 
+export type LocationSource =
+  | 'NONE'
+  | 'MANUAL_ENTRY'
+  | 'MAP_PICKER'
+  | 'DEVICE_GPS'
+  | 'TECHNICIAN_PROPOSAL_APPROVED'
+  | 'IMPORT'
+  | 'API'
+  | 'FUTURE_DEVICE';
+
+export type LocationStatus =
+  | 'LOCATION_NOT_CONFIGURED'
+  | 'GPS_CONFIGURED'
+  | 'GPS_VERIFIED'
+  | 'GPS_FAILED_DISTANCE'
+  | 'GPS_FAILED_ACCURACY'
+  | 'COORDINATES_MISSING'
+  | 'QR_CONFIRMED_GPS_UNAVAILABLE'
+  | 'PENDING_LOCATION_APPROVAL'
+  | 'MANUAL_EXCEPTION_APPROVED';
+
 export interface SanitizedCloudMachine {
   integrationMachineId: string;
   publicQrToken: string;
@@ -14,9 +35,54 @@ export interface SanitizedCloudMachine {
   locationPublicName: string;
   latitude: number | null;
   longitude: number | null;
+  locationSource?: LocationSource;
+  locationNote?: string;
+  locationUpdatedAt?: string;
+  locationUpdatedByActorId?: string;
+  locationUpdatedByActorName?: string;
   active: boolean;
   lastSyncedAt: string;
   version: number;
+}
+
+export interface MachineLocationProposal {
+  id: string;
+  integrationMachineId: string;
+  publicQrToken: string;
+  ticketId?: string | null;
+  technicianId: string;
+  technicianName: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  capturedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUPERSEDED';
+  submittedIp?: string | null;
+  approvedByActorId?: string | null;
+  approvedByActorName?: string | null;
+  approvedAt?: string | null;
+  rejectedByActorId?: string | null;
+  rejectedByActorName?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FieldExceptionApproval {
+  id: string;
+  ticketId: string;
+  integrationMachineId: string;
+  technicianId?: string | null;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'USED' | 'EXPIRED';
+  approvedByActorId: string;
+  approvedByActorName: string;
+  approvedAt: string;
+  expiresAt?: string | null;
+  usedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CloudCheckinRecord {
@@ -30,8 +96,11 @@ export interface CloudCheckinRecord {
   accuracyMeters: number;
   distanceMeters: number;
   verified: boolean;
-  status: 'VERIFIED' | 'FAILED_DISTANCE' | 'FAILED_ACCURACY' | 'MANUAL_EXCEPTION' | 'COORDINATES_MISSING';
+  status: LocationStatus | 'VERIFIED' | 'FAILED_DISTANCE' | 'FAILED_ACCURACY' | 'MANUAL_EXCEPTION' | 'COORDINATES_MISSING';
+  exceptionApprovalId?: string;
+  proposalId?: string;
   manualException?: {
+    approvalId?: string;
     approvedBy: string;
     reason: string;
     approverRole: string;
@@ -138,7 +207,14 @@ export type CloudSyncEventType =
   | 'EVIDENCE_ADDED'
   | 'FUNCTIONAL_TEST_COMPLETED'
   | 'PART_REQUEST_CREATED'
-  | 'TICKET_RESOLVED';
+  | 'TICKET_RESOLVED'
+  | 'MACHINE_LOCATION_PROPOSED'
+  | 'MACHINE_LOCATION_APPROVED'
+  | 'MACHINE_LOCATION_REJECTED'
+  | 'MACHINE_LOCATION_MANUALLY_UPDATED'
+  | 'MACHINE_LOCATION_CLEARED'
+  | 'FIELD_EXCEPTION_APPROVED'
+  | 'FIELD_EXCEPTION_USED';
 
 export interface CloudSyncEvent {
   cursor: number;
@@ -174,6 +250,8 @@ export interface CloudDatabaseData {
   lastCursor: number;
   idempotency_keys: Record<string, { createdAt: string; response: any }>;
   audit_events: CloudAuditEvent[];
+  machine_location_proposals: MachineLocationProposal[];
+  field_exception_approvals: FieldExceptionApproval[];
 }
 
 export class CloudDatabase {
@@ -207,7 +285,9 @@ export class CloudDatabase {
       sync_events: [],
       lastCursor: 0,
       idempotency_keys: {},
-      audit_events: []
+      audit_events: [],
+      machine_location_proposals: [],
+      field_exception_approvals: []
     };
   }
 
@@ -224,7 +304,9 @@ export class CloudDatabase {
           sync_events: Array.isArray(parsed.sync_events) ? parsed.sync_events : [],
           lastCursor: typeof parsed.lastCursor === 'number' ? parsed.lastCursor : (parsed.sync_events?.length || 0),
           idempotency_keys: typeof parsed.idempotency_keys === 'object' && parsed.idempotency_keys ? parsed.idempotency_keys : {},
-          audit_events: Array.isArray(parsed.audit_events) ? parsed.audit_events : []
+          audit_events: Array.isArray(parsed.audit_events) ? parsed.audit_events : [],
+          machine_location_proposals: Array.isArray(parsed.machine_location_proposals) ? parsed.machine_location_proposals : [],
+          field_exception_approvals: Array.isArray(parsed.field_exception_approvals) ? parsed.field_exception_approvals : []
         };
       }
     } catch (err) {

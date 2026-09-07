@@ -33,10 +33,12 @@ import { StatusBadge } from '../common/StatusBadge';
 import { Modal } from '../common/Modal';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { QRCodeDisplay } from '../common/QRCodeDisplay';
+import { MachineGpsFormSection } from '../common/MachineGpsFormSection';
+import { MachineLocationPicker } from '../common/MachineLocationPicker';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
-import { Machine, Ticket, NavigationTab, FaultCategory, TicketPriority, MachinePartHistoryRecord, MachineStatus, DataQualityStatus, Location } from '../../types';
+import { Machine, Ticket, NavigationTab, FaultCategory, TicketPriority, MachinePartHistoryRecord, MachineStatus, DataQualityStatus, Location, LocationSource, Building } from '../../types';
 import { api } from '../../services/api';
 import { buildPublicMachineQrUrl } from '../../utils/qrUrlBuilder';
 
@@ -54,6 +56,7 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [partsHistory, setPartsHistory] = useState<MachinePartHistoryRecord[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -81,7 +84,12 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
   const [editLocationId, setEditLocationId] = useState('');
   const [editInstallationDate, setEditInstallationDate] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editLatitude, setEditLatitude] = useState<number | null>(null);
+  const [editLongitude, setEditLongitude] = useState<number | null>(null);
+  const [editLocationSource, setEditLocationSource] = useState<LocationSource>('NONE');
+  const [editLocationNote, setEditLocationNote] = useState('');
   const [isEditingSubmitting, setIsEditingSubmitting] = useState(false);
+  const [isDetailMapOpen, setIsDetailMapOpen] = useState(false);
 
   // Status Change Modal
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
@@ -111,13 +119,15 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
       }
       setMachine(mch);
 
-      const [allTickets, parts, allLocations] = await Promise.all([
+      const [allTickets, parts, allLocations, allBuildings] = await Promise.all([
         api.getTickets(),
         api.getMachinePartsHistory(machineId),
-        api.getLocations()
+        api.getLocations(),
+        api.getBuildings()
       ]);
 
       setLocations(allLocations || []);
+      setBuildings(allBuildings || []);
       if (allLocations && allLocations.length > 0 && !targetLocationId) {
         setTargetLocationId(allLocations[0].id);
       }
@@ -170,6 +180,10 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
     setEditLocationId(machine.currentLocation?.id || (locations[0]?.id || ''));
     setEditInstallationDate(machine.installationDate || new Date().toISOString().split('T')[0]);
     setEditNotes(machine.notes || '');
+    setEditLatitude(machine.latitude ?? null);
+    setEditLongitude(machine.longitude ?? null);
+    setEditLocationSource(machine.locationSource || (machine.latitude != null ? 'MANUAL_ENTRY' : 'NONE'));
+    setEditLocationNote(machine.locationNote || '');
     setIsEditOpen(true);
   };
 
@@ -189,7 +203,11 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
         healthScore: Number(editHealthScore),
         locationId: editLocationId,
         installationDate: editInstallationDate,
-        notes: editNotes
+        notes: editNotes,
+        latitude: editLatitude,
+        longitude: editLongitude,
+        locationSource: editLocationSource,
+        locationNote: editLocationNote
       });
 
       showToast(t('success'), `Machine ${editMachineNumber} updated successfully!`, 'success');
@@ -520,6 +538,113 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
                 <dd className="text-amber-400">{formatDate(machine.nextMaintenanceDue)}</dd>
               </div>
             </dl>
+          </Card>
+
+          {/* Geographic Location / GPS Information Card */}
+          <Card
+            title="الموقع الجغرافي / Geographic Location"
+            subtitle="إحداثيات نظام تحديد المواقع العالمي ونطاق التغطية"
+          >
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-slate-400">حالة الإحداثيات:</span>
+                {machine.latitude != null && machine.longitude != null ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    ✓ GPS_CONFIGURED
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    ⚠ LOCATION_NOT_CONFIGURED
+                  </span>
+                )}
+              </div>
+
+              {machine.latitude != null && machine.longitude != null ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-slate-950 font-mono text-[11px]">
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">LATITUDE</span>
+                      <span className="text-blue-400 font-bold">{machine.latitude}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">LONGITUDE</span>
+                      <span className="text-blue-400 font-bold">{machine.longitude}</span>
+                    </div>
+                  </div>
+
+                  <dl className="divide-y divide-slate-800/60 text-xs">
+                    <div className="py-2 flex justify-between">
+                      <dt className="text-slate-400">مصدر الإحداثيات</dt>
+                      <dd className="font-mono text-slate-200">{machine.locationSource || 'MANUAL_ENTRY'}</dd>
+                    </div>
+
+                    {machine.locationNote && (
+                      <div className="py-2 flex justify-between">
+                        <dt className="text-slate-400">وصف الموقع الداخلي</dt>
+                        <dd className="text-slate-200 text-right">{machine.locationNote}</dd>
+                      </div>
+                    )}
+
+                    {machine.locationUpdatedAt && (
+                      <div className="py-2 flex justify-between">
+                        <dt className="text-slate-400">تاريخ آخر تحديث</dt>
+                        <dd className="text-slate-300 font-mono text-[11px]">{formatDate(machine.locationUpdatedAt)}</dd>
+                      </div>
+                    )}
+
+                    {machine.locationUpdatedByActorName && (
+                      <div className="py-2 flex justify-between">
+                        <dt className="text-slate-400">القائم بالتحديث</dt>
+                        <dd className="text-slate-200">{machine.locationUpdatedByActorName}</dd>
+                      </div>
+                    )}
+                  </dl>
+
+                  <div className="pt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      icon={MapPin}
+                      onClick={() => setIsDetailMapOpen(true)}
+                    >
+                      🗺 عرض على الخريطة
+                    </Button>
+                    {canEditMachines && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={openEditModal}
+                      >
+                        ✏ تعديل
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3 pt-1">
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    لم يتم تعيين إحداثيات GPS دقيقة لهذه الماكينة حتى الآن. (حفظ الموقع الجغرافي اختياري).
+                  </p>
+                  {canEditMachines && (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      className="w-full"
+                      icon={MapPin}
+                      onClick={openEditModal}
+                    >
+                      📍 تعيين إحداثيات الموقع الآن
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
 
@@ -1076,6 +1201,32 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
             />
           </div>
 
+          {/* Geographic Location / GPS Section */}
+          {(() => {
+            const selectedLoc = locations.find(l => l.id === editLocationId);
+            const bld = buildings.find(b => b.id === selectedLoc?.buildingId || b.id === selectedLoc?.building?.id || b.id === machine?.currentLocation?.buildingId);
+            const bldCoords = (bld?.latitude !== null && bld?.latitude !== undefined && bld?.longitude !== null && bld?.longitude !== undefined)
+              ? { latitude: bld.latitude, longitude: bld.longitude, buildingName: bld.nameAr || bld.name }
+              : null;
+
+            return (
+              <MachineGpsFormSection
+                latitude={editLatitude}
+                longitude={editLongitude}
+                locationSource={editLocationSource}
+                locationNote={editLocationNote}
+                onCoordinatesChange={({ latitude, longitude, source }) => {
+                  setEditLatitude(latitude);
+                  setEditLongitude(longitude);
+                  setEditLocationSource(source);
+                }}
+                onLocationNoteChange={setEditLocationNote}
+                machineTitle={editMachineNumber || machine.machineNumber}
+                buildingReferenceCoords={bldCoords}
+              />
+            );
+          })()}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -1312,6 +1463,29 @@ export const MachineDetailView: React.FC<MachineDetailViewProps> = ({ machineId,
           </div>
         </form>
       </Modal>
+
+      {/* Detail View Location Map Modal */}
+      {machine && machine.latitude != null && machine.longitude != null && (
+        (() => {
+          const mchBld = buildings.find(b => b.id === machine.currentLocation?.buildingId);
+          const bldCoords = (mchBld?.latitude !== null && mchBld?.latitude !== undefined && mchBld?.longitude !== null && mchBld?.longitude !== undefined)
+            ? { latitude: mchBld.latitude, longitude: mchBld.longitude, buildingName: mchBld.nameAr || mchBld.name }
+            : null;
+
+          return (
+            <MachineLocationPicker
+              isOpen={isDetailMapOpen}
+              onClose={() => setIsDetailMapOpen(false)}
+              onConfirm={() => setIsDetailMapOpen(false)}
+              initialLatitude={machine.latitude}
+              initialLongitude={machine.longitude}
+              machineTitle={machine.machineNumber}
+              isReadOnly={true}
+              buildingReferenceCoords={bldCoords}
+            />
+          );
+        })()
+      )}
     </div>
   );
 };

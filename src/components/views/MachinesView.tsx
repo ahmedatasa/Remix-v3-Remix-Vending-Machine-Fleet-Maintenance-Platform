@@ -30,11 +30,13 @@ import { StatusBadge } from '../common/StatusBadge';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { QRCodeDisplay } from '../common/QRCodeDisplay';
+import { MachineGpsFormSection } from '../common/MachineGpsFormSection';
+import { LocationProposalsModal } from '../common/LocationProposalsModal';
 import QRCode from 'qrcode';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useAuth } from '../../context/AuthContext';
-import { Machine, NavigationTab, MachineStatus, DataQualityStatus, Location } from '../../types';
+import { Machine, NavigationTab, MachineStatus, DataQualityStatus, Location, LocationSource, Building } from '../../types';
 import { api } from '../../services/api';
 import { excelService } from '../../services/excelService';
 import { buildPublicMachineQrUrl } from '../../utils/qrUrlBuilder';
@@ -94,6 +96,7 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
 
   const [machines, setMachines] = useState<Machine[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [qualityFilter, setQualityFilter] = useState<string>('ALL');
@@ -131,6 +134,10 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
   const [newType, setNewType] = useState('Combination Snack & Soda');
   const [newLocationId, setNewLocationId] = useState('');
   const [newNotes, setNewNotes] = useState('');
+  const [newLatitude, setNewLatitude] = useState<number | null>(null);
+  const [newLongitude, setNewLongitude] = useState<number | null>(null);
+  const [newLocationSource, setNewLocationSource] = useState<LocationSource>('NONE');
+  const [newLocationNote, setNewLocationNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Edit / Modify Modal State
@@ -145,7 +152,14 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
   const [editLocationId, setEditLocationId] = useState('');
   const [editInstallationDate, setEditInstallationDate] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editLatitude, setEditLatitude] = useState<number | null>(null);
+  const [editLongitude, setEditLongitude] = useState<number | null>(null);
+  const [editLocationSource, setEditLocationSource] = useState<LocationSource>('NONE');
+  const [editLocationNote, setEditLocationNote] = useState('');
   const [isEditingSubmitting, setIsEditingSubmitting] = useState(false);
+
+  // Location Proposals Review Modal
+  const [isProposalsModalOpen, setIsProposalsModalOpen] = useState(false);
 
   // Delete Modal State
   const [deleteTargetMachine, setDeleteTargetMachine] = useState<Machine | null>(null);
@@ -172,12 +186,14 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
   const loadMachines = async () => {
     try {
       setIsLoading(true);
-      const [machinesData, locationsData] = await Promise.all([
+      const [machinesData, locationsData, buildingsData] = await Promise.all([
         api.getMachines(),
-        api.getLocations()
+        api.getLocations(),
+        api.getBuildings()
       ]);
       setMachines(machinesData || []);
       setLocations(locationsData || []);
+      setBuildings(buildingsData || []);
       if (locationsData && locationsData.length > 0) {
         if (!newLocationId) setNewLocationId(locationsData[0].id);
         if (!targetLocationId) setTargetLocationId(locationsData[0].id);
@@ -220,7 +236,11 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
         modelId: newLocationId,
         notes: newNotes,
         status: 'OPERATIONAL',
-        dataQualityStatus: 'VALID'
+        dataQualityStatus: 'VALID',
+        latitude: newLatitude,
+        longitude: newLongitude,
+        locationSource: newLocationSource,
+        locationNote: newLocationNote
       });
 
       showToast(t('success'), `Machine ${created.machineNumber} registered successfully!`, 'success');
@@ -229,6 +249,10 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
       setNewSerialNumber('');
       setNewAllowDuplicateSerial(false);
       setNewNotes('');
+      setNewLatitude(null);
+      setNewLongitude(null);
+      setNewLocationSource('NONE');
+      setNewLocationNote('');
       await loadMachines();
     } catch (err: any) {
       showToast(t('error'), err?.message || 'Failed to register machine', 'error');
@@ -249,6 +273,10 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
     setEditLocationId(machine.currentLocation?.id || locations[0]?.id || '');
     setEditInstallationDate(machine.installationDate || new Date().toISOString().split('T')[0]);
     setEditNotes(machine.notes || '');
+    setEditLatitude(machine.latitude ?? null);
+    setEditLongitude(machine.longitude ?? null);
+    setEditLocationSource(machine.locationSource || (machine.latitude != null ? 'MANUAL_ENTRY' : 'NONE'));
+    setEditLocationNote(machine.locationNote || '');
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -267,7 +295,11 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
         healthScore: Number(editHealthScore),
         locationId: editLocationId,
         installationDate: editInstallationDate,
-        notes: editNotes
+        notes: editNotes,
+        latitude: editLatitude,
+        longitude: editLongitude,
+        locationSource: editLocationSource,
+        locationNote: editLocationNote
       });
 
       showToast(t('success'), `Machine ${editMachineNumber} updated successfully!`, 'success');
@@ -489,6 +521,24 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
       )
     },
     {
+      key: 'gpsStatus',
+      header: 'GPS / الموقع',
+      render: row => {
+        const isConfigured = row.latitude != null && row.longitude != null;
+        return isConfigured ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            ✓ محدد ({row.locationSource === 'DEVICE_GPS' ? 'ميداني' : 'معتمد'})
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/25">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            ⚠ غير محدد
+          </span>
+        );
+      }
+    },
+    {
       key: 'status',
       header: t('status'),
       sortable: true,
@@ -590,6 +640,15 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            icon={MapPin}
+            onClick={() => setIsProposalsModalOpen(true)}
+          >
+            مقترحات المواقع / Location Proposals
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -878,6 +937,32 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
             />
           </div>
 
+          {/* Geographic Location / GPS Section */}
+          {(() => {
+            const selectedLoc = locations.find(l => l.id === newLocationId);
+            const bld = buildings.find(b => b.id === selectedLoc?.buildingId || b.id === selectedLoc?.building?.id);
+            const bldCoords = (bld?.latitude !== null && bld?.latitude !== undefined && bld?.longitude !== null && bld?.longitude !== undefined)
+              ? { latitude: bld.latitude, longitude: bld.longitude, buildingName: bld.nameAr || bld.name }
+              : null;
+
+            return (
+              <MachineGpsFormSection
+                latitude={newLatitude}
+                longitude={newLongitude}
+                locationSource={newLocationSource}
+                locationNote={newLocationNote}
+                onCoordinatesChange={({ latitude, longitude, source }) => {
+                  setNewLatitude(latitude);
+                  setNewLongitude(longitude);
+                  setNewLocationSource(source);
+                }}
+                onLocationNoteChange={setNewLocationNote}
+                machineTitle={newMachineNumber || 'الماكينة الجديدة'}
+                buildingReferenceCoords={bldCoords}
+              />
+            );
+          })()}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -1056,6 +1141,32 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
               className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs text-slate-100 focus:outline-none focus:border-blue-500 resize-none"
             />
           </div>
+
+          {/* Geographic Location / GPS Section */}
+          {(() => {
+            const selectedLoc = locations.find(l => l.id === editLocationId);
+            const bld = buildings.find(b => b.id === selectedLoc?.buildingId || b.id === selectedLoc?.building?.id);
+            const bldCoords = (bld?.latitude !== null && bld?.latitude !== undefined && bld?.longitude !== null && bld?.longitude !== undefined)
+              ? { latitude: bld.latitude, longitude: bld.longitude, buildingName: bld.nameAr || bld.name }
+              : null;
+
+            return (
+              <MachineGpsFormSection
+                latitude={editLatitude}
+                longitude={editLongitude}
+                locationSource={editLocationSource}
+                locationNote={editLocationNote}
+                onCoordinatesChange={({ latitude, longitude, source }) => {
+                  setEditLatitude(latitude);
+                  setEditLongitude(longitude);
+                  setEditLocationSource(source);
+                }}
+                onLocationNoteChange={setEditLocationNote}
+                machineTitle={editMachineNumber || editMachine?.machineNumber}
+                buildingReferenceCoords={bldCoords}
+              />
+            );
+          })()}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -1455,6 +1566,14 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
           />
         </Modal>
       )}
+
+      {/* Location Proposals Review Modal */}
+      <LocationProposalsModal
+        isOpen={isProposalsModalOpen}
+        onClose={() => setIsProposalsModalOpen(false)}
+        machines={machines}
+        onProposalApproved={loadMachines}
+      />
     </div>
   );
 };

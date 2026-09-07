@@ -6,7 +6,9 @@ import type {
   ISessionRepository,
   ISyncEventRepository,
   IAuditRepository,
-  IIdempotencyRepository
+  IIdempotencyRepository,
+  IMachineLocationProposalRepository,
+  IFieldExceptionApprovalRepository
 } from './interfaces';
 import {
   getCloudDb,
@@ -23,7 +25,10 @@ import type {
   CloudTechnicianAccount,
   CloudTechnicianSession,
   CloudSyncEvent,
-  CloudSyncEventType
+  CloudSyncEventType,
+  MachineLocationProposal,
+  FieldExceptionApproval,
+  LocationSource
 } from '../db/cloudDb';
 
 export class JsonCloudMachineRepository implements ICloudMachineRepository {
@@ -43,6 +48,75 @@ export class JsonCloudMachineRepository implements ICloudMachineRepository {
 
   async upsertMachine(machine: SanitizedCloudMachine): Promise<void> {
     this.db.bootstrapMachineRegistry([machine]);
+  }
+
+  async updateLocation(
+    idOrToken: string,
+    params: {
+      latitude: number | null;
+      longitude: number | null;
+      locationSource: LocationSource;
+      locationNote?: string;
+      actorId: string;
+      actorName: string;
+    }
+  ): Promise<SanitizedCloudMachine> {
+    const clean = idOrToken.trim().toUpperCase();
+    const machine = this.db.getData().cloud_machine_registry.find(
+      m => m.integrationMachineId === idOrToken || (m.publicQrToken && m.publicQrToken.toUpperCase() === clean)
+    );
+    if (!machine) {
+      throw new Error(`MACHINE_NOT_FOUND: الماكينة المطلوبة (${idOrToken}) غير موجودة.`);
+    }
+
+    const { latitude, longitude, locationSource, locationNote, actorId, actorName } = params;
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+      if (latitude !== longitude) {
+        throw new Error('INVALID_COORDINATES: يجب تحديد كل من خط العرض وخط الطول معاً أو تركهما كلاهما فارغين.');
+      }
+    } else {
+      if (typeof latitude !== 'number' || isNaN(latitude) || latitude < -90 || latitude > 90) {
+        throw new Error(`INVALID_LATITUDE: خط العرض غير صالح (${latitude}). يجب أن يكون بين -90 و 90.`);
+      }
+      if (typeof longitude !== 'number' || isNaN(longitude) || longitude < -180 || longitude > 180) {
+        throw new Error(`INVALID_LONGITUDE: خط الطول غير صالح (${longitude}). يجب أن يكون بين -180 و 180.`);
+      }
+    }
+
+    machine.latitude = latitude ?? null;
+    machine.longitude = longitude ?? null;
+    machine.locationSource = locationSource;
+    if (locationNote !== undefined) machine.locationNote = locationNote;
+    machine.locationUpdatedAt = new Date().toISOString();
+    machine.locationUpdatedByActorId = actorId;
+    machine.locationUpdatedByActorName = actorName;
+    machine.version = (machine.version || 1) + 1;
+    this.db.save();
+    return { ...machine };
+  }
+
+  async clearLocation(
+    idOrToken: string,
+    actor: { id: string; name: string }
+  ): Promise<SanitizedCloudMachine> {
+    const clean = idOrToken.trim().toUpperCase();
+    const machine = this.db.getData().cloud_machine_registry.find(
+      m => m.integrationMachineId === idOrToken || (m.publicQrToken && m.publicQrToken.toUpperCase() === clean)
+    );
+    if (!machine) {
+      throw new Error(`MACHINE_NOT_FOUND: الماكينة المطلوبة (${idOrToken}) غير موجودة.`);
+    }
+
+    machine.latitude = null;
+    machine.longitude = null;
+    machine.locationSource = 'NONE';
+    machine.locationNote = undefined;
+    machine.locationUpdatedAt = new Date().toISOString();
+    machine.locationUpdatedByActorId = actor.id;
+    machine.locationUpdatedByActorName = actor.name;
+    machine.version = (machine.version || 1) + 1;
+    this.db.save();
+    return { ...machine };
   }
 
   async removeMachine(idOrToken: string): Promise<boolean> {
@@ -291,10 +365,154 @@ export class JsonIdempotencyRepository implements IIdempotencyRepository {
   }
 }
 
+export class JsonMachineLocationProposalRepository implements IMachineLocationProposalRepository {
+  constructor(private db: CloudDatabase) {}
+
+  async submitProposal(proposal: MachineLocationProposal): Promise<MachineLocationProposal> {
+    const list = this.db.getData().machine_location_proposals = this.db.getData().machine_location_proposals || [];
+    list.unshift(proposal);
+    this.db.save();
+    return proposal;
+  }
+
+  async findById(id: string): Promise<MachineLocationProposal | null> {
+    const list = this.db.getData().machine_location_proposals || [];
+    return list.find(p => p.id === id) || null;
+  }
+
+  async findPendingByMachineId(machineId: string): Promise<MachineLocationProposal[]> {
+    const list = this.db.getData().machine_location_proposals || [];
+    return list.filter(p => p.integrationMachineId === machineId && p.status === 'PENDING');
+  }
+
+  async listPending(limit = 50): Promise<MachineLocationProposal[]> {
+    const list = this.db.getData().machine_location_proposals || [];
+    return list.filter(p => p.status === 'PENDING').slice(0, limit);
+  }
+
+  async approveProposal(
+    proposalId: string,
+    approver: { id: string; name: string }
+  ): Promise<{ proposal: MachineLocationProposal; machine: SanitizedCloudMachine }> {
+    const list = this.db.getData().machine_location_proposals || [];
+    const proposal = list.find(p => p.id === proposalId);
+    if (!proposal) {
+      throw new Error(`PROPOSAL_NOT_FOUND: مقترح الموقع رقم ${proposalId} غير موجود.`);
+    }
+    if (proposal.status !== 'PENDING') {
+      throw new Error(`PROPOSAL_NOT_PENDING: لا يمكن اعتماد المقترح لأن حالته الحالية: ${proposal.status}`);
+    }
+
+    const machine = this.db.getData().cloud_machine_registry.find(
+      m => m.integrationMachineId === proposal.integrationMachineId
+    );
+    if (!machine) {
+      throw new Error(`MACHINE_NOT_FOUND: الماكينة ${proposal.integrationMachineId} غير موجودة.`);
+    }
+
+    machine.latitude = proposal.latitude;
+    machine.longitude = proposal.longitude;
+    machine.locationSource = 'TECHNICIAN_PROPOSAL_APPROVED';
+    machine.locationUpdatedAt = new Date().toISOString();
+    machine.locationUpdatedByActorId = approver.id;
+    machine.locationUpdatedByActorName = approver.name;
+    machine.version = (machine.version || 1) + 1;
+
+    proposal.status = 'APPROVED';
+    proposal.approvedByActorId = approver.id;
+    proposal.approvedByActorName = approver.name;
+    proposal.approvedAt = new Date().toISOString();
+    proposal.updatedAt = new Date().toISOString();
+
+    for (const other of list) {
+      if (other.integrationMachineId === proposal.integrationMachineId && other.id !== proposalId && other.status === 'PENDING') {
+        other.status = 'SUPERSEDED';
+        other.updatedAt = new Date().toISOString();
+      }
+    }
+
+    this.db.save();
+    return { proposal: { ...proposal }, machine: { ...machine } };
+  }
+
+  async rejectProposal(
+    proposalId: string,
+    actor: { id: string; name: string },
+    reason?: string
+  ): Promise<MachineLocationProposal> {
+    const list = this.db.getData().machine_location_proposals || [];
+    const proposal = list.find(p => p.id === proposalId);
+    if (!proposal) {
+      throw new Error(`PROPOSAL_NOT_FOUND: المقترح غير موجود.`);
+    }
+    if (proposal.status !== 'PENDING') {
+      throw new Error(`PROPOSAL_NOT_PENDING: لا يمكن رفض المقترح لأن حالته: ${proposal.status}`);
+    }
+    proposal.status = 'REJECTED';
+    proposal.rejectedByActorId = actor.id;
+    proposal.rejectedByActorName = actor.name;
+    proposal.rejectedAt = new Date().toISOString();
+    proposal.rejectionReason = reason || 'Rejected by management';
+    proposal.updatedAt = new Date().toISOString();
+    this.db.save();
+    return { ...proposal };
+  }
+
+  async countPending(): Promise<number> {
+    const list = this.db.getData().machine_location_proposals || [];
+    return list.filter(p => p.status === 'PENDING').length;
+  }
+}
+
+export class JsonFieldExceptionApprovalRepository implements IFieldExceptionApprovalRepository {
+  constructor(private db: CloudDatabase) {}
+
+  async createApproval(approval: FieldExceptionApproval): Promise<FieldExceptionApproval> {
+    const list = this.db.getData().field_exception_approvals = this.db.getData().field_exception_approvals || [];
+    list.unshift(approval);
+    this.db.save();
+    return approval;
+  }
+
+  async findById(id: string): Promise<FieldExceptionApproval | null> {
+    const list = this.db.getData().field_exception_approvals || [];
+    return list.find(a => a.id === id) || null;
+  }
+
+  async findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null> {
+    const list = this.db.getData().field_exception_approvals || [];
+    const now = new Date().getTime();
+    return list.find(a =>
+      a.ticketId === ticketId &&
+      a.integrationMachineId === machineId &&
+      a.status === 'APPROVED' &&
+      (!a.expiresAt || new Date(a.expiresAt).getTime() > now)
+    ) || null;
+  }
+
+  async consumeApproval(id: string): Promise<FieldExceptionApproval> {
+    const list = this.db.getData().field_exception_approvals || [];
+    const approval = list.find(a => a.id === id);
+    if (!approval) {
+      throw new Error('EXCEPTION_APPROVAL_NOT_FOUND: تصريح الاستثناء غير موجود.');
+    }
+    if (approval.status !== 'APPROVED') {
+      throw new Error(`EXCEPTION_APPROVAL_INVALID: لا يمكن استخدام التصريح لأن حالته الحالية: ${approval.status}`);
+    }
+    approval.status = 'USED';
+    approval.usedAt = new Date().toISOString();
+    approval.updatedAt = new Date().toISOString();
+    this.db.save();
+    return { ...approval };
+  }
+}
+
 export class JsonCloudRepositoryManager implements ICloudRepositoryManager {
   public providerType: 'JSON_DEV' = 'JSON_DEV';
   public machines: ICloudMachineRepository;
   public tickets: ICloudTicketRepository;
+  public locationProposals: IMachineLocationProposalRepository;
+  public fieldExceptions: IFieldExceptionApprovalRepository;
   public technicians: ITechnicianRepository;
   public sessions: ISessionRepository;
   public syncEvents: ISyncEventRepository;
@@ -305,6 +523,8 @@ export class JsonCloudRepositoryManager implements ICloudRepositoryManager {
     const db = dbInstance || getCloudDb();
     this.machines = new JsonCloudMachineRepository(db);
     this.tickets = new JsonCloudTicketRepository(db);
+    this.locationProposals = new JsonMachineLocationProposalRepository(db);
+    this.fieldExceptions = new JsonFieldExceptionApprovalRepository(db);
     this.technicians = new JsonTechnicianRepository(db);
     this.sessions = new JsonSessionRepository(db);
     this.syncEvents = new JsonSyncEventRepository(db);

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from '../services/authService';
 import { TicketService } from '../services/ticketService';
+import { LocationService } from '../services/locationService';
 import { requireCloudTechnicianAuth } from '../middleware/technicianAuth';
 import { createCloudRateLimiter } from '../middleware/rateLimiter';
 import { cloudStorage } from '../storage/cloudStorage';
@@ -288,3 +289,58 @@ technicianRoutes.post('/technician/resolve', requireCloudTechnicianAuth, async (
     return res.status(404).json({ error: 'RESOLVE_FAILED', message: err.message });
   }
 });
+
+/**
+ * POST /technician/propose-location
+ * Submit machine location proposal from field device
+ */
+technicianRoutes.post('/technician/propose-location', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+  const tech = (req as any).technician;
+  const { machineTokenOrId, machineId, publicQrToken, latitude, longitude, accuracyMeters, ticketId } = req.body;
+
+  const target = machineTokenOrId || machineId || publicQrToken;
+  if (!target) {
+    return res.status(400).json({
+      error: 'PARAMS_REQUIRED',
+      message: 'رمز أو معرف الماكينة مطلوب لتقديم المقترح.'
+    });
+  }
+
+  try {
+    const proposal = await LocationService.submitProposal({
+      machineTokenOrId: target,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      accuracyMeters: Number(accuracyMeters),
+      technicianId: tech.id,
+      technicianName: tech.fullName,
+      ticketId,
+      clientIp: req.ip
+    });
+
+    res.json({
+      success: true,
+      proposal,
+      message: 'تم تقديم مقترح إحداثيات موقع الماكينة بنجاح وبانتظار الاعتماد.'
+    });
+  } catch (err: any) {
+    return res.status(400).json({ error: 'PROPOSAL_FAILED', message: err.message });
+  }
+});
+
+/**
+ * GET /technician/machine-location/:tokenOrId
+ * Check machine coordinates and pending proposals
+ */
+technicianRoutes.get('/technician/machine-location/:tokenOrId', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+  try {
+    const details = await LocationService.getMachineLocationDetails(req.params.tokenOrId);
+    res.json({
+      success: true,
+      ...details
+    });
+  } catch (err: any) {
+    return res.status(404).json({ error: 'NOT_FOUND', message: err.message });
+  }
+});
+

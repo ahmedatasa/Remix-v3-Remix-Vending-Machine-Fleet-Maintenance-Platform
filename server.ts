@@ -742,12 +742,25 @@ async function startServer() {
     const store = getStore();
     const data = req.body;
     const now = new Date().toISOString();
+
+    const hasGps = typeof data.latitude === 'number' && typeof data.longitude === 'number';
+    const lat = hasGps ? Number(data.latitude.toFixed(6)) : null;
+    const lng = hasGps ? Number(data.longitude.toFixed(6)) : null;
+
     const newBld = {
       id: `bld-${Date.now()}`,
       name: data.name || 'New Building',
       nameAr: data.nameAr,
       code: (data.code || `BLD-${Date.now().toString().slice(-3)}`).trim().toUpperCase(),
       address: data.address,
+      latitude: lat,
+      longitude: lng,
+      locationSource: hasGps ? (data.locationSource || 'MANUAL_ENTRY') : 'NONE',
+      locationStatus: hasGps ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED',
+      locationNote: data.locationNote || '',
+      locationUpdatedAt: hasGps ? now : null,
+      locationUpdatedByActorId: data.locationUpdatedByActorId || 'admin',
+      locationUpdatedByActorName: data.locationUpdatedByActorName || 'Super Administrator',
       isActive: true,
       isDeleted: false,
       floors: [],
@@ -755,8 +768,47 @@ async function startServer() {
       updatedAt: now,
       ...data
     };
+
+    // Ensure normalized location fields overwrite raw spread data
+    newBld.latitude = lat;
+    newBld.longitude = lng;
+    newBld.locationSource = hasGps ? (data.locationSource || 'MANUAL_ENTRY') : 'NONE';
+    newBld.locationStatus = hasGps ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED';
+
     if (!store.buildings) store.buildings = [];
     store.buildings.unshift(newBld);
+
+    // Audit initial location if configured
+    if (hasGps) {
+      if (!store.auditLogs) store.auditLogs = [];
+      const auditAction = data.locationSource === 'DEVICE_GPS'
+        ? 'BUILDING_LOCATION_DEVICE_GPS_UPDATED'
+        : data.locationSource === 'MAP_PICKER'
+        ? 'BUILDING_LOCATION_MAP_UPDATED'
+        : 'BUILDING_LOCATION_MANUALLY_UPDATED';
+
+      store.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        action: auditAction,
+        entityName: 'Building',
+        entityId: newBld.id,
+        userName: newBld.locationUpdatedByActorName,
+        details: `Initial building location configured for ${newBld.name} (${lat}, ${lng})`,
+        oldValues: null,
+        newValues: {
+          buildingId: newBld.id,
+          buildingName: newBld.name,
+          latitude: lat,
+          longitude: lng,
+          locationSource: newBld.locationSource,
+          locationStatus: newBld.locationStatus,
+          locationNote: newBld.locationNote
+        },
+        timestamp: now,
+        createdAt: now
+      });
+    }
+
     saveStore(store);
     res.status(201).json(newBld);
   });
@@ -764,9 +816,101 @@ async function startServer() {
   apiRouter.put('/buildings/:id', (req, res) => {
     const store = getStore();
     const id = req.params.id;
-    const idx = (store.buildings || []).findIndex((b: any) => b.id === id);
+    const idx = (store.buildings || []).findIndex((b: any) => b.id === id || b.code === id);
     if (idx === -1) return res.status(404).json({ error: 'Building not found' });
-    store.buildings[idx] = { ...store.buildings[idx], ...req.body, updatedAt: new Date().toISOString() };
+
+    const oldBld = { ...store.buildings[idx] };
+    const data = req.body;
+    const now = new Date().toISOString();
+
+    // Check location modifications
+    let lat = oldBld.latitude;
+    let lng = oldBld.longitude;
+    let locationSource = oldBld.locationSource || 'NONE';
+    let locationStatus = oldBld.locationStatus || (lat !== null && lng !== null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED');
+    let locationNote = data.locationNote !== undefined ? data.locationNote : (oldBld.locationNote || '');
+
+    const locationChanged =
+      data.latitude !== undefined ||
+      data.longitude !== undefined ||
+      data.locationSource !== undefined ||
+      data.locationNote !== undefined;
+
+    if (data.latitude !== undefined || data.longitude !== undefined) {
+      const isNewLatNum = typeof data.latitude === 'number' && !isNaN(data.latitude);
+      const isNewLngNum = typeof data.longitude === 'number' && !isNaN(data.longitude);
+
+      if (isNewLatNum && isNewLngNum) {
+        lat = Number(data.latitude.toFixed(6));
+        lng = Number(data.longitude.toFixed(6));
+        locationSource = data.locationSource || 'MANUAL_ENTRY';
+        locationStatus = 'GPS_CONFIGURED';
+      } else {
+        lat = null;
+        lng = null;
+        locationSource = 'NONE';
+        locationStatus = 'LOCATION_NOT_CONFIGURED';
+      }
+    } else if (data.locationSource !== undefined) {
+      locationSource = data.locationSource;
+    }
+
+    store.buildings[idx] = {
+      ...store.buildings[idx],
+      ...data,
+      latitude: lat,
+      longitude: lng,
+      locationSource,
+      locationStatus,
+      locationNote,
+      locationUpdatedAt: locationChanged ? now : oldBld.locationUpdatedAt,
+      locationUpdatedByActorId: data.locationUpdatedByActorId || oldBld.locationUpdatedByActorId || 'admin',
+      locationUpdatedByActorName: data.locationUpdatedByActorName || oldBld.locationUpdatedByActorName || 'Super Administrator',
+      updatedAt: now
+    };
+
+    // Audit location changes (Section 20)
+    const prevCoordsExist = oldBld.latitude !== null && oldBld.latitude !== undefined && oldBld.longitude !== null && oldBld.longitude !== undefined;
+    const newCoordsExist = lat !== null && lng !== null;
+
+    if (locationChanged) {
+      let auditAction = 'BUILDING_LOCATION_MANUALLY_UPDATED';
+      if (prevCoordsExist && !newCoordsExist) {
+        auditAction = 'BUILDING_LOCATION_CLEARED';
+      } else if (locationSource === 'DEVICE_GPS') {
+        auditAction = 'BUILDING_LOCATION_DEVICE_GPS_UPDATED';
+      } else if (locationSource === 'MAP_PICKER') {
+        auditAction = 'BUILDING_LOCATION_MAP_UPDATED';
+      }
+
+      if (!store.auditLogs) store.auditLogs = [];
+      store.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        action: auditAction,
+        entityName: 'Building',
+        entityId: oldBld.id,
+        userName: store.buildings[idx].locationUpdatedByActorName,
+        details: `Building location updated for ${oldBld.name}`,
+        oldValues: {
+          latitude: oldBld.latitude,
+          longitude: oldBld.longitude,
+          locationSource: oldBld.locationSource,
+          locationStatus: oldBld.locationStatus
+        },
+        newValues: {
+          buildingId: oldBld.id,
+          buildingName: oldBld.name,
+          latitude: lat,
+          longitude: lng,
+          locationSource,
+          locationStatus,
+          locationNote
+        },
+        timestamp: now,
+        createdAt: now
+      });
+    }
+
     saveStore(store);
     res.json(store.buildings[idx]);
   });

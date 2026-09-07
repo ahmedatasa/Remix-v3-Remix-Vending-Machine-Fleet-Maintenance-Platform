@@ -2284,6 +2284,14 @@ export const api = {
         notes: machine.notes || '',
         currentLocation: machine.currentLocation || store.locations.find(l => l.id === machine.modelId) || store.locations[0],
         importProvenance: machine.importProvenance,
+        latitude: machine.latitude !== undefined ? machine.latitude : null,
+        longitude: machine.longitude !== undefined ? machine.longitude : null,
+        locationSource: machine.latitude != null && machine.longitude != null ? (machine.locationSource || 'MANUAL_ENTRY') : 'NONE',
+        locationStatus: machine.latitude != null && machine.longitude != null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED',
+        locationNote: machine.locationNote || '',
+        locationUpdatedAt: machine.latitude != null && machine.longitude != null ? new Date().toISOString() : undefined,
+        locationUpdatedByActorId: machine.locationUpdatedByActorId,
+        locationUpdatedByActorName: machine.locationUpdatedByActorName,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -2339,12 +2347,37 @@ export const api = {
           }
         }
 
+        const isClearingGps = updates.latitude === null && updates.longitude === null;
+        const isSettingGps = typeof updates.latitude === 'number' && typeof updates.longitude === 'number';
+
+        let newLocationSource = oldMachine.locationSource || 'NONE';
+        let newLocationStatus = oldMachine.locationStatus || (oldMachine.latitude != null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED');
+        let newLocationUpdatedAt = oldMachine.locationUpdatedAt;
+
+        if (isClearingGps) {
+          newLocationSource = 'NONE';
+          newLocationStatus = 'LOCATION_NOT_CONFIGURED';
+          newLocationUpdatedAt = new Date().toISOString();
+        } else if (isSettingGps) {
+          newLocationSource = updates.locationSource || 'MANUAL_ENTRY';
+          newLocationStatus = 'GPS_CONFIGURED';
+          newLocationUpdatedAt = new Date().toISOString();
+        }
+
         const merged: Machine = {
           ...store.machines[idx],
           ...updates,
           currentLocation: newLocation,
+          locationSource: newLocationSource,
+          locationStatus: newLocationStatus,
+          locationUpdatedAt: newLocationUpdatedAt,
           updatedAt: new Date().toISOString()
         };
+
+        if (isClearingGps) {
+          merged.latitude = null as any;
+          merged.longitude = null as any;
+        }
 
         // Recalculate health
         const { healthScore, healthStatus, isChronic, reason } = this.calculateMachineHealth(merged);
@@ -2354,6 +2387,46 @@ export const api = {
         merged.chronicFailureReason = reason;
 
         store.machines[idx] = merged;
+
+        if (isClearingGps) {
+          store.auditLogs.unshift({
+            id: `aud-${Date.now()}-loc-clr`,
+            action: 'MACHINE_LOCATION_CLEARED',
+            entityName: 'Machine',
+            entityId: store.machines[idx].machineNumber,
+            oldValues: {
+              latitude: oldMachine.latitude,
+              longitude: oldMachine.longitude,
+              locationSource: oldMachine.locationSource
+            },
+            newValues: {
+              latitude: null,
+              longitude: null,
+              locationSource: 'NONE',
+              locationStatus: 'LOCATION_NOT_CONFIGURED'
+            },
+            createdAt: new Date().toISOString()
+          });
+        } else if (isSettingGps && (oldMachine.latitude !== updates.latitude || oldMachine.longitude !== updates.longitude)) {
+          store.auditLogs.unshift({
+            id: `aud-${Date.now()}-loc-upd`,
+            action: 'MACHINE_LOCATION_MANUALLY_UPDATED',
+            entityName: 'Machine',
+            entityId: store.machines[idx].machineNumber,
+            oldValues: {
+              latitude: oldMachine.latitude,
+              longitude: oldMachine.longitude,
+              locationSource: oldMachine.locationSource
+            },
+            newValues: {
+              latitude: updates.latitude,
+              longitude: updates.longitude,
+              locationSource: newLocationSource,
+              locationStatus: 'GPS_CONFIGURED'
+            },
+            createdAt: new Date().toISOString()
+          });
+        }
 
         store.auditLogs.unshift({
           id: `aud-${Date.now()}`,
@@ -3278,6 +3351,13 @@ export const api = {
         nameAr: building.nameAr,
         code: (building.code || `BLD-${Date.now().toString().slice(-3)}`).trim().toUpperCase(),
         address: building.address,
+        latitude: typeof building.latitude === 'number' ? building.latitude : null,
+        longitude: typeof building.longitude === 'number' ? building.longitude : null,
+        locationSource: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? (building.locationSource || 'MANUAL_ENTRY') : 'NONE',
+        locationStatus: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED',
+        locationNote: building.locationNote || '',
+        locationUpdatedAt: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? new Date().toISOString() : undefined,
+        locationUpdatedByActorName: building.locationUpdatedByActorName || 'Super Administrator',
         isActive: true,
         isDeleted: false,
         floors: [],
@@ -3343,23 +3423,99 @@ export const api = {
       const bld = store.buildings.find(b => b.id === id || b.code === id);
       if (!bld) throw new Error('Building not found');
 
-      const oldValues = { name: bld.name, code: bld.code, address: bld.address, isActive: bld.isActive };
+      const oldValues = {
+        name: bld.name,
+        code: bld.code,
+        address: bld.address,
+        isActive: bld.isActive,
+        latitude: bld.latitude,
+        longitude: bld.longitude,
+        locationSource: bld.locationSource,
+        locationStatus: bld.locationStatus
+      };
       if (updates.name !== undefined) bld.name = updates.name.trim();
       if (updates.nameAr !== undefined) bld.nameAr = updates.nameAr.trim();
       if (updates.code !== undefined) bld.code = updates.code.trim().toUpperCase();
       if (updates.address !== undefined) bld.address = updates.address.trim();
       if (updates.isActive !== undefined) bld.isActive = updates.isActive;
+
+      const locationChanged =
+        updates.latitude !== undefined ||
+        updates.longitude !== undefined ||
+        updates.locationSource !== undefined ||
+        updates.locationNote !== undefined;
+
+      if (updates.latitude !== undefined || updates.longitude !== undefined) {
+        const isLatNum = typeof updates.latitude === 'number' && !isNaN(updates.latitude);
+        const isLngNum = typeof updates.longitude === 'number' && !isNaN(updates.longitude);
+        if (isLatNum && isLngNum) {
+          bld.latitude = Number(updates.latitude.toFixed(6));
+          bld.longitude = Number(updates.longitude.toFixed(6));
+          bld.locationSource = updates.locationSource || 'MANUAL_ENTRY';
+          bld.locationStatus = 'GPS_CONFIGURED';
+        } else {
+          bld.latitude = null;
+          bld.longitude = null;
+          bld.locationSource = 'NONE';
+          bld.locationStatus = 'LOCATION_NOT_CONFIGURED';
+        }
+      } else if (updates.locationSource !== undefined) {
+        bld.locationSource = updates.locationSource;
+      }
+
+      if (updates.locationNote !== undefined) bld.locationNote = updates.locationNote;
+      if (locationChanged) {
+        bld.locationUpdatedAt = new Date().toISOString();
+        bld.locationUpdatedByActorName = updates.locationUpdatedByActorName || 'Super Administrator';
+      }
+
       bld.updatedAt = new Date().toISOString();
 
-      store.auditLogs.unshift({
-        id: `aud-${Date.now()}`,
-        action: 'BUILDING_UPDATED',
-        entityName: 'Building',
-        entityId: bld.code || bld.id,
-        oldValues,
-        newValues: { name: bld.name, code: bld.code, address: bld.address, isActive: bld.isActive },
-        createdAt: new Date().toISOString()
-      });
+      // Audit location change specifically if location changed
+      if (locationChanged) {
+        const hadCoords = oldValues.latitude !== null && oldValues.latitude !== undefined && oldValues.longitude !== null && oldValues.longitude !== undefined;
+        const hasCoords = bld.latitude !== null && bld.longitude !== null;
+        let auditAction = 'BUILDING_LOCATION_MANUALLY_UPDATED';
+        if (hadCoords && !hasCoords) {
+          auditAction = 'BUILDING_LOCATION_CLEARED';
+        } else if (bld.locationSource === 'DEVICE_GPS') {
+          auditAction = 'BUILDING_LOCATION_DEVICE_GPS_UPDATED';
+        } else if (bld.locationSource === 'MAP_PICKER') {
+          auditAction = 'BUILDING_LOCATION_MAP_UPDATED';
+        }
+
+        store.auditLogs.unshift({
+          id: `aud-${Date.now()}`,
+          action: auditAction,
+          entityName: 'Building',
+          entityId: bld.code || bld.id,
+          userName: bld.locationUpdatedByActorName || 'Super Administrator',
+          oldValues: {
+            latitude: oldValues.latitude,
+            longitude: oldValues.longitude,
+            locationSource: oldValues.locationSource,
+            locationStatus: oldValues.locationStatus
+          },
+          newValues: {
+            latitude: bld.latitude,
+            longitude: bld.longitude,
+            locationSource: bld.locationSource,
+            locationStatus: bld.locationStatus,
+            locationNote: bld.locationNote
+          },
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        store.auditLogs.unshift({
+          id: `aud-${Date.now()}`,
+          action: 'BUILDING_UPDATED',
+          entityName: 'Building',
+          entityId: bld.code || bld.id,
+          oldValues,
+          newValues: { name: bld.name, code: bld.code, address: bld.address, isActive: bld.isActive },
+          createdAt: new Date().toISOString()
+        });
+      }
 
       return bld;
     }

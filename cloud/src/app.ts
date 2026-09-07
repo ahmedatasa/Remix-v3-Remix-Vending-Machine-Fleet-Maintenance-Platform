@@ -4,6 +4,7 @@ import { securityHeaders, cloudCors } from './middleware/securityHeaders';
 import { publicRoutes } from './routes/publicRoutes';
 import { technicianRoutes } from './routes/technicianRoutes';
 import { syncRoutes } from './routes/syncRoutes';
+import { locationRoutes } from './routes/locationRoutes';
 import { cloudConfig } from './config/cloudConfig';
 
 export function createCloudApp(): express.Express {
@@ -69,6 +70,7 @@ export function createCloudApp(): express.Express {
   app.use(publicRoutes);
   app.use(technicianRoutes);
   app.use(syncRoutes);
+  app.use(locationRoutes);
 
   // Catch-all 404 handler
   app.use((req: Request, res: Response) => {
