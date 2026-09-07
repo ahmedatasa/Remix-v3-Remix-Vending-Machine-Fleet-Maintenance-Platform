@@ -37,7 +37,12 @@ const parseOrigins = (raw?: string): string[] => {
 const currentEnv = process.env.NODE_ENV || 'development';
 
 export function resolveCloudPort(): number {
-  // If running under Cloud Run (K_SERVICE is set by Cloud Run runtime)
+  // 1. Hosted Render Web Service (RENDER=true or RENDER environment variable)
+  if (process.env.RENDER === 'true' || Boolean(process.env.RENDER)) {
+    return parseInt(process.env.PORT || '10000', 10);
+  }
+
+  // 2. Hosted Cloud Run (K_SERVICE is set by Cloud Run runtime)
   // or explicitly targeted for Cloud Run staging/production:
   const isCloudRun = Boolean(
     process.env.K_SERVICE &&
@@ -49,7 +54,7 @@ export function resolveCloudPort(): number {
     return parseInt(process.env.PORT || '8080', 10);
   }
 
-  // Standalone local Cloud with explicit CLOUD_PORT
+  // 3. Standalone local Cloud with explicit CLOUD_PORT
   if (process.env.CLOUD_PORT) {
     return parseInt(process.env.CLOUD_PORT, 10);
   }
@@ -59,7 +64,7 @@ export function resolveCloudPort(): number {
     return parseInt(process.env.PORT, 10);
   }
 
-  // Default internal port for local standalone Cloud
+  // 4. Default internal port for local standalone Cloud
   return 3001;
 }
 

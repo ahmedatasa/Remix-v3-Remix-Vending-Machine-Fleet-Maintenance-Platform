@@ -2066,7 +2066,8 @@
       "machineLatitude": 24.7157,
       "machineLongitude": 46.676,
       "latitude": 24.7157,
-      "longitude": 46.676
+      "longitude": 46.676,
+      "lastFaultAt": "2026-09-07T07:34:50.661Z"
     },
     {
       "id": "mch-imp-1788442674014-7",
@@ -9757,6 +9758,101 @@
   ],
   "tickets": [
     {
+      "id": "tck-1788772898582-9073bb",
+      "ticketNumber": "TCK-2026-0012",
+      "cloudTicketId": "cld-tck-1788772884971-6e699e4a",
+      "cloudReportId": "idemp-1788772884969",
+      "publicTrackingToken": "TRK-MTR16VHN-DD813910",
+      "machineId": "mch-imp-1788442674014-1",
+      "machineNumber": "1",
+      "machine": {
+        "id": "mch-imp-1788442674014-1",
+        "machineNumber": "1",
+        "serialNumber": "1640056931",
+        "machineType": "Zaki Vending Machine",
+        "currentLocation": {
+          "id": "loc-1788442674014-1",
+          "buildingId": "bld-1788442674014-1",
+          "floorId": "flr-1788442674014-1",
+          "floor": {
+            "id": "flr-1788442674014-1",
+            "buildingId": "bld-1788442674014-1",
+            "floorNumber": 1,
+            "levelOrder": 1,
+            "floorName": "الدور",
+            "createdAt": "2026-09-03T13:37:54.013Z"
+          },
+          "building": {
+            "id": "bld-1788442674014-1",
+            "code": "BLD-01",
+            "name": "القاده",
+            "createdAt": "2026-09-03T13:37:54.013Z",
+            "updatedAt": "2026-09-03T13:37:54.013Z"
+          },
+          "areaZone": "شمال",
+          "fullDescription": "القاده — الدور — شمال",
+          "isActive": true,
+          "createdAt": "2026-09-03T13:37:54.013Z"
+        }
+      },
+      "title": "عطل مُبلغ عنه: BEVERAGE_DISPENSE",
+      "description": "الماكينة لم تسقط عبوة الماء بعد خصم المبلغ عبر مدى",
+      "category": "BEVERAGE_DISPENSE",
+      "priority": "MEDIUM",
+      "status": "RESOLVED",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "0551122334",
+      "reporterEmail": "",
+      "source": "PUBLIC_QR",
+      "createdAt": "2026-09-07T09:21:24.971Z",
+      "updatedAt": "2026-09-07T09:21:25.376Z",
+      "actions": [
+        {
+          "id": "act-1788772885366-926a97",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-07T09:21:25.366Z"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "evi-1788772885357-a59266",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788772884971-6e699e4a/1788772885356-6279ae0533e65c533f81e21b4395be9a.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788772884971-6e699e4a/1788772885356-6279ae0533e65c533f81e21b4395be9a.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-07T09:21:25.357Z"
+        }
+      ],
+      "checkins": [
+        {
+          "id": "chk-1788772885349-6dd15c",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-07T09:21:25.349Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        }
+      ],
+      "functionalTests": [],
+      "resolutionSummary": "تم استبدال الحساس وفحص الماكينة وعودتها للخدمة بنجاح",
+      "resolvedBy": "ahmed",
+      "resolvedAt": "2026-09-07T09:21:25.376Z"
+    },
+    {
       "id": "tck-1788707116906-5794d3",
       "ticketNumber": "TCK-2026-0011",
       "cloudTicketId": "cld-tck-1788707053277-dd117f0b",
@@ -10212,17 +10308,96 @@
       "description": "الماكينة لم تسقط عبوة الماء بعد خصم المبلغ عبر مدى",
       "category": "BEVERAGE_DISPENSE",
       "priority": "MEDIUM",
-      "status": "OPEN",
+      "status": "IN_PROGRESS",
       "reporterName": "طالب جامعي",
       "reporterPhone": "0551122334",
       "reporterEmail": "",
       "source": "PUBLIC_QR",
       "createdAt": "2026-09-06T09:40:18.877Z",
-      "updatedAt": "2026-09-06T09:40:18.878Z",
+      "updatedAt": "2026-09-07T09:16:30.868Z",
       "actions": [],
       "evidence": [],
       "checkins": [],
-      "functionalTests": []
+      "functionalTests": [],
+      "assignedTechnicianId": "tch-1788444652245",
+      "assignedTechnician": {
+        "id": "tch-1788444652245",
+        "userId": "usr-1788444652245",
+        "employeeCode": "TECH-1",
+        "fullName": "ahmed",
+        "fullNameAr": "ahmed",
+        "email": "ahmed@vendingfleet.com",
+        "phone": "01010904549",
+        "phoneNumber": "01010904549",
+        "specialization": "Senior Master Technician",
+        "status": "AVAILABLE",
+        "skills": [
+          "Senior Master Technician",
+          "General Vending Maintenance"
+        ],
+        "assignedRegion": "Central Campus & Admin Complex",
+        "maxDailyCapacity": 15,
+        "maxActiveTickets": 15,
+        "isActive": true,
+        "isDeleted": false,
+        "createdAt": "2026-09-03T14:10:52.245Z",
+        "kpis": {
+          "technicianId": "tch-1788444652245",
+          "responseTimeMinutes": 15,
+          "repairTimeMinutes": 45,
+          "completedTickets": 1,
+          "firstTimeFixRate": 95,
+          "slaComplianceRate": 98,
+          "activeTicketsCount": 2,
+          "totalLaborMinutes": 0,
+          "partsReplacedCount": 0,
+          "rating": 5
+        },
+        "updatedAt": "2026-09-03T15:05:37.987Z"
+      },
+      "timeline": [
+        {
+          "id": "tl-1788772590868",
+          "ticketId": "tck-1788687619273-6a9df6",
+          "timestamp": "2026-09-07T09:16:30.868Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "WORK_STARTED",
+          "actionLabel": "بدء العمل الميداني",
+          "description": "Technician arrived on site at machine unit and commenced diagnostics."
+        },
+        {
+          "id": "tl-1788772584531",
+          "ticketId": "tck-1788687619273-6a9df6",
+          "timestamp": "2026-09-07T09:16:24.531Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "ASSIGNED",
+          "actionLabel": "تم إسناد التذكرة للفني",
+          "description": "تم إسناد التذكرة إلى الفني ahmed (Senior Master Technician)"
+        }
+      ],
+      "statusHistory": [
+        {
+          "id": "sh-1788772584531",
+          "ticketId": "tck-1788687619273-6a9df6",
+          "previousStatus": "OPEN",
+          "newStatus": "ASSIGNED",
+          "comment": "Assigned to ahmed",
+          "createdAt": "2026-09-07T09:16:24.531Z"
+        },
+        {
+          "id": "sh-1788772590868",
+          "ticketId": "tck-1788687619273-6a9df6",
+          "previousStatus": "ASSIGNED",
+          "newStatus": "IN_PROGRESS",
+          "comment": "Technician arrived on site at machine unit and commenced diagnostics.",
+          "createdAt": "2026-09-07T09:16:30.868Z"
+        }
+      ],
+      "startedAt": "2026-09-07T09:16:30.868Z"
     },
     {
       "id": "tck-1788683221820-f6e74c",
@@ -10303,14 +10478,25 @@
       "source": "CUSTOMER_QR",
       "category": "REFRIGERATION",
       "priority": "CRITICAL",
-      "status": "NEW",
+      "status": "ASSIGNED",
       "description": "اختبار تكرار البلاغ وموثوقية المعرف",
       "reporterName": "مختبر النظام",
       "reporterPhone": "0500000000",
       "reporterEmail": "",
       "createdAt": "2026-09-06T08:27:01.820Z",
-      "updatedAt": "2026-09-06T08:27:01.820Z",
+      "updatedAt": "2026-09-07T09:16:49.656Z",
       "timeline": [
+        {
+          "id": "tl-1788772609656",
+          "ticketId": "tck-1788683221820-f6e74c",
+          "timestamp": "2026-09-07T09:16:49.656Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "ASSIGNED",
+          "actionLabel": "تم إسناد التذكرة للفني",
+          "description": "kl"
+        },
         {
           "id": "tml-1788683221820",
           "ticketId": "tck-1788683221820-f6e74c",
@@ -10318,6 +10504,52 @@
           "action": "CREATED",
           "actionLabel": "تم تسجيل البلاغ",
           "description": "تم إرسال بلاغ العطل بواسطة العميل عبر رمز QR الميداني (REFRIGERATION)."
+        }
+      ],
+      "assignedTechnicianId": "tch-1788444652245",
+      "assignedTechnician": {
+        "id": "tch-1788444652245",
+        "userId": "usr-1788444652245",
+        "employeeCode": "TECH-1",
+        "fullName": "ahmed",
+        "fullNameAr": "ahmed",
+        "email": "ahmed@vendingfleet.com",
+        "phone": "01010904549",
+        "phoneNumber": "01010904549",
+        "specialization": "Senior Master Technician",
+        "status": "AVAILABLE",
+        "skills": [
+          "Senior Master Technician",
+          "General Vending Maintenance"
+        ],
+        "assignedRegion": "Central Campus & Admin Complex",
+        "maxDailyCapacity": 15,
+        "maxActiveTickets": 15,
+        "isActive": true,
+        "isDeleted": false,
+        "createdAt": "2026-09-03T14:10:52.245Z",
+        "kpis": {
+          "technicianId": "tch-1788444652245",
+          "responseTimeMinutes": 15,
+          "repairTimeMinutes": 45,
+          "completedTickets": 1,
+          "firstTimeFixRate": 95,
+          "slaComplianceRate": 98,
+          "activeTicketsCount": 3,
+          "totalLaborMinutes": 0,
+          "partsReplacedCount": 0,
+          "rating": 5
+        },
+        "updatedAt": "2026-09-03T15:05:37.987Z"
+      },
+      "statusHistory": [
+        {
+          "id": "sh-1788772609656",
+          "ticketId": "tck-1788683221820-f6e74c",
+          "previousStatus": "NEW",
+          "newStatus": "ASSIGNED",
+          "comment": "kl",
+          "createdAt": "2026-09-07T09:16:49.656Z"
         }
       ]
     },
@@ -11064,50 +11296,12 @@
         "completedTickets": 1,
         "firstTimeFixRate": 95,
         "slaComplianceRate": 98,
-        "activeTicketsCount": 1,
+        "activeTicketsCount": 3,
         "totalLaborMinutes": 0,
         "partsReplacedCount": 0,
         "rating": 5
       },
       "updatedAt": "2026-09-03T15:05:37.987Z"
-    },
-    {
-      "id": "tch-1788444729993",
-      "userId": "usr-1788444729993",
-      "employeeCode": "TECH-2",
-      "fullName": "ataa",
-      "fullNameAr": "ataa",
-      "email": "atasa@vendingfleet.com",
-      "phone": "0128046209",
-      "phoneNumber": "0128046209",
-      "specialization": "Mechanical Dispenser & Motor Tech",
-      "status": "INACTIVE",
-      "skills": [
-        "Mechanical Dispenser & Motor Tech",
-        "General Vending Maintenance"
-      ],
-      "assignedRegion": "Central Campus & Admin Complex",
-      "maxDailyCapacity": 10,
-      "maxActiveTickets": 10,
-      "isActive": false,
-      "isDeleted": true,
-      "createdAt": "2026-09-03T14:12:09.993Z",
-      "kpis": {
-        "technicianId": "tch-1788444729993",
-        "responseTimeMinutes": 15,
-        "repairTimeMinutes": 45,
-        "completedTickets": 0,
-        "firstTimeFixRate": 95,
-        "slaComplianceRate": 98,
-        "activeTicketsCount": 0,
-        "totalLaborMinutes": 0,
-        "partsReplacedCount": 8,
-        "rating": 5
-      },
-      "updatedAt": "2026-09-03T15:26:04.148Z",
-      "deletedAt": "2026-09-03T15:26:04.148Z",
-      "deletedBy": "System Admin",
-      "deletionReason": "ليس"
     }
   ],
   "categories": [],
@@ -11134,6 +11328,17 @@
   ],
   "suppliers": [],
   "partRequests": [
+    {
+      "id": "prq-1788772885371-f17436",
+      "ticketId": "cld-tck-1788772884971-6e699e4a",
+      "technicianId": "tch-1788444652245",
+      "technicianName": "ahmed",
+      "partName": "حساس خروج العبوات البصري",
+      "quantityRequested": 1,
+      "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
+      "status": "REQUESTED",
+      "timestamp": "2026-09-07T09:21:25.371Z"
+    },
     {
       "id": "prq-1788707053655-04fc74",
       "ticketId": "cld-tck-1788707053277-dd117f0b",
@@ -11751,6 +11956,47 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1788772898638",
+      "action": "MACHINE_DELETED",
+      "entityName": "Machine",
+      "entityId": "TEST-VM-190-AUTOMATED",
+      "oldValues": {
+        "id": "mch-1788772898508-770f22",
+        "machineNumber": "TEST-VM-190-AUTOMATED",
+        "publicQrToken": "RMRQSKP3"
+      },
+      "createdAt": "2026-09-07T09:21:38.638Z"
+    },
+    {
+      "id": "aud-1788772898509",
+      "action": "MACHINE_CREATED",
+      "entityName": "Machine",
+      "entityId": "TEST-VM-190-AUTOMATED",
+      "newValues": {
+        "id": "mch-1788772898508-770f22",
+        "machineNumber": "TEST-VM-190-AUTOMATED",
+        "serialNumber": "SN-TEST-VERIFY-190",
+        "publicQrToken": "RMRQSKP3",
+        "status": "OPERATIONAL"
+      },
+      "createdAt": "2026-09-07T09:21:38.508Z"
+    },
+    {
+      "id": "aud-1788772609656",
+      "action": "TICKET_ASSIGNED",
+      "entityName": "Ticket",
+      "entityId": "TCK-2026-0006",
+      "oldValues": {
+        "status": "NEW"
+      },
+      "newValues": {
+        "status": "ASSIGNED",
+        "technicianId": "tch-1788444652245",
+        "technicianName": "ahmed"
+      },
+      "createdAt": "2026-09-07T09:16:49.656Z"
+    },
     {
       "id": "aud-1788707116957",
       "action": "MACHINE_DELETED",
@@ -20605,307 +20851,6 @@
       },
       "timestamp": "2026-09-03T00:00:00.000Z",
       "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-1788443967033",
-      "action": "TICKET_TRIAGED",
-      "entityName": "Ticket",
-      "entityId": "TCK-2026-0001",
-      "oldValues": {
-        "status": "NEW"
-      },
-      "newValues": {
-        "status": "TRIAGED",
-        "priority": "CRITICAL",
-        "category": "POWER_ELECTRICAL"
-      },
-      "createdAt": "2026-09-03T13:59:27.033Z"
-    },
-    {
-      "id": "aud-1788442748560",
-      "action": "BASELINE_COMMITTED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "تم اعتماد وحفظ البيانات الحقيقية الحالية كنسخة أساسية دائمة للنظام بواسطة مدير النظام.",
-        "machinesCount": 189,
-        "locationsCount": 55,
-        "techniciansCount": 0,
-        "sparePartsCount": 0
-      },
-      "createdAt": "2026-09-03T13:39:08.560Z"
-    },
-    {
-      "id": "aud-1788442674037",
-      "userId": "usr-admin-01",
-      "user": {
-        "id": "usr-admin-01",
-        "email": "admin@vendingfleet.com",
-        "fullName": "مدير النظام",
-        "phone": "+966 50 123 4567",
-        "role": "SUPER_ADMIN",
-        "isActive": true,
-        "createdAt": "2026-09-03T00:00:00.000Z",
-        "updatedAt": "2026-09-03T00:00:00.000Z",
-        "lastLoginAt": "2026-09-03T00:00:00.000Z"
-      },
-      "action": "EXCEL_BATCH_IMPORTED",
-      "entityName": "ImportBatch",
-      "entityId": "imp-batch-1788442674013",
-      "oldValues": {},
-      "newValues": {
-        "importBatchId": "imp-batch-1788442674013",
-        "user": "Sultan Al-Otaibi (Super Admin)",
-        "timestamp": "2026-09-03T13:37:54.013Z",
-        "sourceFile": "تقرير_الماكينات_20260826_2313.xlsx",
-        "fileHash": "sha256-2a1e6479",
-        "recordsApproved": 189,
-        "recordsInserted": 189,
-        "recordsSkipped": 1,
-        "recordsRejected": 0,
-        "recordsRequiringReview": 1,
-        "buildingsCreated": 32,
-        "locationsCreated": 55
-      },
-      "ipAddress": "192.168.1.45",
-      "createdAt": "2026-09-03T13:37:54.013Z"
-    },
-    {
-      "id": "aud-init-001",
-      "action": "DATABASE_INITIALIZED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "قاعدة البيانات نظيفة تماماً وجاهزة لاستقبال وتخزين البيانات الحقيقية للشركة."
-      },
-      "timestamp": "2026-09-03T00:00:00.000Z",
-      "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-1788442748508",
-      "action": "BASELINE_COMMITTED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "تم اعتماد وحفظ البيانات الحقيقية الحالية كنسخة أساسية دائمة للنظام بواسطة مدير النظام.",
-        "machinesCount": 189,
-        "buildingsCount": 32,
-        "locationsCount": 55,
-        "techniciansCount": 0,
-        "sparePartsCount": 0
-      },
-      "timestamp": "2026-09-03T13:39:08.508Z",
-      "createdAt": "2026-09-03T13:39:08.508Z"
-    },
-    {
-      "id": "aud-1788442674037",
-      "userId": "usr-admin-01",
-      "user": {
-        "id": "usr-admin-01",
-        "email": "admin@vendingfleet.com",
-        "fullName": "مدير النظام",
-        "phone": "+966 50 123 4567",
-        "role": "SUPER_ADMIN",
-        "isActive": true,
-        "createdAt": "2026-09-03T00:00:00.000Z",
-        "updatedAt": "2026-09-03T00:00:00.000Z",
-        "lastLoginAt": "2026-09-03T00:00:00.000Z"
-      },
-      "action": "EXCEL_BATCH_IMPORTED",
-      "entityName": "ImportBatch",
-      "entityId": "imp-batch-1788442674013",
-      "oldValues": {},
-      "newValues": {
-        "importBatchId": "imp-batch-1788442674013",
-        "user": "Sultan Al-Otaibi (Super Admin)",
-        "timestamp": "2026-09-03T13:37:54.013Z",
-        "sourceFile": "تقرير_الماكينات_20260826_2313.xlsx",
-        "fileHash": "sha256-2a1e6479",
-        "recordsApproved": 189,
-        "recordsInserted": 189,
-        "recordsSkipped": 1,
-        "recordsRejected": 0,
-        "recordsRequiringReview": 1,
-        "buildingsCreated": 32,
-        "locationsCreated": 55
-      },
-      "ipAddress": "192.168.1.45",
-      "createdAt": "2026-09-03T13:37:54.013Z"
-    },
-    {
-      "id": "aud-init-001",
-      "action": "DATABASE_INITIALIZED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "قاعدة البيانات نظيفة تماماً وجاهزة لاستقبال وتخزين البيانات الحقيقية للشركة."
-      },
-      "timestamp": "2026-09-03T00:00:00.000Z",
-      "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-1788442674037",
-      "userId": "usr-admin-01",
-      "user": {
-        "id": "usr-admin-01",
-        "email": "admin@vendingfleet.com",
-        "fullName": "مدير النظام",
-        "phone": "+966 50 123 4567",
-        "role": "SUPER_ADMIN",
-        "isActive": true,
-        "createdAt": "2026-09-03T00:00:00.000Z",
-        "updatedAt": "2026-09-03T00:00:00.000Z",
-        "lastLoginAt": "2026-09-03T00:00:00.000Z"
-      },
-      "action": "EXCEL_BATCH_IMPORTED",
-      "entityName": "ImportBatch",
-      "entityId": "imp-batch-1788442674013",
-      "oldValues": {},
-      "newValues": {
-        "importBatchId": "imp-batch-1788442674013",
-        "user": "Sultan Al-Otaibi (Super Admin)",
-        "timestamp": "2026-09-03T13:37:54.013Z",
-        "sourceFile": "تقرير_الماكينات_20260826_2313.xlsx",
-        "fileHash": "sha256-2a1e6479",
-        "recordsApproved": 189,
-        "recordsInserted": 189,
-        "recordsSkipped": 1,
-        "recordsRejected": 0,
-        "recordsRequiringReview": 1,
-        "buildingsCreated": 32,
-        "locationsCreated": 55
-      },
-      "ipAddress": "192.168.1.45",
-      "createdAt": "2026-09-03T13:37:54.013Z"
-    },
-    {
-      "id": "aud-init-001",
-      "action": "DATABASE_INITIALIZED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "قاعدة البيانات نظيفة تماماً وجاهزة لاستقبال وتخزين البيانات الحقيقية للشركة."
-      },
-      "timestamp": "2026-09-03T00:00:00.000Z",
-      "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-init-001",
-      "action": "DATABASE_INITIALIZED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "قاعدة البيانات نظيفة تماماً وجاهزة لاستقبال وتخزين البيانات الحقيقية للشركة."
-      },
-      "timestamp": "2026-09-03T00:00:00.000Z",
-      "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-1788445636676",
-      "action": "USER_UPDATED",
-      "entityName": "User",
-      "entityId": "admin@vendingfleet.com",
-      "newValues": {
-        "name": "مدير النظام",
-        "role": "SUPER_ADMIN"
-      },
-      "createdAt": "2026-09-03T14:27:16.676Z"
-    },
-    {
-      "id": "aud-1788444748168",
-      "action": "TECHNICIAN_UPDATED",
-      "entityName": "Technician",
-      "entityId": "TECH-2",
-      "newValues": {
-        "fullName": "ataa",
-        "specialization": "Mechanical Dispenser & Motor Tech",
-        "status": "AVAILABLE"
-      },
-      "createdAt": "2026-09-03T14:12:28.168Z"
-    },
-    {
-      "id": "aud-1788444729993",
-      "action": "TECHNICIAN_CREATED",
-      "entityName": "Technician",
-      "entityId": "TECH-2",
-      "newValues": {
-        "fullName": "ataa",
-        "employeeCode": "TECH-2",
-        "specialization": "Mechanical Dispenser & Motor Tech",
-        "phone": "0128046209",
-        "userId": "usr-1788444729993"
-      },
-      "createdAt": "2026-09-03T14:12:09.993Z"
-    },
-    {
-      "id": "aud-1788444652245",
-      "action": "TECHNICIAN_CREATED",
-      "entityName": "Technician",
-      "entityId": "TECH-1",
-      "newValues": {
-        "fullName": "ahmed",
-        "employeeCode": "TECH-1",
-        "specialization": "Senior Master Technician",
-        "phone": "01010904549",
-        "userId": "usr-1788444652245"
-      },
-      "createdAt": "2026-09-03T14:10:52.245Z"
-    },
-    {
-      "id": "aud-1788442748560",
-      "action": "BASELINE_COMMITTED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "تم اعتماد وحفظ البيانات الحقيقية الحالية كنسخة أساسية دائمة للنظام بواسطة مدير النظام.",
-        "machinesCount": 189,
-        "locationsCount": 55,
-        "techniciansCount": 0,
-        "sparePartsCount": 0
-      },
-      "createdAt": "2026-09-03T13:39:08.560Z"
-    },
-    {
-      "id": "aud-1788442674037",
-      "userId": "usr-admin-01",
-      "user": {
-        "id": "usr-admin-01",
-        "email": "admin@vendingfleet.com",
-        "fullName": "مدير النظام",
-        "phone": "+966 50 123 4567",
-        "role": "SUPER_ADMIN",
-        "isActive": true,
-        "createdAt": "2026-09-03T00:00:00.000Z",
-        "updatedAt": "2026-09-03T00:00:00.000Z",
-        "lastLoginAt": "2026-09-03T00:00:00.000Z"
-      },
-      "action": "EXCEL_BATCH_IMPORTED",
-      "entityName": "ImportBatch",
-      "entityId": "imp-batch-1788442674013",
-      "oldValues": {},
-      "newValues": {
-        "importBatchId": "imp-batch-1788442674013",
-        "user": "Sultan Al-Otaibi (Super Admin)",
-        "timestamp": "2026-09-03T13:37:54.013Z",
-        "sourceFile": "تقرير_الماكينات_20260826_2313.xlsx",
-        "fileHash": "sha256-2a1e6479",
-        "recordsApproved": 189,
-        "recordsInserted": 189,
-        "recordsSkipped": 1,
-        "recordsRejected": 0,
-        "recordsRequiringReview": 1,
-        "buildingsCreated": 32,
-        "locationsCreated": 55
-      },
-      "ipAddress": "192.168.1.45",
-      "createdAt": "2026-09-03T13:37:54.013Z"
     }
   ],
   "importBatches": [
@@ -24049,7 +23994,13 @@
     "cld-evt-1788707053646-c30f7ec8",
     "cld-evt-1788707053652-f475ba40",
     "cld-evt-1788707053657-6ae66c75",
-    "cld-evt-1788707053663-35a2b0fa"
+    "cld-evt-1788707053663-35a2b0fa",
+    "cld-evt-1788772884973-ba75788b",
+    "cld-evt-1788772885351-9cea1a81",
+    "cld-evt-1788772885358-f2857533",
+    "cld-evt-1788772885368-ad586496",
+    "cld-evt-1788772885372-c1128bf1",
+    "cld-evt-1788772885377-a2f893e5"
   ],
-  "lastCloudSyncCursor": 24
+  "lastCloudSyncCursor": 30
 }

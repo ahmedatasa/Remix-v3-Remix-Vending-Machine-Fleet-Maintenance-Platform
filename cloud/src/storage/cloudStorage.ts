@@ -217,13 +217,19 @@ export class S3CompatibleStorageProvider implements ICloudStorageProvider {
         ? `${this.endpoint.replace(/\/+$/, '')}/${this.bucket}/${objectKey}`
         : `https://${this.bucket}.s3.${this.region}.amazonaws.com/${objectKey}`;
 
+      const providerName = cloudConfig.storageProvider === 'supabase'
+        ? 'supabase_s3'
+        : cloudConfig.storageProvider === 'r2'
+        ? 'cloudflare_r2'
+        : 's3_compatible';
+
       return {
         objectKey,
         url: publicUrl,
         sizeBytes: input.buffer.length,
         mimeType: input.mimeType.toLowerCase(),
         sha256,
-        provider: 'cloudflare_r2'
+        provider: providerName
       };
     } catch (err: any) {
       console.error('[CloudStorage R2] Upload error:', err.message);

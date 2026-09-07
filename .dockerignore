@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+fleet_data.json
+fleet_master_baseline.json
+fleet_data.backup.*.json
+cloud_data.json
+cloud_storage
+dist
+.git
+.env
+tests
+coverage
+*.md

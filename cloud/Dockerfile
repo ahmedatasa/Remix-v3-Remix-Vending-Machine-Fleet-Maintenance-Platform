@@ -15,7 +15,6 @@ RUN npm ci --ignore-scripts
 # Copy application source (excluding fleet_data via .dockerignore)
 COPY tsconfig*.json ./
 COPY cloud ./cloud
-COPY src/types.ts ./src/types.ts
 
 # Bundle Cloud Server into a standalone CommonJS bundle
 RUN npx esbuild cloud/src/server.ts \
