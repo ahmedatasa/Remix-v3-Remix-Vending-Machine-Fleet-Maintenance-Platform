@@ -1,4 +1,4 @@
-import {
+import type {
   ICloudRepositoryManager,
   ICloudMachineRepository,
   ICloudTicketRepository,
@@ -9,8 +9,10 @@ import {
   IIdempotencyRepository
 } from './interfaces';
 import {
-  cloudDb,
-  CloudDatabase,
+  getCloudDb,
+  CloudDatabase
+} from '../db/cloudDb';
+import type {
   SanitizedCloudMachine,
   CloudTicket,
   CloudCheckinRecord,
@@ -299,14 +301,15 @@ export class JsonCloudRepositoryManager implements ICloudRepositoryManager {
   public audit: IAuditRepository;
   public idempotency: IIdempotencyRepository;
 
-  constructor(dbInstance: CloudDatabase = cloudDb) {
-    this.machines = new JsonCloudMachineRepository(dbInstance);
-    this.tickets = new JsonCloudTicketRepository(dbInstance);
-    this.technicians = new JsonTechnicianRepository(dbInstance);
-    this.sessions = new JsonSessionRepository(dbInstance);
-    this.syncEvents = new JsonSyncEventRepository(dbInstance);
-    this.audit = new JsonAuditRepository(dbInstance);
-    this.idempotency = new JsonIdempotencyRepository(dbInstance);
+  constructor(dbInstance?: CloudDatabase) {
+    const db = dbInstance || getCloudDb();
+    this.machines = new JsonCloudMachineRepository(db);
+    this.tickets = new JsonCloudTicketRepository(db);
+    this.technicians = new JsonTechnicianRepository(db);
+    this.sessions = new JsonSessionRepository(db);
+    this.syncEvents = new JsonSyncEventRepository(db);
+    this.audit = new JsonAuditRepository(db);
+    this.idempotency = new JsonIdempotencyRepository(db);
   }
 
   async checkHealth(): Promise<{ healthy: boolean; details?: any }> {

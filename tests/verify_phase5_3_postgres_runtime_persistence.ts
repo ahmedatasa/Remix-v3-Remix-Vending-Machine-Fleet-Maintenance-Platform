@@ -530,7 +530,7 @@ async function runTests() {
   try {
     cloudDb.save();
   } catch (err: any) {
-    if (err.message.includes('FATAL_SPLIT_BRAIN_GUARD') && err.message.includes('Writing to cloud_data.json is strictly prohibited')) {
+    if (err.message.includes('FATAL_SPLIT_BRAIN_GUARD')) {
       caughtCloudDbWrite = true;
     }
   }

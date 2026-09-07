@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { CloudTechnicianSession } from '../db/cloudDb';
+import type { CloudTechnicianSession } from '../db/cloudDb';
 import { getCloudRepository } from '../repositories';
 
 export interface TechnicianLoginResult {

@@ -182,6 +182,18 @@ export class CloudDatabase {
   private isWriting = false;
 
   constructor(filePath?: string) {
+    const isStagingOrProduction =
+      cloudConfig.isProduction ||
+      cloudConfig.isStaging ||
+      process.env.NODE_ENV === 'staging' ||
+      process.env.NODE_ENV === 'production';
+
+    if (isStagingOrProduction) {
+      throw new Error(
+        'FATAL_SPLIT_BRAIN_GUARD: CloudDatabase instantiation is strictly prohibited in staging/production mode. PostgreSQL is the authoritative runtime data store.'
+      );
+    }
+
     this.filePath = filePath || cloudConfig.cloudDatabaseFile;
     this.data = this.loadInitial();
   }
@@ -219,7 +231,15 @@ export class CloudDatabase {
       console.warn('[CloudDb] Failed to read existing cloud database, initializing fresh state:', err);
     }
     const def = this.getDefaultData();
-    this.persistSync(def);
+    const isStagingOrProduction =
+      cloudConfig.isProduction ||
+      cloudConfig.isStaging ||
+      process.env.NODE_ENV === 'staging' ||
+      process.env.NODE_ENV === 'production';
+
+    if (!isStagingOrProduction) {
+      this.persistSync(def);
+    }
     return def;
   }
 
@@ -435,4 +455,38 @@ export class CloudDatabase {
   }
 }
 
-export const cloudDb = new CloudDatabase();
+let _cloudDbInstance: CloudDatabase | null = null;
+
+export function getCloudDb(): CloudDatabase {
+  const isStagingOrProduction =
+    cloudConfig.isProduction ||
+    cloudConfig.isStaging ||
+    process.env.NODE_ENV === 'staging' ||
+    process.env.NODE_ENV === 'production';
+
+  if (isStagingOrProduction) {
+    throw new Error(
+      'FATAL_SPLIT_BRAIN_GUARD: Accessing CloudDatabase/cloudDb is strictly prohibited in staging/production mode. PostgreSQL is the authoritative runtime data store.'
+    );
+  }
+
+  if (!_cloudDbInstance) {
+    _cloudDbInstance = new CloudDatabase();
+  }
+  return _cloudDbInstance;
+}
+
+export function resetCloudDbInstance(): void {
+  _cloudDbInstance = null;
+}
+
+export const cloudDb: CloudDatabase = new Proxy({} as CloudDatabase, {
+  get(_target, prop, receiver) {
+    const instance = getCloudDb();
+    const value = Reflect.get(instance as any, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(instance);
+    }
+    return value;
+  }
+});

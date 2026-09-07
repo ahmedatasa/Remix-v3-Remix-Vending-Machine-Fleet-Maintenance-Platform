@@ -1,6 +1,5 @@
 import { Pool } from 'pg';
 import type { ICloudRepositoryManager } from './interfaces';
-import { JsonCloudRepositoryManager } from './jsonRepository';
 import { PostgresCloudRepositoryManager } from './postgresRepository';
 import { runCloudDatabaseMigrations } from '../db/migrations/runner';
 import { cloudConfig } from '../config/cloudConfig';
@@ -12,6 +11,12 @@ export async function initializeCloudRepository(): Promise<ICloudRepositoryManag
   if (activeRepository) {
     return activeRepository;
   }
+
+  const isStagingOrProduction =
+    cloudConfig.isProduction ||
+    cloudConfig.isStaging ||
+    process.env.NODE_ENV === 'staging' ||
+    process.env.NODE_ENV === 'production';
 
   const dbUrl = cloudConfig.databaseUrl;
 
@@ -35,22 +40,28 @@ export async function initializeCloudRepository(): Promise<ICloudRepositoryManag
       return activeRepository;
     } catch (err: any) {
       console.error('[CloudRepository] Failed to initialize PostgreSQL:', err.message);
-      if (cloudConfig.isProduction || cloudConfig.isStaging || process.env.NODE_ENV === 'staging') {
+      if (isStagingOrProduction) {
         throw new Error('FATAL: Database connection failed in staging/production mode. Refusing to fallback to local JSON to prevent split-brain data.');
       }
       console.warn('[CloudRepository] Falling back to JSON Development repository for local/testing mode.');
+      const { JsonCloudRepositoryManager } = await import('./jsonRepository');
       activeRepository = new JsonCloudRepositoryManager();
       return activeRepository;
     }
   }
 
-  if (cloudConfig.isProduction || cloudConfig.isStaging || process.env.NODE_ENV === 'staging') {
+  if (isStagingOrProduction) {
     throw new Error('FATAL: CLOUD_DATABASE_URL is required in staging/production environment.');
   }
 
   console.log('[CloudRepository] CLOUD_DATABASE_URL not set. Running in JSON Development repository mode.');
+  const { JsonCloudRepositoryManager } = await import('./jsonRepository');
   activeRepository = new JsonCloudRepositoryManager();
   return activeRepository;
+}
+
+export function setActiveRepository(repo: ICloudRepositoryManager | null): void {
+  activeRepository = repo;
 }
 
 export async function resetActiveRepository(): Promise<void> {
@@ -75,6 +86,9 @@ export function getCloudRepository(): ICloudRepositoryManager {
       throw new Error('FATAL_SPLIT_BRAIN_GUARD: getCloudRepository() called before PostgreSQL repository was initialized in staging/production mode.');
     }
     // Default synchronous instance for dev/test before async init
+    // Dynamic require so JSON repository is never evaluated at module import time
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JsonCloudRepositoryManager } = require('./jsonRepository');
     activeRepository = new JsonCloudRepositoryManager();
   }
 

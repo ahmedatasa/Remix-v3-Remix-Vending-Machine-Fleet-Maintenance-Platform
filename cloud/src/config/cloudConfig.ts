@@ -59,8 +59,8 @@ export function resolveCloudPort(): number {
     return parseInt(process.env.CLOUD_PORT, 10);
   }
 
-  // Standalone production container fallback
-  if (process.env.NODE_ENV === 'production' && process.env.PORT) {
+  // Standalone staging/production container fallback
+  if ((process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') && process.env.PORT) {
     return parseInt(process.env.PORT, 10);
   }
 

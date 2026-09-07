@@ -1,5 +1,5 @@
 import { cloudConfig } from '../config/cloudConfig';
-import { SanitizedCloudMachine } from '../db/cloudDb';
+import type { SanitizedCloudMachine } from '../db/cloudDb';
 
 export interface GpsCoordinates {
   latitude: number;

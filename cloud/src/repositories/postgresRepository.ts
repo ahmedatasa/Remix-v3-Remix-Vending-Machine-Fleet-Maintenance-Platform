@@ -10,7 +10,7 @@ import {
   IAuditRepository,
   IIdempotencyRepository
 } from './interfaces';
-import {
+import type {
   SanitizedCloudMachine,
   CloudTicket,
   CloudCheckinRecord,

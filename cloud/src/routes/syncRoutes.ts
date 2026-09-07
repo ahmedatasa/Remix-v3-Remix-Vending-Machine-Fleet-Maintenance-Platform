@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireSyncAuth } from '../middleware/syncAuth';
-import { SanitizedCloudMachine, CloudTechnicianAccount } from '../db/cloudDb';
+import type { SanitizedCloudMachine, CloudTechnicianAccount } from '../db/cloudDb';
 import { getCloudRepository } from '../repositories';
 
 export const syncRoutes = Router();

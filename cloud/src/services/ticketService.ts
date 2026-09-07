@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { CloudTicket } from '../db/cloudDb';
+import type { CloudTicket } from '../db/cloudDb';
 import { getCloudRepository } from '../repositories';
 import { GpsService, GpsCoordinates } from './gpsService';
 import { StorageUploadResult } from '../storage/cloudStorage';

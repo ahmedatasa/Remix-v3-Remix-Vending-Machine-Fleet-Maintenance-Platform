@@ -1,4 +1,4 @@
-import {
+import type {
   SanitizedCloudMachine,
   CloudTicket,
   CloudCheckinRecord,

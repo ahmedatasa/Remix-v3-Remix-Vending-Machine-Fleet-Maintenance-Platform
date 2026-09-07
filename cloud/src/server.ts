@@ -3,6 +3,10 @@ import { createCloudApp } from './app';
 import { cloudConfig } from './config/cloudConfig';
 import { initializeCloudRepository } from './repositories';
 
+export { createCloudApp } from './app';
+export { initializeCloudRepository, getCloudRepository, resetActiveRepository } from './repositories';
+export { CloudDatabase, getCloudDb } from './db/cloudDb';
+
 let serverInstance: http.Server | null = null;
 
 export async function startCloudServer(port?: number): Promise<http.Server> {
