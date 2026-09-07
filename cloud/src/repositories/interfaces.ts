@@ -33,12 +33,14 @@ export interface ICloudTicketRepository {
   addFunctionalTest(test: CloudFunctionalTestRecord): Promise<void>;
   addPartRequest(request: CloudPartRequestRecord): Promise<void>;
   updateTicketStatus(ticketId: string, status: CloudTicket['status'], resolutionSummary?: string): Promise<void>;
+  count(): Promise<number>;
 }
 
 export interface ITechnicianRepository {
   findByEmployeeCode(code: string): Promise<CloudTechnicianAccount | null>;
   findById(id: string): Promise<CloudTechnicianAccount | null>;
   saveTechnician(account: CloudTechnicianAccount): Promise<void>;
+  count(): Promise<number>;
 }
 
 export interface ISessionRepository {
@@ -46,12 +48,15 @@ export interface ISessionRepository {
   findSessionByTokenHash(tokenHash: string): Promise<CloudTechnicianSession | null>;
   deleteSession(sessionId: string): Promise<void>;
   deleteExpiredSessions(): Promise<number>;
+  countActive(): Promise<number>;
 }
 
 export interface ISyncEventRepository {
   pushEvent(eventType: CloudSyncEventType, entityId: string, payload: any, version?: number): Promise<CloudSyncEvent>;
   getEventsAfter(cursor: number, limit?: number): Promise<{ events: CloudSyncEvent[]; nextCursor: number; hasMore: boolean }>;
   acknowledgeEvents(eventIds: string[]): Promise<{ acknowledgedCount: number }>;
+  count(): Promise<number>;
+  countPending(): Promise<number>;
 }
 
 export interface IAuditRepository {

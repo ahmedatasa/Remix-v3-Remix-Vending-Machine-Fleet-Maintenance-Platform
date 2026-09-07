@@ -24,6 +24,13 @@ import {
   CloudSyncEventType
 } from '../db/cloudDb';
 
+function toIsoDate(d: any): string {
+  if (!d) return new Date().toISOString();
+  if (d instanceof Date) return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
 export class PostgresCloudMachineRepository implements ICloudMachineRepository {
   constructor(private pool: Pool) {}
 
@@ -192,14 +199,14 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
       status: ticketRow.status,
       syncStatus: ticketRow.sync_status,
       resolutionSummary: ticketRow.resolution_summary || undefined,
-      createdAt: ticketRow.created_at.toISOString(),
-      updatedAt: ticketRow.updated_at.toISOString(),
+      createdAt: toIsoDate(ticketRow.created_at),
+      updatedAt: toIsoDate(ticketRow.updated_at),
       checkins: checkinsRes.rows.map(r => ({
         id: r.id,
         ticketId: r.ticket_id,
         technicianId: r.technician_id,
         technicianName: r.technician_name,
-        timestamp: r.created_at.toISOString(),
+        timestamp: toIsoDate(r.created_at || r.timestamp),
         latitude: r.latitude,
         longitude: r.longitude,
         accuracyMeters: r.accuracy_meters,
@@ -215,7 +222,7 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
         technicianName: r.technician_name,
         actionType: r.action_type,
         description: r.description,
-        timestamp: r.created_at.toISOString()
+        timestamp: toIsoDate(r.created_at || r.timestamp)
       })),
       evidence: evidenceRes.rows.map(r => ({
         id: r.id,
@@ -228,7 +235,7 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
         sizeBytes: Number(r.size_bytes),
         sha256: r.sha256,
         caption: r.caption || '',
-        timestamp: r.created_at.toISOString()
+        timestamp: toIsoDate(r.created_at || r.timestamp)
       })),
       functionalTests: testsRes.rows.map(r => ({
         id: r.id,
@@ -238,7 +245,7 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
         testType: r.test_type,
         passed: r.passed,
         notes: r.notes || '',
-        timestamp: r.created_at.toISOString()
+        timestamp: toIsoDate(r.created_at || r.timestamp)
       })),
       partRequests: partReqsRes.rows.map(r => ({
         id: r.id,
@@ -250,7 +257,7 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
         quantityRequested: r.quantity_requested,
         reason: r.reason,
         status: r.status,
-        timestamp: r.created_at.toISOString()
+        timestamp: toIsoDate(r.created_at || r.timestamp)
       }))
     };
   }
@@ -413,6 +420,11 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
       );
     }
   }
+
+  async count(): Promise<number> {
+    const res = await this.pool.query('SELECT COUNT(*) as cnt FROM cloud_tickets;');
+    return parseInt(res.rows[0].cnt, 10);
+  }
 }
 
 export class PostgresTechnicianRepository implements ITechnicianRepository {
@@ -420,7 +432,10 @@ export class PostgresTechnicianRepository implements ITechnicianRepository {
 
   async findByEmployeeCode(code: string): Promise<CloudTechnicianAccount | null> {
     const clean = code.trim().toUpperCase();
-    const res = await this.pool.query('SELECT * FROM technician_accounts WHERE UPPER(employee_code) = $1 LIMIT 1;', [clean]);
+    const res = await this.pool.query(
+      'SELECT * FROM technician_accounts WHERE UPPER(employee_code) = $1 OR UPPER(email) = $1 OR id = $2 LIMIT 1;',
+      [clean, code.trim()]
+    );
     if (res.rows.length === 0) return null;
     const r = res.rows[0];
     return {
@@ -475,6 +490,11 @@ export class PostgresTechnicianRepository implements ITechnicianRepository {
       account.specialization || null
     ]);
   }
+
+  async count(): Promise<number> {
+    const res = await this.pool.query('SELECT COUNT(*) as cnt FROM technician_accounts;');
+    return parseInt(res.rows[0].cnt, 10);
+  }
 }
 
 export class PostgresSessionRepository implements ISessionRepository {
@@ -524,6 +544,11 @@ export class PostgresSessionRepository implements ISessionRepository {
   async deleteExpiredSessions(): Promise<number> {
     const res = await this.pool.query('DELETE FROM technician_sessions WHERE expires_at <= CURRENT_TIMESTAMP;');
     return res.rowCount || 0;
+  }
+
+  async countActive(): Promise<number> {
+    const res = await this.pool.query('SELECT COUNT(*) as cnt FROM technician_sessions WHERE expires_at > CURRENT_TIMESTAMP;');
+    return parseInt(res.rows[0].cnt, 10);
   }
 }
 
@@ -594,6 +619,16 @@ export class PostgresSyncEventRepository implements ISyncEventRepository {
     `;
     const res = await this.pool.query(query, [eventIds]);
     return { acknowledgedCount: res.rowCount || 0 };
+  }
+
+  async count(): Promise<number> {
+    const res = await this.pool.query('SELECT COUNT(*) as cnt FROM sync_events;');
+    return parseInt(res.rows[0].cnt, 10);
+  }
+
+  async countPending(): Promise<number> {
+    const res = await this.pool.query("SELECT COUNT(*) as cnt FROM sync_events WHERE status = 'PENDING';");
+    return parseInt(res.rows[0].cnt, 10);
   }
 }
 

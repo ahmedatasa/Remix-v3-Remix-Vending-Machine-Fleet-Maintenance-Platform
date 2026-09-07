@@ -64,10 +64,24 @@ export async function resetActiveRepository(): Promise<void> {
 }
 
 export function getCloudRepository(): ICloudRepositoryManager {
+  const isStagingOrProduction =
+    cloudConfig.isProduction ||
+    cloudConfig.isStaging ||
+    process.env.NODE_ENV === 'staging' ||
+    process.env.NODE_ENV === 'production';
+
   if (!activeRepository) {
+    if (isStagingOrProduction) {
+      throw new Error('FATAL_SPLIT_BRAIN_GUARD: getCloudRepository() called before PostgreSQL repository was initialized in staging/production mode.');
+    }
     // Default synchronous instance for dev/test before async init
     activeRepository = new JsonCloudRepositoryManager();
   }
+
+  if (isStagingOrProduction && activeRepository.providerType === 'JSON_DEV') {
+    throw new Error('FATAL_SPLIT_BRAIN_GUARD: Operational cloud route attempted to use JSON_DEV repository in staging/production mode. PostgreSQL is strictly required.');
+  }
+
   return activeRepository;
 }
 

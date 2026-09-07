@@ -56,9 +56,9 @@ technicianRoutes.post('/technician/login', loginLimiter, async (req: Request, re
 /**
  * POST /technician/logout
  */
-technicianRoutes.post('/technician/logout', requireCloudTechnicianAuth, (req: Request, res: Response) => {
+technicianRoutes.post('/technician/logout', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tokenHash = (req as any).sessionTokenHash;
-  AuthService.logoutTechnician(tokenHash);
+  await AuthService.logoutTechnician(tokenHash);
   res.json({ success: true, message: 'تم تسجيل الخروج بنجاح وإلغاء صلاحية الجلسة.' });
 });
 
@@ -76,7 +76,7 @@ technicianRoutes.get('/technician/me', requireCloudTechnicianAuth, (req: Request
 /**
  * POST /technician/checkin
  */
-technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnicianAuth, (req: Request, res: Response) => {
+technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, machineToken, coordinates, manualException } = req.body;
 
@@ -88,7 +88,7 @@ technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnic
   }
 
   try {
-    const result = TicketService.performTechnicianCheckin({
+    const result = await TicketService.performTechnicianCheckin({
       ticketId,
       machineToken,
       technicianId: tech.id,
@@ -148,7 +148,7 @@ technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, async 
       technicianId: tech.id
     });
 
-    const result = TicketService.attachEvidence({
+    const result = await TicketService.attachEvidence({
       ticketId,
       technicianId: tech.id,
       technicianName: tech.fullName,
@@ -172,7 +172,7 @@ technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, async 
 /**
  * POST /technician/action
  */
-technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, (req: Request, res: Response) => {
+technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, actionType = 'MAINTENANCE_WORK', description } = req.body;
 
@@ -184,7 +184,7 @@ technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, (req: Re
   }
 
   try {
-    const result = TicketService.addTechnicianAction({
+    const result = await TicketService.addTechnicianAction({
       ticketId,
       technicianId: tech.id,
       technicianName: tech.fullName,
@@ -205,7 +205,7 @@ technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, (req: Re
 /**
  * POST /technician/test
  */
-technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, (req: Request, res: Response) => {
+technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, testType = 'DISPENSE_TEST', passed, notes } = req.body;
 
@@ -217,7 +217,7 @@ technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, (req: Requ
   }
 
   try {
-    const result = TicketService.addFunctionalTest({
+    const result = await TicketService.addFunctionalTest({
       ticketId,
       technicianId: tech.id,
       technicianName: tech.fullName,
@@ -239,12 +239,12 @@ technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, (req: Requ
 /**
  * POST /technician/part-request
  */
-technicianRoutes.post('/technician/part-request', requireCloudTechnicianAuth, (req: Request, res: Response) => {
+technicianRoutes.post('/technician/part-request', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, partName, quantityRequested = 1, reason, partId } = req.body;
 
   try {
-    const result = TicketService.requestSparePart({
+    const result = await TicketService.requestSparePart({
       ticketId,
       technicianId: tech.id,
       technicianName: tech.fullName,
@@ -267,12 +267,12 @@ technicianRoutes.post('/technician/part-request', requireCloudTechnicianAuth, (r
 /**
  * POST /technician/resolve
  */
-technicianRoutes.post('/technician/resolve', requireCloudTechnicianAuth, (req: Request, res: Response) => {
+technicianRoutes.post('/technician/resolve', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, summary = 'تمت معالجة العطل واختبار الماكينة بنجاح.' } = req.body;
 
   try {
-    const result = TicketService.resolveTicket({
+    const result = await TicketService.resolveTicket({
       ticketId,
       technicianId: tech.id,
       technicianName: tech.fullName,

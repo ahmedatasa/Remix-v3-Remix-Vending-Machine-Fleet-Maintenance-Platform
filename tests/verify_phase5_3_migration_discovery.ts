@@ -48,9 +48,9 @@ function createMockPgPool() {
       executedQueries.push(sql.trim());
 
       // Query for already applied migrations
-      if (sql.includes('SELECT version FROM schema_migrations')) {
+      if (sql.includes('SELECT') && sql.includes('FROM schema_migrations')) {
         return {
-          rows: schemaMigrations.map(m => ({ version: m.version }))
+          rows: schemaMigrations.map(m => ({ version: m.version, name: m.name }))
         };
       }
 

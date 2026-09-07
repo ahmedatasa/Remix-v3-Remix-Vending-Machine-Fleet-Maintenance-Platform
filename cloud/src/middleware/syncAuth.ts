@@ -1,14 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { cloudConfig } from '../config/cloudConfig';
-import { cloudDb } from '../db/cloudDb';
+import { getCloudRepository } from '../repositories';
 
-export function requireSyncAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireSyncAuth(req: Request, res: Response, next: NextFunction) {
   const clientId = req.headers['x-sync-client-id'] as string;
   const clientSecret = req.headers['x-sync-client-secret'] as string;
+  const repo = getCloudRepository();
 
   if (!clientId || !clientSecret) {
-    cloudDb.logAudit('DESKTOP_SYNC', 'ANONYMOUS', 'Desktop Sync Client', 'SYNC_AUTH_FAILED', 'SYNC_API', 'BLOCKED', {
-      reason: 'MISSING_SYNC_CREDENTIALS',
+    await repo.audit.log({
+      actorType: 'DESKTOP_SYNC',
+      actorId: 'ANONYMOUS',
+      actorName: 'Desktop Sync Client',
+      action: 'SYNC_AUTH_FAILED',
+      entity: 'SYNC_API',
+      result: 'BLOCKED',
+      details: {
+        reason: 'MISSING_SYNC_CREDENTIALS',
+        ip: req.ip
+      },
       ip: req.ip
     });
     return res.status(401).json({
@@ -18,8 +28,17 @@ export function requireSyncAuth(req: Request, res: Response, next: NextFunction)
   }
 
   if (clientId !== cloudConfig.syncClientId || clientSecret !== cloudConfig.syncClientSecret) {
-    cloudDb.logAudit('DESKTOP_SYNC', clientId, 'Unknown Sync Client', 'SYNC_AUTH_FAILED', 'SYNC_API', 'BLOCKED', {
-      reason: 'INVALID_SYNC_CREDENTIALS',
+    await repo.audit.log({
+      actorType: 'DESKTOP_SYNC',
+      actorId: clientId,
+      actorName: 'Unknown Sync Client',
+      action: 'SYNC_AUTH_FAILED',
+      entity: 'SYNC_API',
+      result: 'BLOCKED',
+      details: {
+        reason: 'INVALID_SYNC_CREDENTIALS',
+        ip: req.ip
+      },
       ip: req.ip
     });
     return res.status(403).json({

@@ -238,6 +238,18 @@ export class CloudDatabase {
   }
 
   private persistSync(dataToSave: CloudDatabaseData): void {
+    const isStagingOrProduction =
+      cloudConfig.isProduction ||
+      cloudConfig.isStaging ||
+      process.env.NODE_ENV === 'staging' ||
+      process.env.NODE_ENV === 'production';
+
+    if (isStagingOrProduction) {
+      throw new Error(
+        'FATAL_SPLIT_BRAIN_GUARD: Writing to cloud_data.json is strictly prohibited in staging/production mode. PostgreSQL is the authoritative runtime data store.'
+      );
+    }
+
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { cloudDb } from '../db/cloudDb';
+import { getCloudRepository } from '../repositories';
 import { cloudConfig } from '../config/cloudConfig';
 import { TicketService } from '../services/ticketService';
 import { createCloudRateLimiter } from '../middleware/rateLimiter';
@@ -38,13 +38,23 @@ publicRoutes.get('/public/config', (req: Request, res: Response) => {
  * Lookup sanitized machine by opaque public QR token.
  * Returns 404 if invalid. Never returns private costs, serial numbers, or technicians.
  */
-publicRoutes.get('/public/m/:token', (req: Request, res: Response) => {
+publicRoutes.get('/public/m/:token', async (req: Request, res: Response) => {
   const token = req.params.token;
-  const machine = cloudDb.findMachineByQrToken(token);
+  const repo = getCloudRepository();
+  const machine = await repo.machines.findByQrToken(token);
 
   if (!machine) {
-    cloudDb.logAudit('ANONYMOUS', token, 'Anonymous Scanner', 'INVALID_QR_LOOKUP', 'MACHINE_REGISTRY', 'FAILURE', {
-      token,
+    await repo.audit.log({
+      actorType: 'ANONYMOUS',
+      actorId: token,
+      actorName: 'Anonymous Scanner',
+      action: 'INVALID_QR_LOOKUP',
+      entity: 'MACHINE_REGISTRY',
+      result: 'FAILURE',
+      details: {
+        token,
+        ip: req.ip
+      },
       ip: req.ip
     });
     return res.status(404).json({
@@ -70,12 +80,12 @@ publicRoutes.get('/public/m/:token', (req: Request, res: Response) => {
  * POST /public/m/:token/report
  * Customer fault report submission.
  */
-publicRoutes.post('/public/m/:token/report', customerReportLimiter, (req: Request, res: Response) => {
+publicRoutes.post('/public/m/:token/report', customerReportLimiter, async (req: Request, res: Response) => {
   const token = req.params.token;
   const { category, description, reporterName, reporterPhone, reporterEmail, cloudReportId } = req.body;
 
   try {
-    const result = TicketService.submitCustomerFaultReport({
+    const result = await TicketService.submitCustomerFaultReport({
       publicQrToken: token,
       category,
       description,
@@ -112,11 +122,11 @@ publicRoutes.post('/public/m/:token/report', customerReportLimiter, (req: Reques
  * GET /public/ticket/:trackingToken
  * Public ticket status query by opaque tracking token.
  */
-publicRoutes.get('/public/ticket/:trackingToken', ticketTrackingLimiter, (req: Request, res: Response) => {
+publicRoutes.get('/public/ticket/:trackingToken', ticketTrackingLimiter, async (req: Request, res: Response) => {
   const trackingToken = req.params.trackingToken;
 
   try {
-    const data = TicketService.getPublicTicketTracking(trackingToken, req.ip);
+    const data = await TicketService.getPublicTicketTracking(trackingToken, req.ip);
     res.json(data);
   } catch (err: any) {
     const msg = err.message || '';

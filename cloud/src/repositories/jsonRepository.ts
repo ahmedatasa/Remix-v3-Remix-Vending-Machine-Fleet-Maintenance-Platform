@@ -134,6 +134,10 @@ export class JsonCloudTicketRepository implements ICloudTicketRepository {
       this.db.save();
     }
   }
+
+  async count(): Promise<number> {
+    return this.db.getData().cloud_tickets.length;
+  }
 }
 
 export class JsonTechnicianRepository implements ITechnicianRepository {
@@ -141,7 +145,11 @@ export class JsonTechnicianRepository implements ITechnicianRepository {
 
   async findByEmployeeCode(code: string): Promise<CloudTechnicianAccount | null> {
     const clean = code.trim().toUpperCase();
-    return this.db.getData().technician_accounts.find(t => t.employeeCode.toUpperCase() === clean) || null;
+    return this.db.getData().technician_accounts.find(t =>
+      t.employeeCode.toUpperCase() === clean ||
+      (t.email && t.email.toUpperCase() === clean) ||
+      t.id === code.trim()
+    ) || null;
   }
 
   async findById(id: string): Promise<CloudTechnicianAccount | null> {
@@ -156,6 +164,10 @@ export class JsonTechnicianRepository implements ITechnicianRepository {
       this.db.getData().technician_accounts.push(account);
     }
     this.db.save();
+  }
+
+  async count(): Promise<number> {
+    return this.db.getData().technician_accounts.length;
   }
 }
 
@@ -202,6 +214,12 @@ export class JsonSessionRepository implements ISessionRepository {
     if (removed > 0) this.db.save();
     return removed;
   }
+
+  async countActive(): Promise<number> {
+    const data = this.db.getData();
+    const now = Date.now();
+    return Object.values(data.technician_sessions).filter(s => new Date(s.expiresAt).getTime() > now).length;
+  }
 }
 
 export class JsonSyncEventRepository implements ISyncEventRepository {
@@ -217,6 +235,14 @@ export class JsonSyncEventRepository implements ISyncEventRepository {
 
   async acknowledgeEvents(eventIds: string[]): Promise<{ acknowledgedCount: number }> {
     return this.db.acknowledgeSyncEvents(eventIds);
+  }
+
+  async count(): Promise<number> {
+    return this.db.getData().sync_events.length;
+  }
+
+  async countPending(): Promise<number> {
+    return this.db.getData().sync_events.filter(e => e.status === 'PENDING').length;
   }
 }
 

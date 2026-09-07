@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { cloudDb, CloudTechnicianAccount } from '../db/cloudDb';
+import { CloudTechnicianSession } from '../db/cloudDb';
+import { getCloudRepository } from '../repositories';
 
 export interface TechnicianLoginResult {
   success: boolean;
@@ -30,7 +31,8 @@ export class AuthService {
     secret: string,
     clientIp?: string
   ): Promise<TechnicianLoginResult> {
-    const cleanId = (identifier || '').trim().toLowerCase();
+    const repo = getCloudRepository();
+    const cleanId = (identifier || '').trim();
     const cleanSecret = (secret || '').trim();
 
     if (!cleanId) {
@@ -40,33 +42,55 @@ export class AuthService {
       throw new Error('CREDENTIALS_REQUIRED: كلمة المرور أو رمز الـ PIN مطلوب.');
     }
 
-    // Lookup technician in cloud accounts
-    const tech = cloudDb.getData().technician_accounts.find(t => {
-      const code = (t.employeeCode || '').toLowerCase().trim();
-      const mail = (t.email || '').toLowerCase().trim();
-      const id = (t.id || '').toLowerCase().trim();
-      return code === cleanId || mail === cleanId || id === cleanId;
-    });
+    // Lookup technician in authoritative cloud accounts
+    const tech = await repo.technicians.findByEmployeeCode(cleanId);
 
     if (!tech) {
-      cloudDb.logAudit('TECHNICIAN', cleanId, 'Unknown Technician', 'TECHNICIAN_LOGIN_FAILED', 'AUTH', 'FAILURE', {
-        reason: 'TECHNICIAN_NOT_FOUND',
+      await repo.audit.log({
+        actorType: 'TECHNICIAN',
+        actorId: cleanId,
+        actorName: 'Unknown Technician',
+        action: 'TECHNICIAN_LOGIN_FAILED',
+        entity: 'AUTH',
+        result: 'FAILURE',
+        details: {
+          reason: 'TECHNICIAN_NOT_FOUND',
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error('TECHNICIAN_NOT_AUTHORIZED: الفني غير مسجل في النظام السحابي أو حسابه غير مفعل.');
     }
 
     if (tech.status === 'DISABLED') {
-      cloudDb.logAudit('TECHNICIAN', tech.employeeCode, tech.fullName, 'TECHNICIAN_LOGIN_FAILED', 'AUTH', 'BLOCKED', {
-        reason: 'ACCOUNT_DISABLED',
+      await repo.audit.log({
+        actorType: 'TECHNICIAN',
+        actorId: tech.employeeCode,
+        actorName: tech.fullName,
+        action: 'TECHNICIAN_LOGIN_FAILED',
+        entity: 'AUTH',
+        result: 'BLOCKED',
+        details: {
+          reason: 'ACCOUNT_DISABLED',
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error('TECHNICIAN_ACCOUNT_DISABLED: تم تعطيل حساب الفني من قبل إدارة النظام.');
     }
 
     if (!tech.passwordHash) {
-      cloudDb.logAudit('TECHNICIAN', tech.employeeCode, tech.fullName, 'TECHNICIAN_LOGIN_FAILED', 'AUTH', 'BLOCKED', {
-        reason: 'NO_CREDENTIALS_CONFIGURED',
+      await repo.audit.log({
+        actorType: 'TECHNICIAN',
+        actorId: tech.employeeCode,
+        actorName: tech.fullName,
+        action: 'TECHNICIAN_LOGIN_FAILED',
+        entity: 'AUTH',
+        result: 'BLOCKED',
+        details: {
+          reason: 'NO_CREDENTIALS_CONFIGURED',
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error('TECHNICIAN_CREDENTIALS_NOT_CONFIGURED: لم يتم ضبط كلمة مرور أو رمز PIN لهذا الحساب بعد.');
@@ -75,8 +99,17 @@ export class AuthService {
     // Secure bcrypt hash verification
     const isValid = bcrypt.compareSync(cleanSecret, tech.passwordHash);
     if (!isValid) {
-      cloudDb.logAudit('TECHNICIAN', tech.employeeCode, tech.fullName, 'TECHNICIAN_LOGIN_FAILED', 'AUTH', 'FAILURE', {
-        reason: 'INVALID_CREDENTIALS',
+      await repo.audit.log({
+        actorType: 'TECHNICIAN',
+        actorId: tech.employeeCode,
+        actorName: tech.fullName,
+        action: 'TECHNICIAN_LOGIN_FAILED',
+        entity: 'AUTH',
+        result: 'FAILURE',
+        details: {
+          reason: 'INVALID_CREDENTIALS',
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error('INVALID_CREDENTIALS: كلمة المرور أو رمز الـ PIN غير صحيح.');
@@ -89,8 +122,8 @@ export class AuthService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString();
 
-    // Store ONLY the token hash server-side
-    cloudDb.getData().technician_sessions[tokenHash] = {
+    // Store session in authoritative repository
+    const session: CloudTechnicianSession = {
       sessionId: `sess-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
       tokenHash,
       technicianId: tech.id,
@@ -99,10 +132,19 @@ export class AuthService {
       createdAt: now.toISOString(),
       expiresAt
     };
-    cloudDb.save();
+    await repo.sessions.createSession(session);
 
-    cloudDb.logAudit('TECHNICIAN', tech.employeeCode, tech.fullName, 'TECHNICIAN_LOGIN_SUCCESS', 'AUTH', 'SUCCESS', {
-      expiresAt,
+    await repo.audit.log({
+      actorType: 'TECHNICIAN',
+      actorId: tech.employeeCode,
+      actorName: tech.fullName,
+      action: 'TECHNICIAN_LOGIN_SUCCESS',
+      entity: 'AUTH',
+      result: 'SUCCESS',
+      details: {
+        expiresAt,
+        ip: clientIp
+      },
       ip: clientIp
     });
 
@@ -122,10 +164,11 @@ export class AuthService {
     };
   }
 
-  public static logoutTechnician(tokenHash: string): boolean {
-    if (cloudDb.getData().technician_sessions[tokenHash]) {
-      delete cloudDb.getData().technician_sessions[tokenHash];
-      cloudDb.save();
+  public static async logoutTechnician(tokenHash: string): Promise<boolean> {
+    const repo = getCloudRepository();
+    const session = await repo.sessions.findSessionByTokenHash(tokenHash);
+    if (session) {
+      await repo.sessions.deleteSession(session.sessionId);
       return true;
     }
     return false;

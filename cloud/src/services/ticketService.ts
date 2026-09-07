@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { cloudDb, CloudTicket, SanitizedCloudMachine } from '../db/cloudDb';
+import { CloudTicket } from '../db/cloudDb';
+import { getCloudRepository } from '../repositories';
 import { GpsService, GpsCoordinates } from './gpsService';
 import { StorageUploadResult } from '../storage/cloudStorage';
 
@@ -22,7 +23,7 @@ export class TicketService {
    * Submit customer fault report via opaque public QR token.
    * Idempotent: repeated identical submissions with the same cloudReportId do not duplicate tickets.
    */
-  public static submitCustomerFaultReport(params: {
+  public static async submitCustomerFaultReport(params: {
     publicQrToken: string;
     category: string;
     description: string;
@@ -31,7 +32,8 @@ export class TicketService {
     reporterEmail?: string;
     cloudReportId?: string;
     clientIp?: string;
-  }): { ticket: CloudTicket; isDuplicate: boolean } {
+  }): Promise<{ ticket: CloudTicket; isDuplicate: boolean }> {
+    const repo = getCloudRepository();
     const {
       publicQrToken,
       category,
@@ -44,11 +46,20 @@ export class TicketService {
     } = params;
 
     const cleanToken = (publicQrToken || '').trim().toUpperCase();
-    const machine = cloudDb.findMachineByQrToken(cleanToken);
+    const machine = await repo.machines.findByQrToken(cleanToken);
 
     if (!machine) {
-      cloudDb.logAudit('ANONYMOUS', 'QR_SCANNER', 'Anonymous Customer', 'INVALID_QR_REPORT', 'PUBLIC_PORTAL', 'FAILURE', {
-        publicQrToken,
+      await repo.audit.log({
+        actorType: 'ANONYMOUS',
+        actorId: 'QR_SCANNER',
+        actorName: 'Anonymous Customer',
+        action: 'INVALID_QR_REPORT',
+        entity: 'PUBLIC_PORTAL',
+        result: 'FAILURE',
+        details: {
+          publicQrToken,
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error('INVALID_QR_TOKEN: عذراً، رمز الـ QR الممسوح غير صالح أو غير مرتبط بماكينة في الأسطول السحابي.');
@@ -58,11 +69,19 @@ export class TicketService {
       throw new Error('DESCRIPTION_REQUIRED: يرجى كتابة وصف موجز للمشكلة التي واجهتها.');
     }
 
-    // Check Idempotency via cloudReportId
+    // Check Idempotency via cloudReportId or idempotency repository
     const safeReportId = cloudReportId || `rpt-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-    const existing = cloudDb.findTicketByReportId(safeReportId);
+    const existing = await repo.tickets.findByReportId(safeReportId);
     if (existing) {
       return { ticket: existing, isDuplicate: true };
+    }
+
+    const cachedIdempotency = await repo.idempotency.get(safeReportId);
+    if (cachedIdempotency && cachedIdempotency.ticketId) {
+      const existingCached = await repo.tickets.findById(cachedIdempotency.ticketId);
+      if (existingCached) {
+        return { ticket: existingCached, isDuplicate: true };
+      }
     }
 
     const now = new Date().toISOString();
@@ -92,10 +111,14 @@ export class TicketService {
       partRequests: []
     };
 
-    cloudDb.insertTicket(newTicket);
+    await repo.tickets.createTicket(newTicket);
+    await repo.idempotency.set(safeReportId, {
+      ticketId: newTicket.id,
+      trackingToken: newTicket.trackingToken
+    });
 
     // Push event to sync buffer for desktop sync worker
-    cloudDb.pushSyncEvent('CUSTOMER_TICKET_CREATED', newTicket.id, {
+    await repo.syncEvents.pushEvent('CUSTOMER_TICKET_CREATED', newTicket.id, {
       ticketId: newTicket.id,
       cloudReportId: newTicket.cloudReportId,
       trackingToken: newTicket.trackingToken,
@@ -109,10 +132,19 @@ export class TicketService {
       createdAt: newTicket.createdAt
     });
 
-    cloudDb.logAudit('CUSTOMER', trackingToken, newTicket.reporterName, 'CUSTOMER_TICKET_CREATED', 'TICKET', 'SUCCESS', {
-      ticketId: newTicket.id,
-      machineId: machine.integrationMachineId,
-      category: newTicket.category,
+    await repo.audit.log({
+      actorType: 'CUSTOMER',
+      actorId: trackingToken,
+      actorName: newTicket.reporterName,
+      action: 'CUSTOMER_TICKET_CREATED',
+      entity: 'TICKET',
+      result: 'SUCCESS',
+      details: {
+        ticketId: newTicket.id,
+        machineId: machine.integrationMachineId,
+        category: newTicket.category,
+        ip: clientIp
+      },
       ip: clientIp
     });
 
@@ -125,25 +157,35 @@ export class TicketService {
    * Rejects internal ticket IDs (e.g. TCK-*) or database IDs.
    * Returns sanitized public data.
    */
-  public static getPublicTicketTracking(trackingToken: string, clientIp?: string): PublicTicketResponse {
+  public static async getPublicTicketTracking(trackingToken: string, clientIp?: string): Promise<PublicTicketResponse> {
+    const repo = getCloudRepository();
     const raw = (trackingToken || '').trim().toUpperCase();
 
     // Strict validation: Must start with TRK- and have sufficient length
     if (!raw.startsWith('TRK-') || raw.length < 8) {
-      cloudDb.logAudit('ANONYMOUS', raw, 'Anonymous Querier', 'INVALID_TRACKING_QUERY', 'TICKET_TRACKING', 'BLOCKED', {
-        trackingToken: raw,
-        reason: 'FORBIDDEN_IDENTIFIER_FORMAT',
+      await repo.audit.log({
+        actorType: 'ANONYMOUS',
+        actorId: raw,
+        actorName: 'Anonymous Querier',
+        action: 'INVALID_TRACKING_QUERY',
+        entity: 'TICKET_TRACKING',
+        result: 'BLOCKED',
+        details: {
+          trackingToken: raw,
+          reason: 'FORBIDDEN_IDENTIFIER_FORMAT',
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error('INVALID_TRACKING_TOKEN: رمز التتبع غير صالح. يجب استخدام رمز التتبع العشوائي الخاص بالبلاغ (يبدأ بـ TRK-).');
     }
 
-    const ticket = cloudDb.findTicketByTrackingToken(raw);
+    const ticket = await repo.tickets.findByTrackingToken(raw);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: لم يتم العثور على بلاغ مطابق لرمز التتبع المدخل.');
     }
 
-    const machine = cloudDb.findMachineByIntegrationId(ticket.integrationMachineId);
+    const machine = await repo.machines.findByIntegrationId(ticket.integrationMachineId);
 
     const statusDescriptions: Record<string, string> = {
       OPEN: 'تم استلام البلاغ وهو بانتظار تعيين ومباشرة الفني المختص.',
@@ -170,7 +212,7 @@ export class TicketService {
   /**
    * Technician Field Check-In with GPS verification
    */
-  public static performTechnicianCheckin(params: {
+  public static async performTechnicianCheckin(params: {
     ticketId: string;
     machineToken: string;
     technicianId: string;
@@ -178,15 +220,16 @@ export class TicketService {
     coordinates?: GpsCoordinates | null;
     manualException?: { approvedBy: string; reason: string; approverRole?: string };
     clientIp?: string;
-  }): { checkin: any; ticket: CloudTicket } {
+  }): Promise<{ checkin: any; ticket: CloudTicket }> {
+    const repo = getCloudRepository();
     const { ticketId, machineToken, technicianId, technicianName, coordinates, manualException, clientIp } = params;
 
-    const ticket = cloudDb.findTicketById(ticketId);
+    const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
 
-    const machine = cloudDb.findMachineByQrToken(machineToken) || cloudDb.findMachineByIntegrationId(ticket.integrationMachineId);
+    const machine = (await repo.machines.findByQrToken(machineToken)) || (await repo.machines.findByIntegrationId(ticket.integrationMachineId));
     if (!machine) {
       throw new Error('MACHINE_NOT_FOUND: رمز الماكينة غير صالح أو غير مرتبط بسجل معتمد.');
     }
@@ -195,10 +238,19 @@ export class TicketService {
     const validation = GpsService.validateFieldPresence(coordinates, machine, manualException);
 
     if (!validation.verified) {
-      cloudDb.logAudit('TECHNICIAN', technicianId, technicianName, 'TECHNICIAN_CHECKIN_FAILED', 'TICKET', 'FAILURE', {
-        ticketId,
-        validation,
-        coordinates,
+      await repo.audit.log({
+        actorType: 'TECHNICIAN',
+        actorId: technicianId,
+        actorName: technicianName,
+        action: 'TECHNICIAN_CHECKIN_FAILED',
+        entity: 'TICKET',
+        result: 'FAILURE',
+        details: {
+          ticketId,
+          validation,
+          coordinates,
+          ip: clientIp
+        },
         ip: clientIp
       });
       throw new Error(`GPS_VALIDATION_FAILED: ${validation.message}`);
@@ -225,43 +277,52 @@ export class TicketService {
       } : undefined
     };
 
-    ticket.checkins.push(checkinRecord);
+    await repo.tickets.addCheckin(checkinRecord);
     if (ticket.status === 'OPEN') {
-      ticket.status = 'IN_PROGRESS';
+      await repo.tickets.updateTicketStatus(ticket.id, 'IN_PROGRESS');
     }
-    ticket.updatedAt = now;
-    cloudDb.save();
 
     // Push sync event
-    cloudDb.pushSyncEvent('TECHNICIAN_CHECKIN', ticket.id, {
+    await repo.syncEvents.pushEvent('TECHNICIAN_CHECKIN', ticket.id, {
       ticketId: ticket.id,
       checkin: checkinRecord,
       updatedAt: now
     });
 
-    cloudDb.logAudit('TECHNICIAN', technicianId, technicianName, 'TECHNICIAN_CHECKIN_SUCCESS', 'TICKET', 'SUCCESS', {
-      ticketId,
-      status: validation.status,
-      distanceMeters: validation.distanceMeters,
+    await repo.audit.log({
+      actorType: 'TECHNICIAN',
+      actorId: technicianId,
+      actorName: technicianName,
+      action: 'TECHNICIAN_CHECKIN_SUCCESS',
+      entity: 'TICKET',
+      result: 'SUCCESS',
+      details: {
+        ticketId,
+        status: validation.status,
+        distanceMeters: validation.distanceMeters,
+        ip: clientIp
+      },
       ip: clientIp
     });
 
-    return { checkin: checkinRecord, ticket };
+    const updatedTicket = (await repo.tickets.findById(ticket.id)) || ticket;
+    return { checkin: checkinRecord, ticket: updatedTicket };
   }
 
   /**
    * Record Technician Maintenance Action
    */
-  public static addTechnicianAction(params: {
+  public static async addTechnicianAction(params: {
     ticketId: string;
     technicianId: string;
     technicianName: string;
     actionType: string;
     description: string;
-  }): { action: any; ticket: CloudTicket } {
+  }): Promise<{ action: any; ticket: CloudTicket }> {
+    const repo = getCloudRepository();
     const { ticketId, technicianId, technicianName, actionType, description } = params;
 
-    const ticket = cloudDb.findTicketById(ticketId);
+    const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
@@ -277,32 +338,32 @@ export class TicketService {
       timestamp: now
     };
 
-    ticket.actions.push(actionRecord);
-    ticket.updatedAt = now;
-    cloudDb.save();
+    await repo.tickets.addAction(actionRecord);
 
-    cloudDb.pushSyncEvent('TECHNICIAN_ACTION', ticket.id, {
+    await repo.syncEvents.pushEvent('TECHNICIAN_ACTION', ticket.id, {
       ticketId: ticket.id,
       action: actionRecord,
       updatedAt: now
     });
 
-    return { action: actionRecord, ticket };
+    const updatedTicket = (await repo.tickets.findById(ticket.id)) || ticket;
+    return { action: actionRecord, ticket: updatedTicket };
   }
 
   /**
    * Attach Evidence Metadata to Ticket
    */
-  public static attachEvidence(params: {
+  public static async attachEvidence(params: {
     ticketId: string;
     technicianId: string;
     technicianName: string;
     uploadResult: StorageUploadResult;
     caption?: string;
-  }): { evidence: any; ticket: CloudTicket } {
+  }): Promise<{ evidence: any; ticket: CloudTicket }> {
+    const repo = getCloudRepository();
     const { ticketId, technicianId, technicianName, uploadResult, caption = '' } = params;
 
-    const ticket = cloudDb.findTicketById(ticketId);
+    const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
@@ -322,33 +383,33 @@ export class TicketService {
       timestamp: now
     };
 
-    ticket.evidence.push(evidenceRecord);
-    ticket.updatedAt = now;
-    cloudDb.save();
+    await repo.tickets.addEvidence(evidenceRecord);
 
-    cloudDb.pushSyncEvent('EVIDENCE_ADDED', ticket.id, {
+    await repo.syncEvents.pushEvent('EVIDENCE_ADDED', ticket.id, {
       ticketId: ticket.id,
       evidence: evidenceRecord,
       updatedAt: now
     });
 
-    return { evidence: evidenceRecord, ticket };
+    const updatedTicket = (await repo.tickets.findById(ticket.id)) || ticket;
+    return { evidence: evidenceRecord, ticket: updatedTicket };
   }
 
   /**
    * Record Functional Test
    */
-  public static addFunctionalTest(params: {
+  public static async addFunctionalTest(params: {
     ticketId: string;
     technicianId: string;
     technicianName: string;
     testType: string;
     passed: boolean;
     notes?: string;
-  }): { test: any; ticket: CloudTicket } {
+  }): Promise<{ test: any; ticket: CloudTicket }> {
+    const repo = getCloudRepository();
     const { ticketId, technicianId, technicianName, testType, passed, notes = '' } = params;
 
-    const ticket = cloudDb.findTicketById(ticketId);
+    const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
@@ -365,24 +426,23 @@ export class TicketService {
       timestamp: now
     };
 
-    ticket.functionalTests.push(testRecord);
-    ticket.updatedAt = now;
-    cloudDb.save();
+    await repo.tickets.addFunctionalTest(testRecord);
 
-    cloudDb.pushSyncEvent('FUNCTIONAL_TEST_COMPLETED', ticket.id, {
+    await repo.syncEvents.pushEvent('FUNCTIONAL_TEST_COMPLETED', ticket.id, {
       ticketId: ticket.id,
       functionalTest: testRecord,
       updatedAt: now
     });
 
-    return { test: testRecord, ticket };
+    const updatedTicket = (await repo.tickets.findById(ticket.id)) || ticket;
+    return { test: testRecord, ticket: updatedTicket };
   }
 
   /**
    * Request Spare Part from Field
    * Sets status 'REQUESTED'. Never modifies inventory stock directly from Cloud.
    */
-  public static requestSparePart(params: {
+  public static async requestSparePart(params: {
     ticketId: string;
     technicianId: string;
     technicianName: string;
@@ -390,10 +450,11 @@ export class TicketService {
     quantityRequested: number;
     reason: string;
     partId?: string;
-  }): { partRequest: any; ticket: CloudTicket } {
+  }): Promise<{ partRequest: any; ticket: CloudTicket }> {
+    const repo = getCloudRepository();
     const { ticketId, technicianId, technicianName, partName, quantityRequested, reason, partId } = params;
 
-    const ticket = cloudDb.findTicketById(ticketId);
+    const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
@@ -419,53 +480,59 @@ export class TicketService {
       timestamp: now
     };
 
-    ticket.partRequests.push(partRequestRecord);
-    ticket.updatedAt = now;
-    cloudDb.save();
+    await repo.tickets.addPartRequest(partRequestRecord);
 
-    cloudDb.pushSyncEvent('PART_REQUEST_CREATED', ticket.id, {
+    await repo.syncEvents.pushEvent('PART_REQUEST_CREATED', ticket.id, {
       ticketId: ticket.id,
       partRequest: partRequestRecord,
       updatedAt: now
     });
 
-    return { partRequest: partRequestRecord, ticket };
+    const updatedTicket = (await repo.tickets.findById(ticket.id)) || ticket;
+    return { partRequest: partRequestRecord, ticket: updatedTicket };
   }
 
   /**
    * Resolve Ticket with Summary
    */
-  public static resolveTicket(params: {
+  public static async resolveTicket(params: {
     ticketId: string;
     technicianId: string;
     technicianName: string;
     summary: string;
-  }): { ticket: CloudTicket } {
+  }): Promise<{ ticket: CloudTicket }> {
+    const repo = getCloudRepository();
     const { ticketId, technicianId, technicianName, summary } = params;
 
-    const ticket = cloudDb.findTicketById(ticketId);
+    const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
 
     const now = new Date().toISOString();
-    ticket.status = 'RESOLVED';
-    ticket.resolutionSummary = summary.trim();
-    ticket.updatedAt = now;
-    cloudDb.save();
+    await repo.tickets.updateTicketStatus(ticket.id, 'RESOLVED', summary.trim());
 
-    cloudDb.pushSyncEvent('TICKET_RESOLVED', ticket.id, {
+    await repo.syncEvents.pushEvent('TICKET_RESOLVED', ticket.id, {
       ticketId: ticket.id,
-      resolutionSummary: ticket.resolutionSummary,
+      resolutionSummary: summary.trim(),
       resolvedBy: technicianName,
       resolvedAt: now
     });
 
-    cloudDb.logAudit('TECHNICIAN', technicianId, technicianName, 'TICKET_RESOLVED', 'TICKET', 'SUCCESS', {
-      ticketId: ticket.id,
-      summary: ticket.resolutionSummary
+    await repo.audit.log({
+      actorType: 'TECHNICIAN',
+      actorId: technicianId,
+      actorName: technicianName,
+      action: 'TICKET_RESOLVED',
+      entity: 'TICKET',
+      result: 'SUCCESS',
+      details: {
+        ticketId: ticket.id,
+        summary: summary.trim()
+      }
     });
 
-    return { ticket };
+    const updatedTicket = (await repo.tickets.findById(ticket.id)) || ticket;
+    return { ticket: updatedTicket };
   }
 }
