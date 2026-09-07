@@ -9758,6 +9758,101 @@
   ],
   "tickets": [
     {
+      "id": "tck-1788778542180-cfd8cb",
+      "ticketNumber": "TCK-2026-0013",
+      "cloudTicketId": "cld-tck-1788778541754-96a5d75e",
+      "cloudReportId": "idemp-1788778541751",
+      "publicTrackingToken": "TRK-MTR4K4AI-2401C5ED",
+      "machineId": "mch-imp-1788442674014-1",
+      "machineNumber": "1",
+      "machine": {
+        "id": "mch-imp-1788442674014-1",
+        "machineNumber": "1",
+        "serialNumber": "1640056931",
+        "machineType": "Zaki Vending Machine",
+        "currentLocation": {
+          "id": "loc-1788442674014-1",
+          "buildingId": "bld-1788442674014-1",
+          "floorId": "flr-1788442674014-1",
+          "floor": {
+            "id": "flr-1788442674014-1",
+            "buildingId": "bld-1788442674014-1",
+            "floorNumber": 1,
+            "levelOrder": 1,
+            "floorName": "الدور",
+            "createdAt": "2026-09-03T13:37:54.013Z"
+          },
+          "building": {
+            "id": "bld-1788442674014-1",
+            "code": "BLD-01",
+            "name": "القاده",
+            "createdAt": "2026-09-03T13:37:54.013Z",
+            "updatedAt": "2026-09-03T13:37:54.013Z"
+          },
+          "areaZone": "شمال",
+          "fullDescription": "القاده — الدور — شمال",
+          "isActive": true,
+          "createdAt": "2026-09-03T13:37:54.013Z"
+        }
+      },
+      "title": "عطل مُبلغ عنه: BEVERAGE_DISPENSE",
+      "description": "الماكينة لم تسقط عبوة الماء بعد خصم المبلغ عبر مدى",
+      "category": "BEVERAGE_DISPENSE",
+      "priority": "MEDIUM",
+      "status": "RESOLVED",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "0551122334",
+      "reporterEmail": "",
+      "source": "PUBLIC_QR",
+      "createdAt": "2026-09-07T10:55:41.754Z",
+      "updatedAt": "2026-09-07T10:55:42.153Z",
+      "actions": [
+        {
+          "id": "act-1788778542141-6f5239",
+          "ticketId": "cld-tck-1788778541754-96a5d75e",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-07T10:55:42.141Z"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "evi-1788778542135-03ed16",
+          "ticketId": "cld-tck-1788778541754-96a5d75e",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788778541754-96a5d75e/1788778542134-78b1c0a1a1eb56557543b646c2326930.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788778541754-96a5d75e/1788778542134-78b1c0a1a1eb56557543b646c2326930.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-07T10:55:42.135Z"
+        }
+      ],
+      "checkins": [
+        {
+          "id": "chk-1788778542124-085a8b",
+          "ticketId": "cld-tck-1788778541754-96a5d75e",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-07T10:55:42.124Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        }
+      ],
+      "functionalTests": [],
+      "resolutionSummary": "تم استبدال الحساس وفحص الماكينة وعودتها للخدمة بنجاح",
+      "resolvedBy": "ahmed",
+      "resolvedAt": "2026-09-07T10:55:42.153Z"
+    },
+    {
       "id": "tck-1788772898582-9073bb",
       "ticketNumber": "TCK-2026-0012",
       "cloudTicketId": "cld-tck-1788772884971-6e699e4a",
@@ -9815,9 +9910,31 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-07T09:21:25.366Z"
+        },
+        {
+          "id": "act-1788772885366-926a97",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-07T09:21:25.366Z"
         }
       ],
       "evidence": [
+        {
+          "id": "evi-1788772885357-a59266",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788772884971-6e699e4a/1788772885356-6279ae0533e65c533f81e21b4395be9a.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788772884971-6e699e4a/1788772885356-6279ae0533e65c533f81e21b4395be9a.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-07T09:21:25.357Z"
+        },
         {
           "id": "evi-1788772885357-a59266",
           "ticketId": "cld-tck-1788772884971-6e699e4a",
@@ -9845,12 +9962,65 @@
           "distanceMeters": 2,
           "verified": true,
           "status": "VERIFIED"
+        },
+        {
+          "id": "chk-1788772885349-6dd15c",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-07T09:21:25.349Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
         }
       ],
       "functionalTests": [],
       "resolutionSummary": "تم استبدال الحساس وفحص الماكينة وعودتها للخدمة بنجاح",
       "resolvedBy": "ahmed",
-      "resolvedAt": "2026-09-07T09:21:25.376Z"
+      "resolvedAt": "2026-09-07T09:21:25.376Z",
+      "verifiedAt": "2026-09-07T10:13:37.589Z",
+      "timeline": [
+        {
+          "id": "tl-1788776022092",
+          "ticketId": "tck-1788772898582-9073bb",
+          "timestamp": "2026-09-07T10:13:42.092Z",
+          "technicianName": "مدير النظام",
+          "action": "CLOSED",
+          "actionLabel": "إغلاق وأرشفة البلاغ",
+          "description": "بيليب"
+        },
+        {
+          "id": "tl-1788776017589",
+          "ticketId": "tck-1788772898582-9073bb",
+          "timestamp": "2026-09-07T10:13:37.589Z",
+          "technicianName": "مدير النظام",
+          "action": "VERIFIED",
+          "actionLabel": "اعتماد ومطابقة الفحص",
+          "description": "بلييب"
+        }
+      ],
+      "statusHistory": [
+        {
+          "id": "sh-1788776017589",
+          "ticketId": "tck-1788772898582-9073bb",
+          "previousStatus": "RESOLVED",
+          "newStatus": "VERIFIED",
+          "comment": "بلييب",
+          "createdAt": "2026-09-07T10:13:37.589Z"
+        },
+        {
+          "id": "sh-1788776022092",
+          "ticketId": "tck-1788772898582-9073bb",
+          "previousStatus": "VERIFIED",
+          "newStatus": "CLOSED",
+          "comment": "بيليب",
+          "createdAt": "2026-09-07T10:13:42.092Z"
+        }
+      ],
+      "closedAt": "2026-09-07T10:13:42.092Z"
     },
     {
       "id": "tck-1788707116906-5794d3",
@@ -9910,6 +10080,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-06T15:04:13.650Z"
+        },
+        {
+          "id": "act-1788707053650-563439",
+          "ticketId": "cld-tck-1788707053277-dd117f0b",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-06T15:04:13.650Z"
         }
       ],
       "evidence": [
@@ -9925,9 +10104,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-06T15:04:13.645Z"
+        },
+        {
+          "id": "evi-1788707053645-e9d742",
+          "ticketId": "cld-tck-1788707053277-dd117f0b",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788707053277-dd117f0b/1788707053644-6bcc82a4c54bd47da8c69a9167ec3015.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788707053277-dd117f0b/1788707053644-6bcc82a4c54bd47da8c69a9167ec3015.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-06T15:04:13.645Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788707053637-8c637f",
+          "ticketId": "cld-tck-1788707053277-dd117f0b",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-06T15:04:13.637Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788707053637-8c637f",
           "ticketId": "cld-tck-1788707053277-dd117f0b",
@@ -10005,6 +10210,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-06T10:54:44.775Z"
+        },
+        {
+          "id": "act-1788692084775-16b46b",
+          "ticketId": "cld-tck-1788692084363-aa7f032c",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-06T10:54:44.775Z"
         }
       ],
       "evidence": [
@@ -10020,9 +10234,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-06T10:54:44.770Z"
+        },
+        {
+          "id": "evi-1788692084770-ded56a",
+          "ticketId": "cld-tck-1788692084363-aa7f032c",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788692084363-aa7f032c/1788692084770-0f0537173049114df0d1d8e09f5dc7a7.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788692084363-aa7f032c/1788692084770-0f0537173049114df0d1d8e09f5dc7a7.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-06T10:54:44.770Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788692084764-66db34",
+          "ticketId": "cld-tck-1788692084363-aa7f032c",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-06T10:54:44.764Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788692084764-66db34",
           "ticketId": "cld-tck-1788692084363-aa7f032c",
@@ -10204,6 +10444,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-06T09:40:55.790Z"
+        },
+        {
+          "id": "act-1788687655790-3ba9ff",
+          "ticketId": "cld-tck-1788687655430-c325cfb9",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-06T09:40:55.790Z"
         }
       ],
       "evidence": [
@@ -10232,9 +10481,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-06T09:40:55.787Z"
+        },
+        {
+          "id": "evi-1788687655787-7ed607",
+          "ticketId": "cld-tck-1788687655430-c325cfb9",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788687655430-c325cfb9/1788687655786-4a5da477bcb072ede3f1d33915905d98.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788687655430-c325cfb9/1788687655786-4a5da477bcb072ede3f1d33915905d98.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-06T09:40:55.787Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788687655781-2db81d",
+          "ticketId": "cld-tck-1788687655430-c325cfb9",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-06T09:40:55.781Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788687655781-2db81d",
           "ticketId": "cld-tck-1788687655430-c325cfb9",
@@ -10478,14 +10753,36 @@
       "source": "CUSTOMER_QR",
       "category": "REFRIGERATION",
       "priority": "CRITICAL",
-      "status": "ASSIGNED",
+      "status": "IN_PROGRESS",
       "description": "اختبار تكرار البلاغ وموثوقية المعرف",
       "reporterName": "مختبر النظام",
       "reporterPhone": "0500000000",
       "reporterEmail": "",
       "createdAt": "2026-09-06T08:27:01.820Z",
-      "updatedAt": "2026-09-07T09:16:49.656Z",
+      "updatedAt": "2026-09-07T10:14:11.756Z",
       "timeline": [
+        {
+          "id": "tl-1788776051756",
+          "ticketId": "tck-1788683221820-f6e74c",
+          "timestamp": "2026-09-07T10:14:11.756Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "WORK_STARTED",
+          "actionLabel": "بدء العمل الميداني",
+          "description": "TECH-1 started on-site diagnostic repairs."
+        },
+        {
+          "id": "tl-1788776047169",
+          "ticketId": "tck-1788683221820-f6e74c",
+          "timestamp": "2026-09-07T10:14:07.169Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "ACCEPTED",
+          "actionLabel": "قبول البلاغ والالتزام بـ SLA",
+          "description": "TECH-1 accepted ticket assignment."
+        },
         {
           "id": "tl-1788772609656",
           "ticketId": "tck-1788683221820-f6e74c",
@@ -10530,14 +10827,14 @@
         "createdAt": "2026-09-03T14:10:52.245Z",
         "kpis": {
           "technicianId": "tch-1788444652245",
-          "responseTimeMinutes": 15,
-          "repairTimeMinutes": 45,
+          "responseTimeMinutes": 3499,
+          "repairTimeMinutes": 5,
           "completedTickets": 1,
-          "firstTimeFixRate": 95,
-          "slaComplianceRate": 98,
-          "activeTicketsCount": 3,
-          "totalLaborMinutes": 0,
-          "partsReplacedCount": 0,
+          "firstTimeFixRate": 100,
+          "slaComplianceRate": 100,
+          "activeTicketsCount": 4,
+          "totalLaborMinutes": 40,
+          "partsReplacedCount": 8,
           "rating": 5
         },
         "updatedAt": "2026-09-03T15:05:37.987Z"
@@ -10550,8 +10847,18 @@
           "newStatus": "ASSIGNED",
           "comment": "kl",
           "createdAt": "2026-09-07T09:16:49.656Z"
+        },
+        {
+          "id": "sh-1788776051756",
+          "ticketId": "tck-1788683221820-f6e74c",
+          "previousStatus": "ASSIGNED",
+          "newStatus": "IN_PROGRESS",
+          "comment": "TECH-1 started on-site diagnostic repairs.",
+          "createdAt": "2026-09-07T10:14:11.756Z"
         }
-      ]
+      ],
+      "acknowledgedAt": "2026-09-07T10:14:07.169Z",
+      "startedAt": "2026-09-07T10:14:11.756Z"
     },
     {
       "id": "tck-1788682793001-54b1b4",
@@ -11003,7 +11310,7 @@
       "source": "CUSTOMER_QR",
       "category": "LEAK",
       "priority": "CRITICAL",
-      "status": "NEW",
+      "status": "IN_PROGRESS",
       "description": "تسريب مياه أو سوائل أسفل الماكينة (بلاغ عميل عبر رمز QR)",
       "reporterName": "عميل عبر رمز QR",
       "isRecurring": false,
@@ -11011,6 +11318,39 @@
       "slaDueAt": "2026-09-03T17:23:26.087Z",
       "totalPartsCost": 0,
       "timeline": [
+        {
+          "id": "tl-1788776054667",
+          "ticketId": "tck-1788449006087-5a1d",
+          "timestamp": "2026-09-07T10:14:14.667Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "WORK_STARTED",
+          "actionLabel": "بدء العمل الميداني",
+          "description": "TECH-1 started on-site diagnostic repairs."
+        },
+        {
+          "id": "tl-1788776049444",
+          "ticketId": "tck-1788449006087-5a1d",
+          "timestamp": "2026-09-07T10:14:09.444Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "ACCEPTED",
+          "actionLabel": "قبول البلاغ والالتزام بـ SLA",
+          "description": "TECH-1 accepted ticket assignment."
+        },
+        {
+          "id": "tl-1788776039184",
+          "ticketId": "tck-1788449006087-5a1d",
+          "timestamp": "2026-09-07T10:13:59.184Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "technicianCode": "TECH-1",
+          "action": "ASSIGNED",
+          "actionLabel": "تم إسناد التذكرة للفني",
+          "description": "بيل"
+        },
         {
           "id": "tl-1788449006087",
           "ticketId": "tck-1788449006087",
@@ -11027,12 +11367,66 @@
           "newStatus": "NEW",
           "comment": "تم فتح البلاغ بواسطة العميل عبر كود الاستجابة السريعة QR",
           "createdAt": "2026-09-03T15:23:26.087Z"
+        },
+        {
+          "id": "sh-1788776039184",
+          "ticketId": "tck-1788449006087-5a1d",
+          "previousStatus": "NEW",
+          "newStatus": "ASSIGNED",
+          "comment": "بيل",
+          "createdAt": "2026-09-07T10:13:59.184Z"
+        },
+        {
+          "id": "sh-1788776054667",
+          "ticketId": "tck-1788449006087-5a1d",
+          "previousStatus": "ASSIGNED",
+          "newStatus": "IN_PROGRESS",
+          "comment": "TECH-1 started on-site diagnostic repairs.",
+          "createdAt": "2026-09-07T10:14:14.667Z"
         }
       ],
       "notes": [],
       "attachments": [],
       "createdAt": "2026-09-03T15:23:26.087Z",
-      "updatedAt": "2026-09-03T15:23:26.087Z"
+      "updatedAt": "2026-09-07T10:14:14.667Z",
+      "assignedTechnicianId": "tch-1788444652245",
+      "assignedTechnician": {
+        "id": "tch-1788444652245",
+        "userId": "usr-1788444652245",
+        "employeeCode": "TECH-1",
+        "fullName": "ahmed",
+        "fullNameAr": "ahmed",
+        "email": "ahmed@vendingfleet.com",
+        "phone": "01010904549",
+        "phoneNumber": "01010904549",
+        "specialization": "Senior Master Technician",
+        "status": "AVAILABLE",
+        "skills": [
+          "Senior Master Technician",
+          "General Vending Maintenance"
+        ],
+        "assignedRegion": "Central Campus & Admin Complex",
+        "maxDailyCapacity": 15,
+        "maxActiveTickets": 15,
+        "isActive": true,
+        "isDeleted": false,
+        "createdAt": "2026-09-03T14:10:52.245Z",
+        "kpis": {
+          "technicianId": "tch-1788444652245",
+          "responseTimeMinutes": 3499,
+          "repairTimeMinutes": 5,
+          "completedTickets": 6,
+          "firstTimeFixRate": 100,
+          "slaComplianceRate": 100,
+          "activeTicketsCount": 4,
+          "totalLaborMinutes": 40,
+          "partsReplacedCount": 8,
+          "rating": 5
+        },
+        "updatedAt": "2026-09-03T15:05:37.987Z"
+      },
+      "acknowledgedAt": "2026-09-07T10:14:09.444Z",
+      "startedAt": "2026-09-07T10:14:14.667Z"
     },
     {
       "id": "tck-1788443930201-b5an",
@@ -11106,7 +11500,7 @@
       "source": "MANUAL",
       "category": "POWER_ELECTRICAL",
       "priority": "CRITICAL",
-      "status": "WAITING_FOR_PART",
+      "status": "IN_PROGRESS",
       "description": "هممم",
       "reporterName": "Operations Team",
       "isRecurring": false,
@@ -11114,6 +11508,16 @@
       "slaDueAt": "2026-09-03T17:58:50.201Z",
       "totalPartsCost": 0,
       "timeline": [
+        {
+          "id": "tl-1788776103289",
+          "ticketId": "tck-1788443930201-b5an",
+          "timestamp": "2026-09-07T10:15:03.288Z",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "Warehouse Supervisor",
+          "action": "PART_DISPATCHED_TO_FIELD",
+          "actionLabel": "تم تسليم القطعة للفني (تحويل لقيد الإصلاح)",
+          "description": "📢 إشعار صيانة فوري: تم صرف وتسليم قطعة الغيار مضخه مياه (21x) من المستودع للفني المعتمد. تم استئناف حالة البلاغ فوراً من [WAITING_FOR_PART] إلى [قيد الإصلاح - IN_PROGRESS] لاستكمال أعمال الإصيانة."
+        },
         {
           "id": "tl-1788448408431",
           "ticketId": "tck-1788443930201-b5an",
@@ -11221,12 +11625,20 @@
           "newStatus": "WAITING_FOR_PART",
           "comment": "تم تقديم طلب توريد/صرف قطعة غيار مضخه مياه (21x). تحولت التذكرة إلى في انتظار قطع الغيار.",
           "createdAt": "2026-09-03T15:13:02.914Z"
+        },
+        {
+          "id": "sh-1788776103289",
+          "ticketId": "tck-1788443930201-b5an",
+          "previousStatus": "WAITING_FOR_PART",
+          "newStatus": "IN_PROGRESS",
+          "comment": "تم صرف وتسليم قطعة الغيار (21x مضخه مياه) للفني المختص، وتم تحويل حالة التذكرة تلقائياً إلى [قيد الإصلاح - IN_PROGRESS].",
+          "createdAt": "2026-09-07T10:15:03.288Z"
         }
       ],
       "notes": [],
       "attachments": [],
       "createdAt": "2026-09-03T13:58:50.201Z",
-      "updatedAt": "2026-09-03T15:13:02.914Z",
+      "updatedAt": "2026-09-07T10:15:03.288Z",
       "triagedAt": "2026-09-03T13:59:27.033Z",
       "assignedTechnicianId": "tch-1788444652245",
       "assignedTechnician": {
@@ -11264,7 +11676,45 @@
         },
         "updatedAt": "2026-09-03T15:05:37.987Z"
       },
-      "startedAt": "2026-09-03T15:12:15.076Z"
+      "startedAt": "2026-09-03T15:12:15.076Z",
+      "maintenanceActions": [
+        {
+          "id": "ma-1788776103289",
+          "ticketId": "tck-1788443930201-b5an",
+          "technicianId": "tch-1788444652245",
+          "actionType": "PART_ISSUED",
+          "actionTaken": "تسليم وصرف قطعة الغيار (مضخه مياه) واستئناف العمل",
+          "description": "تم إصدار إذن الصرف رقم REQ-2026-0001 وتسليم 21x مضخه مياه للفني الميداني ومباشرة أعمال الإصلاح.",
+          "partsUsed": [
+            {
+              "partId": "prt-1788448382914-etst",
+              "sparePart": {
+                "id": "prt-1788448382914-etst",
+                "partNumber": "REQ-SKU-3806",
+                "name": "مضخه مياه",
+                "nameAr": "مضخه مياه",
+                "category": "GENERAL",
+                "unitCost": 45,
+                "currentQuantity": 0,
+                "currentStock": 0,
+                "minimumQuantity": 2,
+                "minStockLevel": 2,
+                "maxStockLevel": 10,
+                "storageLocation": "Central Warehouse Depot",
+                "isActive": true,
+                "status": "ACTIVE",
+                "totalValue": 0,
+                "createdAt": "2026-09-03T15:13:02.914Z",
+                "updatedAt": "2026-09-07T10:15:03.288Z"
+              },
+              "quantity": 21,
+              "unitCostAtUse": 45
+            }
+          ],
+          "performedAt": "2026-09-07T10:15:03.288Z",
+          "createdAt": "2026-09-07T10:15:03.288Z"
+        }
+      ]
     }
   ],
   "technicians": [
@@ -11291,14 +11741,14 @@
       "createdAt": "2026-09-03T14:10:52.245Z",
       "kpis": {
         "technicianId": "tch-1788444652245",
-        "responseTimeMinutes": 15,
-        "repairTimeMinutes": 45,
+        "responseTimeMinutes": 3499,
+        "repairTimeMinutes": 5,
         "completedTickets": 1,
-        "firstTimeFixRate": 95,
-        "slaComplianceRate": 98,
-        "activeTicketsCount": 3,
-        "totalLaborMinutes": 0,
-        "partsReplacedCount": 0,
+        "firstTimeFixRate": 100,
+        "slaComplianceRate": 100,
+        "activeTicketsCount": 4,
+        "totalLaborMinutes": 40,
+        "partsReplacedCount": 8,
         "rating": 5
       },
       "updatedAt": "2026-09-03T15:05:37.987Z"
@@ -11313,21 +11763,32 @@
       "nameAr": "مضخه مياه",
       "category": "GENERAL",
       "unitCost": 45,
-      "currentQuantity": 21,
-      "currentStock": 21,
+      "currentQuantity": 0,
+      "currentStock": 0,
       "minimumQuantity": 2,
       "minStockLevel": 2,
       "maxStockLevel": 10,
       "storageLocation": "Central Warehouse Depot",
       "isActive": true,
       "status": "ACTIVE",
-      "totalValue": 945,
+      "totalValue": 0,
       "createdAt": "2026-09-03T15:13:02.914Z",
-      "updatedAt": "2026-09-03T15:13:28.431Z"
+      "updatedAt": "2026-09-07T10:15:03.288Z"
     }
   ],
   "suppliers": [],
   "partRequests": [
+    {
+      "id": "prq-1788778542147-5621cf",
+      "ticketId": "cld-tck-1788778541754-96a5d75e",
+      "technicianId": "tch-1788444652245",
+      "technicianName": "ahmed",
+      "partName": "حساس خروج العبوات البصري",
+      "quantityRequested": 1,
+      "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
+      "status": "REQUESTED",
+      "timestamp": "2026-09-07T10:55:42.147Z"
+    },
     {
       "id": "prq-1788772885371-f17436",
       "ticketId": "cld-tck-1788772884971-6e699e4a",
@@ -11336,8 +11797,17 @@
       "partName": "حساس خروج العبوات البصري",
       "quantityRequested": 1,
       "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
-      "status": "REQUESTED",
-      "timestamp": "2026-09-07T09:21:25.371Z"
+      "status": "REJECTED",
+      "timestamp": "2026-09-07T09:21:25.371Z",
+      "updatedAt": "2026-09-07T10:20:05.976Z",
+      "timeline": [
+        {
+          "status": "REJECTED",
+          "timestamp": "2026-09-07T10:20:05.976Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "Status moved to REJECTED"
+        }
+      ]
     },
     {
       "id": "prq-1788707053655-04fc74",
@@ -11347,8 +11817,17 @@
       "partName": "حساس خروج العبوات البصري",
       "quantityRequested": 1,
       "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
-      "status": "REQUESTED",
-      "timestamp": "2026-09-06T15:04:13.655Z"
+      "status": "REJECTED",
+      "timestamp": "2026-09-06T15:04:13.655Z",
+      "updatedAt": "2026-09-07T10:20:01.646Z",
+      "timeline": [
+        {
+          "status": "REJECTED",
+          "timestamp": "2026-09-07T10:20:01.646Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "Status moved to REJECTED"
+        }
+      ]
     },
     {
       "id": "prq-1788692084779-d6af08",
@@ -11358,8 +11837,17 @@
       "partName": "حساس خروج العبوات البصري",
       "quantityRequested": 1,
       "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
-      "status": "REQUESTED",
-      "timestamp": "2026-09-06T10:54:44.779Z"
+      "status": "REJECTED",
+      "timestamp": "2026-09-06T10:54:44.779Z",
+      "updatedAt": "2026-09-07T10:19:54.508Z",
+      "timeline": [
+        {
+          "status": "REJECTED",
+          "timestamp": "2026-09-07T10:19:54.508Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "Status moved to REJECTED"
+        }
+      ]
     },
     {
       "id": "prq-1788687826038-81faf0",
@@ -11369,8 +11857,17 @@
       "partName": "حساس خروج العبوات البصري",
       "quantityRequested": 1,
       "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
-      "status": "REQUESTED",
-      "timestamp": "2026-09-06T09:43:46.038Z"
+      "status": "REJECTED",
+      "timestamp": "2026-09-06T09:43:46.038Z",
+      "updatedAt": "2026-09-07T10:14:55.950Z",
+      "timeline": [
+        {
+          "status": "REJECTED",
+          "timestamp": "2026-09-07T10:14:55.950Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "Status moved to REJECTED"
+        }
+      ]
     },
     {
       "id": "prq-1788687655794-ad2d55",
@@ -11380,8 +11877,17 @@
       "partName": "حساس خروج العبوات البصري",
       "quantityRequested": 1,
       "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
-      "status": "REQUESTED",
-      "timestamp": "2026-09-06T09:40:55.794Z"
+      "status": "REJECTED",
+      "timestamp": "2026-09-06T09:40:55.794Z",
+      "updatedAt": "2026-09-07T10:14:50.488Z",
+      "timeline": [
+        {
+          "status": "REJECTED",
+          "timestamp": "2026-09-07T10:14:50.488Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "Status moved to REJECTED"
+        }
+      ]
     },
     {
       "id": "prq-1788687619251-654e25",
@@ -11391,8 +11897,17 @@
       "partName": "حساس خروج العبوات البصري",
       "quantityRequested": 1,
       "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
-      "status": "REQUESTED",
-      "timestamp": "2026-09-06T09:40:19.251Z"
+      "status": "REJECTED",
+      "timestamp": "2026-09-06T09:40:19.251Z",
+      "updatedAt": "2026-09-07T10:14:46.201Z",
+      "timeline": [
+        {
+          "status": "REJECTED",
+          "timestamp": "2026-09-07T10:14:46.201Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "Status moved to REJECTED"
+        }
+      ]
     },
     {
       "id": "req-1788448382914",
@@ -11756,10 +12271,16 @@
       "storageLocation": "Central Warehouse Depot",
       "quantity": 21,
       "priority": "CRITICAL",
-      "status": "RECEIVED",
+      "status": "ISSUED",
       "notes": "",
       "reason": "Requisition for مضخه مياه (REQ-SKU-3806)",
       "timeline": [
+        {
+          "status": "ISSUED",
+          "timestamp": "2026-09-07T10:15:03.288Z",
+          "actor": "Warehouse Supervisor",
+          "comment": "تم تسليم القطعة لفني الصيانة لاستئناف أعمال الإصلاح بالبلاغ"
+        },
         {
           "status": "RECEIVED",
           "timestamp": "2026-09-03T15:13:28.431Z",
@@ -11780,16 +12301,75 @@
         }
       ],
       "createdAt": "2026-09-03T15:13:02.914Z",
-      "updatedAt": "2026-09-03T15:13:28.431Z",
+      "updatedAt": "2026-09-07T10:15:03.288Z",
       "orderedBy": "Warehouse Supervisor",
       "orderedAt": "2026-09-03T15:13:14.067Z",
       "poNumber": "PO-2026-4032",
       "expectedDeliveryDate": "2026-09-06",
       "receivedBy": "Warehouse Supervisor",
-      "receivedAt": "2026-09-03T15:13:28.431Z"
+      "receivedAt": "2026-09-03T15:13:28.431Z",
+      "issuedBy": "Warehouse Supervisor",
+      "issuedAt": "2026-09-07T10:15:03.288Z"
     }
   ],
   "transactions": [
+    {
+      "id": "tx-1788776103288-uvx7",
+      "partId": "prt-1788448382914-etst",
+      "sparePartId": "prt-1788448382914-etst",
+      "part": {
+        "id": "prt-1788448382914-etst",
+        "partNumber": "REQ-SKU-3806",
+        "name": "مضخه مياه",
+        "nameAr": "مضخه مياه",
+        "category": "GENERAL",
+        "unitCost": 45,
+        "currentQuantity": 0,
+        "currentStock": 0,
+        "minimumQuantity": 2,
+        "minStockLevel": 2,
+        "maxStockLevel": 10,
+        "storageLocation": "Central Warehouse Depot",
+        "isActive": true,
+        "status": "ACTIVE",
+        "totalValue": 0,
+        "createdAt": "2026-09-03T15:13:02.914Z",
+        "updatedAt": "2026-09-07T10:15:03.288Z"
+      },
+      "sparePart": {
+        "id": "prt-1788448382914-etst",
+        "partNumber": "REQ-SKU-3806",
+        "name": "مضخه مياه",
+        "nameAr": "مضخه مياه",
+        "category": "GENERAL",
+        "unitCost": 45,
+        "currentQuantity": 0,
+        "currentStock": 0,
+        "minimumQuantity": 2,
+        "minStockLevel": 2,
+        "maxStockLevel": 10,
+        "storageLocation": "Central Warehouse Depot",
+        "isActive": true,
+        "status": "ACTIVE",
+        "totalValue": 0,
+        "createdAt": "2026-09-03T15:13:02.914Z",
+        "updatedAt": "2026-09-07T10:15:03.288Z"
+      },
+      "transactionType": "ISSUE",
+      "quantity": 21,
+      "quantityDelta": -21,
+      "balanceBefore": 21,
+      "balanceAfter": 0,
+      "unitCost": 45,
+      "unitPrice": 45,
+      "totalCost": 945,
+      "referenceTicketId": "tck-1788443930201-b5an",
+      "referenceTicketNumber": "TCK-2026-0001",
+      "machineId": "mch-imp-1788442674016-24",
+      "performedBy": "Warehouse Supervisor",
+      "notes": "تم تسليم القطعة لفني الصيانة لاستئناف أعمال الإصلاح بالبلاغ",
+      "createdAt": "2026-09-07T10:15:03.288Z"
+    },
     {
       "id": "tx-1788448408431-520i",
       "partId": "prt-1788448382914-etst",
@@ -11956,6 +12536,90 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "aud-1788776405976",
+      "action": "PART_REQUEST_REJECTED",
+      "entityName": "SparePartRequest",
+      "entityId": "prq-1788772885371-f17436",
+      "newValues": {
+        "status": "REJECTED",
+        "actor": "Warehouse Supervisor",
+        "comment": "Status moved to REJECTED"
+      },
+      "createdAt": "2026-09-07T10:20:05.976Z"
+    },
+    {
+      "id": "aud-1788776401646",
+      "action": "PART_REQUEST_REJECTED",
+      "entityName": "SparePartRequest",
+      "entityId": "prq-1788707053655-04fc74",
+      "newValues": {
+        "status": "REJECTED",
+        "actor": "Warehouse Supervisor",
+        "comment": "Status moved to REJECTED"
+      },
+      "createdAt": "2026-09-07T10:20:01.646Z"
+    },
+    {
+      "id": "aud-1788776394508",
+      "action": "PART_REQUEST_REJECTED",
+      "entityName": "SparePartRequest",
+      "entityId": "prq-1788692084779-d6af08",
+      "newValues": {
+        "status": "REJECTED",
+        "actor": "Warehouse Supervisor",
+        "comment": "Status moved to REJECTED"
+      },
+      "createdAt": "2026-09-07T10:19:54.508Z"
+    },
+    {
+      "id": "aud-1788776103289",
+      "action": "PART_REQUEST_ISSUED",
+      "entityName": "SparePartRequest",
+      "entityId": "REQ-2026-0001",
+      "newValues": {
+        "status": "ISSUED",
+        "actor": "Warehouse Supervisor",
+        "comment": "تم تسليم القطعة لفني الصيانة لاستئناف أعمال الإصلاح بالبلاغ"
+      },
+      "createdAt": "2026-09-07T10:15:03.288Z"
+    },
+    {
+      "id": "aud-1788776095950",
+      "action": "PART_REQUEST_REJECTED",
+      "entityName": "SparePartRequest",
+      "entityId": "prq-1788687826038-81faf0",
+      "newValues": {
+        "status": "REJECTED",
+        "actor": "Warehouse Supervisor",
+        "comment": "Status moved to REJECTED"
+      },
+      "createdAt": "2026-09-07T10:14:55.950Z"
+    },
+    {
+      "id": "aud-1788776090488",
+      "action": "PART_REQUEST_REJECTED",
+      "entityName": "SparePartRequest",
+      "entityId": "prq-1788687655794-ad2d55",
+      "newValues": {
+        "status": "REJECTED",
+        "actor": "Warehouse Supervisor",
+        "comment": "Status moved to REJECTED"
+      },
+      "createdAt": "2026-09-07T10:14:50.488Z"
+    },
+    {
+      "id": "aud-1788776086201",
+      "action": "PART_REQUEST_REJECTED",
+      "entityName": "SparePartRequest",
+      "entityId": "prq-1788687619251-654e25",
+      "newValues": {
+        "status": "REJECTED",
+        "actor": "Warehouse Supervisor",
+        "comment": "Status moved to REJECTED"
+      },
+      "createdAt": "2026-09-07T10:14:46.201Z"
+    },
     {
       "id": "aud-1788772898638",
       "action": "MACHINE_DELETED",
@@ -20792,65 +21456,6 @@
       },
       "timestamp": "2026-09-03T00:00:00.000Z",
       "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-1788442674037",
-      "userId": "usr-admin-01",
-      "user": {
-        "id": "usr-admin-01",
-        "email": "admin@vendingfleet.com",
-        "fullName": "مدير النظام",
-        "phone": "+966 50 123 4567",
-        "role": "SUPER_ADMIN",
-        "isActive": true,
-        "createdAt": "2026-09-03T00:00:00.000Z",
-        "updatedAt": "2026-09-03T00:00:00.000Z",
-        "lastLoginAt": "2026-09-03T00:00:00.000Z"
-      },
-      "action": "EXCEL_BATCH_IMPORTED",
-      "entityName": "ImportBatch",
-      "entityId": "imp-batch-1788442674013",
-      "oldValues": {},
-      "newValues": {
-        "importBatchId": "imp-batch-1788442674013",
-        "user": "Sultan Al-Otaibi (Super Admin)",
-        "timestamp": "2026-09-03T13:37:54.013Z",
-        "sourceFile": "تقرير_الماكينات_20260826_2313.xlsx",
-        "fileHash": "sha256-2a1e6479",
-        "recordsApproved": 189,
-        "recordsInserted": 189,
-        "recordsSkipped": 1,
-        "recordsRejected": 0,
-        "recordsRequiringReview": 1,
-        "buildingsCreated": 32,
-        "locationsCreated": 55
-      },
-      "ipAddress": "192.168.1.45",
-      "createdAt": "2026-09-03T13:37:54.013Z"
-    },
-    {
-      "id": "aud-init-001",
-      "action": "DATABASE_INITIALIZED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "قاعدة البيانات نظيفة تماماً وجاهزة لاستقبال وتخزين البيانات الحقيقية للشركة."
-      },
-      "timestamp": "2026-09-03T00:00:00.000Z",
-      "createdAt": "2026-09-03T00:00:00.000Z"
-    },
-    {
-      "id": "aud-init-001",
-      "action": "DATABASE_INITIALIZED",
-      "entityName": "System",
-      "entityId": "ROOT",
-      "userName": "مدير النظام",
-      "newValues": {
-        "message": "قاعدة البيانات نظيفة تماماً وجاهزة لاستقبال وتخزين البيانات الحقيقية للشركة."
-      },
-      "timestamp": "2026-09-03T00:00:00.000Z",
-      "createdAt": "2026-09-03T00:00:00.000Z"
     }
   ],
   "importBatches": [
@@ -24000,7 +24605,13 @@
     "cld-evt-1788772885358-f2857533",
     "cld-evt-1788772885368-ad586496",
     "cld-evt-1788772885372-c1128bf1",
-    "cld-evt-1788772885377-a2f893e5"
+    "cld-evt-1788772885377-a2f893e5",
+    "cld-evt-1788778541756-f99c8a69",
+    "cld-evt-1788778542126-8d4cadef",
+    "cld-evt-1788778542137-7dcaf461",
+    "cld-evt-1788778542144-6f1aac6a",
+    "cld-evt-1788778542149-8f0bdb5d",
+    "cld-evt-1788778542155-a381c63a"
   ],
-  "lastCloudSyncCursor": 30
+  "lastCloudSyncCursor": 36
 }

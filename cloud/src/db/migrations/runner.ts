@@ -25,14 +25,41 @@ export async function runCloudDatabaseMigrations(pool: Pool): Promise<MigrationR
     // 2. Fetch already applied versions
     const res = await client.query('SELECT version FROM schema_migrations;');
     const appliedSet = new Set<string>(res.rows.map(r => r.version));
+    const alreadyAppliedVersions = Array.from(appliedSet);
 
-    // 3. Find migration files
-    const migrationsDir = path.resolve(__dirname);
+    // 3. Find migration files using deterministic resolution strategy
+    const configuredDir = process.env.CLOUD_MIGRATIONS_DIR;
+    let migrationsDir = configuredDir
+      ? path.resolve(configuredDir)
+      : path.resolve(process.cwd(), 'cloud', 'src', 'db', 'migrations');
+
+    // Fallback if running from inside the cloud/ directory directly
+    if (!fs.existsSync(migrationsDir)) {
+      const altDir = path.resolve(process.cwd(), 'src', 'db', 'migrations');
+      if (fs.existsSync(altDir)) {
+        migrationsDir = altDir;
+      }
+    }
+
+    console.log(`[CloudDb Migrations] Resolved migration directory: ${migrationsDir}`);
+
     let files: string[] = [];
     if (fs.existsSync(migrationsDir)) {
       files = fs.readdirSync(migrationsDir)
         .filter(f => f.endsWith('.sql'))
         .sort();
+    }
+
+    console.log(`[CloudDb Migrations] Number of .sql files found: ${files.length}`);
+    console.log(`[CloudDb Migrations] Migration filenames found: ${files.length > 0 ? files.join(', ') : 'none'}`);
+    console.log(`[CloudDb Migrations] Already applied migration versions: ${alreadyAppliedVersions.length > 0 ? alreadyAppliedVersions.join(', ') : 'none'}`);
+
+    // Critical: If no migration files are discovered in staging/production, fail startup immediately
+    if (files.length === 0) {
+      const env = (process.env.NODE_ENV || '').toLowerCase();
+      if (env === 'staging' || env === 'production') {
+        throw new Error(`CLOUD_MIGRATION_FILES_NOT_FOUND: ${migrationsDir}`);
+      }
     }
 
     for (const file of files) {
@@ -54,13 +81,15 @@ export async function runCloudDatabaseMigrations(pool: Pool): Promise<MigrationR
         );
         await client.query('COMMIT');
         applied.push(file);
-        console.log(`[CloudDb Migrations] Successfully applied migration: ${file}`);
+        console.log(`[CloudDb Migrations] Successfully applied migration: ${file} (version ${version})`);
       } catch (migrationErr: any) {
         await client.query('ROLLBACK');
         console.error(`[CloudDb Migrations] Migration failed for ${file}:`, migrationErr.message);
         throw migrationErr;
       }
     }
+
+    console.log(`[CloudDb Migrations] Newly applied migration versions: ${applied.length > 0 ? applied.join(', ') : 'none'}`);
 
     return {
       success: true,

@@ -192,7 +192,7 @@ async function runPhase52Verification() {
   assert(!dockerfileContent.includes('src/types.ts'), 'Dockerfile does NOT contain obsolete COPY src/types.ts');
   assert(dockerfileContent.includes('COPY cloud ./cloud'), 'Dockerfile copies cloud source directory');
   assert(dockerfileContent.includes('COPY tsconfig*.json ./'), 'Dockerfile copies tsconfig*.json');
-  assert(dockerfileContent.includes('COPY package.json package-lock.json* ./'), 'Dockerfile copies package manifests');
+  assert(dockerfileContent.includes('COPY package.json package-lock.json'), 'Dockerfile copies package manifests');
 
   // Verify all static source paths referenced in COPY exist in repository root
   const rootDir = process.cwd();

@@ -213,7 +213,9 @@ async function runPhase51Tests() {
   console.log('================================================================\n');
 }
 
-runPhase51Tests().catch((err) => {
+runPhase51Tests().then(() => {
+  process.exit(0);
+}).catch((err) => {
   console.error('Fatal Test Error:', err);
   process.exit(1);
 });
