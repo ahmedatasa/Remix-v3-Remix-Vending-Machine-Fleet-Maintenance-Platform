@@ -2331,10 +2331,19 @@ export const api = {
     }
 
     try {
-      return await apiFetch<Machine>(`/machines/${id}`, {
+      const serverUpdated = await apiFetch<Machine>(`/machines/${id}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
+      const idx = store.machines.findIndex(m => m.id === id || m.publicId === id || m.machineNumber === id);
+      if (idx !== -1) {
+        store.machines[idx] = { ...store.machines[idx], ...serverUpdated };
+        store.save(false);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
+      }
+      return serverUpdated;
     } catch {
       const idx = store.machines.findIndex(m => m.id === id || m.publicId === id || m.machineNumber === id);
       if (idx !== -1) {
@@ -3222,9 +3231,18 @@ export const api = {
 
   async deleteMachine(id: string) {
     try {
-      return await apiFetch<any>(`/machines/${id}`, {
+      const res = await apiFetch<any>(`/machines/${id}`, {
         method: 'DELETE'
       });
+      const idx = store.machines.findIndex(m => m.id === id || m.publicId === id || m.machineNumber === id);
+      if (idx !== -1) {
+        store.machines.splice(idx, 1);
+        store.save(false);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
+      }
+      return res;
     } catch {
       const idx = store.machines.findIndex(m => m.id === id || m.publicId === id || m.machineNumber === id);
       if (idx !== -1) {
@@ -3415,10 +3433,19 @@ export const api = {
 
   async updateBuilding(id: string, updates: Partial<Building>) {
     try {
-      return await apiFetch<Building>(`/buildings/${id}`, {
+      const serverUpdated = await apiFetch<Building>(`/buildings/${id}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
+      const idx = store.buildings.findIndex(b => b.id === id || b.code === id);
+      if (idx !== -1) {
+        store.buildings[idx] = { ...store.buildings[idx], ...serverUpdated };
+        store.save(false);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
+      }
+      return serverUpdated;
     } catch {
       const bld = store.buildings.find(b => b.id === id || b.code === id);
       if (!bld) throw new Error('Building not found');
@@ -3789,10 +3816,19 @@ export const api = {
 
   async updateLocation(id: string, updates: Partial<Location>) {
     try {
-      return await apiFetch<Location>(`/locations/${id}`, {
+      const serverUpdated = await apiFetch<Location>(`/locations/${id}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
+      const idx = store.locations.findIndex(l => l.id === id);
+      if (idx !== -1) {
+        store.locations[idx] = { ...store.locations[idx], ...serverUpdated };
+        store.save(false);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
+      }
+      return serverUpdated;
     } catch {
       const loc = store.locations.find(l => l.id === id);
       if (!loc) throw new Error('Location not found');
@@ -5012,10 +5048,19 @@ export const api = {
 
   async updateTicket(ticketId: string, updates: Partial<Ticket>) {
     try {
-      return await apiFetch<Ticket>(`/tickets/${ticketId}`, {
+      const serverUpdated = await apiFetch<Ticket>(`/tickets/${ticketId}`, {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
+      const idx = store.tickets.findIndex(t => t.id === ticketId || t.ticketNumber === ticketId);
+      if (idx !== -1) {
+        store.tickets[idx] = { ...store.tickets[idx], ...serverUpdated };
+        store.save(false);
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
+      }
+      return serverUpdated;
     } catch {
       const tck = store.tickets.find(t => t.id === ticketId || t.ticketNumber === ticketId);
       if (!tck) throw new Error('Ticket not found');

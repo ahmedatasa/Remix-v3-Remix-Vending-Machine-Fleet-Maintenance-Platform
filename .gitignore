@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Operational Runtime Data Files (DO NOT OVERWRITE VIA GIT)
+fleet_data.json
+fleet_data.backup*
+fleet_runtime_data.json
+*.tmp.*

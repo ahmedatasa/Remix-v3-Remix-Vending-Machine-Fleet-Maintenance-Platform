@@ -5,6 +5,8 @@
 
 export interface GeoCoordinatesValidationResult {
   isValid: boolean;
+  valid: boolean;
+  isConfigured: boolean;
   latitude: number | null;
   longitude: number | null;
   error?: string;
@@ -29,6 +31,8 @@ export function validateCoordinates(
   if (isLatEmpty && isLngEmpty) {
     return {
       isValid: true,
+      valid: true,
+      isConfigured: false,
       latitude: null,
       longitude: null
     };
@@ -38,6 +42,8 @@ export function validateCoordinates(
   if (isLatEmpty || isLngEmpty) {
     return {
       isValid: false,
+      valid: false,
+      isConfigured: false,
       latitude: null,
       longitude: null,
       error: 'يجب إدخال كل من خط العرض وخط الطول معاً، أو تركهما فارغين لحفظ الموقع بدون GPS.'
@@ -50,6 +56,8 @@ export function validateCoordinates(
   if (isNaN(latNum) || latNum < -90 || latNum > 90) {
     return {
       isValid: false,
+      valid: false,
+      isConfigured: false,
       latitude: null,
       longitude: null,
       error: 'خط العرض يجب أن يكون رقماً صحيحاً بين -90 و 90 درجة.'
@@ -59,6 +67,8 @@ export function validateCoordinates(
   if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
     return {
       isValid: false,
+      valid: false,
+      isConfigured: false,
       latitude: null,
       longitude: null,
       error: 'خط الطول يجب أن يكون رقماً صحيحاً بين -180 و 180 درجة.'
@@ -67,6 +77,8 @@ export function validateCoordinates(
 
   return {
     isValid: true,
+    valid: true,
+    isConfigured: true,
     latitude: Number(latNum.toFixed(6)),
     longitude: Number(lngNum.toFixed(6))
   };
