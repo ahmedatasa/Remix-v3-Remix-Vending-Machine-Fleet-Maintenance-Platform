@@ -179,6 +179,7 @@ async function startServer() {
 
   // Mount Hybrid Cloud Operations router as fallback/direct integration
   const hybridRouter = createHybridRouter(getStore, saveStore);
+  initHybridFleetMigration(getStore(), saveStore);
   apiRouter.use(hybridRouter);
 
   // Enterprise Role-Based Access Control (RBAC) Guard
@@ -2841,10 +2842,24 @@ async function startServer() {
       token = generateSecureOpaqueToken(8);
     }
 
-    // 2. Derive stable GPS coordinates (defaulting to Riyadh campus dispersion)
-    const num = parseInt(cleanNum, 10) || (store.machines?.length || 0) + 1;
-    const lat = typeof data.latitude === 'number' ? data.latitude : (typeof data.machineLatitude === 'number' ? data.machineLatitude : Number((24.7136 + ((num % 40) * 0.00035)).toFixed(6)));
-    const lng = typeof data.longitude === 'number' ? data.longitude : (typeof data.machineLongitude === 'number' ? data.machineLongitude : Number((46.6753 + (((num * 7) % 40) * 0.00035)).toFixed(6)));
+    // 2. Validate and set GPS coordinates: NEVER invent fake default GPS coordinates.
+    // If coordinates are not explicitly provided by the user, set to null with LOCATION_NOT_CONFIGURED.
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let locationStatus = 'LOCATION_NOT_CONFIGURED';
+    let locationSource = 'NONE';
+    let locationUpdatedAt: string | null = null;
+
+    const providedLat = typeof data.latitude === 'number' ? data.latitude : (typeof data.machineLatitude === 'number' ? data.machineLatitude : null);
+    const providedLng = typeof data.longitude === 'number' ? data.longitude : (typeof data.machineLongitude === 'number' ? data.machineLongitude : null);
+
+    if (providedLat !== null && providedLng !== null && !isNaN(providedLat) && !isNaN(providedLng)) {
+      lat = Number(providedLat.toFixed(6));
+      lng = Number(providedLng.toFixed(6));
+      locationStatus = data.locationStatus || 'GPS_CONFIGURED';
+      locationSource = data.locationSource || 'MANUAL_ENTRY';
+      locationUpdatedAt = now;
+    }
 
     const machineId = data.id || `mch-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
     const newMachine = {
@@ -2870,9 +2885,13 @@ async function startServer() {
       machineLongitude: lng,
       latitude: lat,
       longitude: lng,
+      locationStatus,
+      locationSource,
+      locationUpdatedAt,
       installationDate: data.installationDate || now.split('T')[0],
       lastMaintenanceDate: data.lastMaintenanceDate || now,
       qrCodeUrl: `/public/m/${token}`,
+      revision: 1,
       createdAt: now,
       updatedAt: now
     };
@@ -2977,6 +2996,22 @@ async function startServer() {
       }
     }
 
+    // Determine strict locationUpdatedAt provenance
+    let finalLocationUpdatedAt: string | null = null;
+    if (lat === null || lng === null) {
+      finalLocationUpdatedAt = null;
+    } else if (locationChanged) {
+      finalLocationUpdatedAt = now;
+    } else {
+      finalLocationUpdatedAt = oldMachine.locationUpdatedAt || null;
+    }
+
+    // Monotonically increment integer revision
+    const oldRev = typeof oldMachine.revision === 'number' && !isNaN(oldMachine.revision) && isFinite(oldMachine.revision) && oldMachine.revision >= 1
+      ? Math.floor(oldMachine.revision)
+      : 1;
+    const nextRev = oldRev + 1;
+
     const updated = {
       ...oldMachine,
       ...data,
@@ -2987,8 +3022,9 @@ async function startServer() {
       locationSource,
       locationStatus,
       locationNote,
-      locationUpdatedAt: locationChanged ? now : (oldMachine.locationUpdatedAt || now),
+      locationUpdatedAt: finalLocationUpdatedAt,
       currentLocation,
+      revision: nextRev,
       updatedAt: now
     };
     store.machines[idx] = updated;

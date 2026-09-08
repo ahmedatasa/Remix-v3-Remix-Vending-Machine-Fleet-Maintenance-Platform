@@ -1,35 +1,88 @@
 import { RuntimeStoreData } from './runtimeStoreTypes';
 import { runtimeStoreManager } from './runtimeStoreManager';
+import { sanitizeMachineGps } from './syntheticGpsSanitizer';
 
 /**
- * PHASE 5.4.4: Authoritative Sync Merge Engine
- * 
- * Implements deterministic conflict resolution for all synchronized operational entities.
- * Replaces unsafe full-array replacement semantics (store.X = incomingX).
+ * PHASE 5.4.5: Authoritative Sync Merge Engine & Deterministic Version Comparator
  * 
  * Policies:
- *  1. Stable-ID identity: matches strictly on entity.id (or ticketNumber / machineNumber).
- *  2. Tombstone Protection: If an entity was deleted/tombstoned locally, stale sync NEVER resurrects it.
- *  3. Revision & Timestamp Priority:
- *     - If incoming.revision < existing.revision -> IGNORE incoming
- *     - If incoming.revision === existing.revision -> IDEMPOTENT (no-op)
- *     - If incoming.revision > existing.revision -> APPLY patch
- *     - Fallback: compare updatedAt timestamps if revision is not provided.
- *  4. GPS Stale-Sync Protection:
- *     - Machine GPS: preserves higher revision coordinates, never allows stale GPS or null to overwrite.
- *     - Building GPS: preserves higher revision coordinates, never allows stale GPS or null to overwrite.
- *  5. Terminal Status Protection:
- *     - Tickets with terminal status (RESOLVED, VERIFIED, CLOSED) are never downgraded to open/in-progress.
+ *  1. Deterministic Version Comparator:
+ *     - Separate numeric revision (1, 2, 3...) from updatedAt timestamp.
+ *     - Never write timestamp milliseconds into the revision field.
+ *  2. True Idempotency:
+ *     - Equal revision & equal timestamp -> IDEMPOTENT NO-OP.
+ *     - No entity mutation, no revision inflation, no duplicate audit.
+ *  3. Stale-Sync Protection:
+ *     - If incoming is strictly older -> IGNORE incoming.
+ *     - Configured GPS is protected from stale null overwrite.
+ *  4. Terminal Status Protection:
+ *     - Tickets in terminal state (RESOLVED, VERIFIED, CLOSED) are never downgraded.
+ *  5. Tombstone Protection:
+ *     - Locally deleted/tombstoned entities are NEVER resurrected by incoming sync.
+ *  6. Zero Fake GPS Rule:
+ *     - Incoming machine sync payloads are filtered through sanitizeMachineGps.
  */
 
-function getEntityRevision(item: any): number {
-  if (typeof item?.revision === 'number' && !isNaN(item.revision)) {
-    return item.revision;
+/**
+ * Extracts a valid positive integer revision, or returns null if not present.
+ */
+export function getNumericRevision(entity: any): number | null {
+  if (typeof entity?.revision === 'number' && !isNaN(entity.revision) && isFinite(entity.revision) && entity.revision >= 1) {
+    return Math.floor(entity.revision);
   }
-  if (item?.updatedAt) {
-    const time = new Date(item.updatedAt).getTime();
-    if (!isNaN(time)) return time;
+  return null;
+}
+
+/**
+ * Extracts timestamp milliseconds from updatedAt, or returns null if not present/invalid.
+ */
+export function getUpdatedAtMs(entity: any): number | null {
+  if (entity?.updatedAt) {
+    const time = new Date(entity.updatedAt).getTime();
+    if (!isNaN(time) && isFinite(time)) return time;
   }
+  return null;
+}
+
+/**
+ * Deterministic Version Comparator.
+ * Returns:
+ *   1  if incoming is strictly newer than existing (apply update)
+ *  -1  if incoming is strictly older than existing (ignore stale)
+ *   0  if incoming has identical/equivalent version (idempotent no-op)
+ */
+export function compareEntityVersion(existing: any, incoming: any): 1 | 0 | -1 {
+  const existingRev = getNumericRevision(existing);
+  const incRev = getNumericRevision(incoming);
+
+  // CASE 1: Both have valid numeric revisions
+  if (existingRev !== null && incRev !== null) {
+    if (incRev > existingRev) return 1;
+    if (incRev < existingRev) return -1;
+    // Equal revision: compare updatedAt timestamps if available and different
+    const existingMs = getUpdatedAtMs(existing);
+    const incMs = getUpdatedAtMs(incoming);
+    if (existingMs !== null && incMs !== null) {
+      if (incMs > existingMs) return 1;
+      if (incMs < existingMs) return -1;
+    }
+    return 0; // Identical revision and timestamp -> True idempotent no-op
+  }
+
+  // CASE 2: One or both lack numeric revision -> fallback to updatedAt timestamp comparison
+  const existingMs = getUpdatedAtMs(existing);
+  const incMs = getUpdatedAtMs(incoming);
+
+  if (incMs !== null && existingMs !== null) {
+    if (incMs > existingMs) return 1;
+    if (incMs < existingMs) return -1;
+    return 0; // Equal timestamps
+  }
+
+  if (incMs !== null && existingMs === null) return 1;
+  if (incMs === null && existingMs !== null) return -1;
+
+  // CASE 3: Neither has revision nor timestamp -> local authoritative existing wins (no-op)
   return 0;
 }
 
@@ -40,33 +93,44 @@ export function mergeMachines(existingMachines: any[], incomingMachines: any[]):
 
   const map = new Map<string, any>(existingMachines.map(m => [m.id, m]));
 
-  for (const inc of incomingMachines) {
-    if (!inc || !inc.id) continue;
+  for (const rawInc of incomingMachines) {
+    if (!rawInc || !rawInc.id) continue;
 
     // Check tombstone
-    if (runtimeStoreManager.isTombstoned('Machine', inc.id)) {
+    if (
+      runtimeStoreManager.isTombstoned('Machine', rawInc.id) ||
+      (rawInc.machineNumber && runtimeStoreManager.isTombstoned('Machine', rawInc.machineNumber))
+    ) {
       continue;
     }
 
+    // Always sanitize incoming machine GPS so synthetic coordinates cannot enter via sync
+    const inc = sanitizeMachineGps(rawInc);
+
     const existing = map.get(inc.id);
     if (!existing) {
+      const incRev = getNumericRevision(inc) || 1;
       map.set(inc.id, {
         ...inc,
-        revision: inc.revision || 1,
+        revision: incRev,
         updatedAt: inc.updatedAt || new Date().toISOString()
       });
       continue;
     }
 
-    const existingRev = getEntityRevision(existing);
-    const incRev = getEntityRevision(inc);
+    const cmp = compareEntityVersion(existing, inc);
 
-    // Stale sync protection: if incoming revision is strictly older, ignore it
-    if (incRev < existingRev) {
+    // Stale sync protection: if incoming is strictly older, ignore it
+    if (cmp < 0) {
       continue;
     }
 
-    // Determine coordinate merging
+    // True Idempotency: if incoming version equals existing, no-op (no revision bump, no timestamp change)
+    if (cmp === 0) {
+      continue;
+    }
+
+    // Incoming is strictly newer (cmp > 0): Determine coordinate merging
     let finalLat = existing.latitude;
     let finalLng = existing.longitude;
     let finalLocationSource = existing.locationSource;
@@ -74,24 +138,37 @@ export function mergeMachines(existingMachines: any[], incomingMachines: any[]):
     let finalLocationUpdatedAt = existing.locationUpdatedAt;
     let finalLocationNote = existing.locationNote;
 
-    const incomingHasValidCoords = typeof inc.latitude === 'number' && !isNaN(inc.latitude);
-    const existingHasValidCoords = typeof existing.latitude === 'number' && !isNaN(existing.latitude);
+    const incomingHasValidCoords = typeof inc.latitude === 'number' && !isNaN(inc.latitude) && typeof inc.longitude === 'number' && !isNaN(inc.longitude);
+    const existingHasValidCoords = typeof existing.latitude === 'number' && !isNaN(existing.latitude) && typeof existing.longitude === 'number' && !isNaN(existing.longitude);
 
     if (incomingHasValidCoords) {
-      // If incoming is newer or equal revision, update GPS
-      if (incRev >= existingRev) {
-        finalLat = Number(inc.latitude.toFixed(6));
-        finalLng = Number(inc.longitude.toFixed(6));
-        finalLocationSource = inc.locationSource || 'MANUAL_ENTRY';
-        finalLocationStatus = 'GPS_CONFIGURED';
-        finalLocationUpdatedAt = inc.locationUpdatedAt || new Date().toISOString();
-        finalLocationNote = inc.locationNote !== undefined ? inc.locationNote : existing.locationNote;
-      }
+      // Newer incoming valid coordinates -> apply
+      finalLat = Number(inc.latitude.toFixed(6));
+      finalLng = Number(inc.longitude.toFixed(6));
+      finalLocationSource = inc.locationSource || 'MANUAL_ENTRY';
+      finalLocationStatus = 'GPS_CONFIGURED';
+      finalLocationUpdatedAt = inc.locationUpdatedAt || new Date().toISOString();
+      finalLocationNote = inc.locationNote !== undefined ? inc.locationNote : existing.locationNote;
     } else if (!existingHasValidCoords && inc.latitude === null && inc.longitude === null) {
+      // Explicit unconfigured state on both sides
       finalLat = null;
       finalLng = null;
+      finalLocationSource = 'NONE';
       finalLocationStatus = 'LOCATION_NOT_CONFIGURED';
+      finalLocationUpdatedAt = null;
+    } else if (existingHasValidCoords && (inc.latitude === null || inc.latitude === undefined)) {
+      // Protect existing configured GPS from stale/unconfigured incoming overwrite
+      finalLat = existing.latitude;
+      finalLng = existing.longitude;
+      finalLocationSource = existing.locationSource;
+      finalLocationStatus = existing.locationStatus;
+      finalLocationUpdatedAt = existing.locationUpdatedAt;
     }
+
+    const existingRev = getNumericRevision(existing) || 1;
+    const incRev = getNumericRevision(inc);
+    // Revision is integer only, never timestamp
+    const nextRev = incRev !== null && incRev > existingRev ? incRev : existingRev + 1;
 
     map.set(inc.id, {
       ...existing,
@@ -104,8 +181,8 @@ export function mergeMachines(existingMachines: any[], incomingMachines: any[]):
       locationStatus: finalLocationStatus,
       locationUpdatedAt: finalLocationUpdatedAt,
       locationNote: finalLocationNote,
-      revision: Math.max(existingRev, incRev) + 1,
-      updatedAt: new Date().toISOString()
+      revision: nextRev,
+      updatedAt: inc.updatedAt || new Date().toISOString()
     });
   }
 
@@ -122,25 +199,32 @@ export function mergeBuildings(existingBuildings: any[], incomingBuildings: any[
   for (const inc of incomingBuildings) {
     if (!inc || !inc.id) continue;
 
-    if (runtimeStoreManager.isTombstoned('Building', inc.id)) {
+    if (
+      runtimeStoreManager.isTombstoned('Building', inc.id) ||
+      (inc.code && runtimeStoreManager.isTombstoned('Building', inc.code))
+    ) {
       continue;
     }
 
     const existing = map.get(inc.id);
     if (!existing) {
+      const incRev = getNumericRevision(inc) || 1;
       map.set(inc.id, {
         ...inc,
-        revision: inc.revision || 1,
+        revision: incRev,
         updatedAt: inc.updatedAt || new Date().toISOString()
       });
       continue;
     }
 
-    const existingRev = getEntityRevision(existing);
-    const incRev = getEntityRevision(inc);
+    const cmp = compareEntityVersion(existing, inc);
 
-    if (incRev < existingRev) {
-      continue;
+    if (cmp < 0) {
+      continue; // Stale incoming
+    }
+
+    if (cmp === 0) {
+      continue; // Idempotent no-op
     }
 
     // GPS protection for Buildings
@@ -148,20 +232,28 @@ export function mergeBuildings(existingBuildings: any[], incomingBuildings: any[
     let finalLng = existing.longitude;
     let finalLocationSource = existing.locationSource;
     let finalLocationStatus = existing.locationStatus;
+    let finalLocationUpdatedAt = existing.locationUpdatedAt;
 
-    const incomingHasCoords = typeof inc.latitude === 'number' && !isNaN(inc.latitude);
-    const existingHasCoords = typeof existing.latitude === 'number' && !isNaN(existing.latitude);
+    const incomingHasCoords = typeof inc.latitude === 'number' && !isNaN(inc.latitude) && typeof inc.longitude === 'number' && !isNaN(inc.longitude);
+    const existingHasCoords = typeof existing.latitude === 'number' && !isNaN(existing.latitude) && typeof existing.longitude === 'number' && !isNaN(existing.longitude);
 
-    if (incomingHasCoords && incRev >= existingRev) {
+    if (incomingHasCoords) {
       finalLat = Number(inc.latitude.toFixed(6));
       finalLng = Number(inc.longitude.toFixed(6));
       finalLocationSource = inc.locationSource || 'MANUAL_ENTRY';
       finalLocationStatus = 'GPS_CONFIGURED';
+      finalLocationUpdatedAt = inc.locationUpdatedAt || new Date().toISOString();
     } else if (!existingHasCoords && inc.latitude === null) {
       finalLat = null;
       finalLng = null;
+      finalLocationSource = 'NONE';
       finalLocationStatus = 'LOCATION_NOT_CONFIGURED';
+      finalLocationUpdatedAt = null;
     }
+
+    const existingRev = getNumericRevision(existing) || 1;
+    const incRev = getNumericRevision(inc);
+    const nextRev = incRev !== null && incRev > existingRev ? incRev : existingRev + 1;
 
     map.set(inc.id, {
       ...existing,
@@ -170,8 +262,9 @@ export function mergeBuildings(existingBuildings: any[], incomingBuildings: any[
       longitude: finalLng,
       locationSource: finalLocationSource,
       locationStatus: finalLocationStatus,
-      revision: Math.max(existingRev, incRev) + 1,
-      updatedAt: new Date().toISOString()
+      locationUpdatedAt: finalLocationUpdatedAt,
+      revision: nextRev,
+      updatedAt: inc.updatedAt || new Date().toISOString()
     });
   }
 
@@ -191,7 +284,10 @@ export function mergeTickets(existingTickets: any[], incomingTickets: any[], aud
     if (!key) continue;
 
     // Check if ticket was tombstoned / deleted
-    if (runtimeStoreManager.isTombstoned('Ticket', inc.id) || runtimeStoreManager.isTombstoned('Ticket', inc.ticketNumber)) {
+    if (
+      runtimeStoreManager.isTombstoned('Ticket', inc.id) ||
+      (inc.ticketNumber && runtimeStoreManager.isTombstoned('Ticket', inc.ticketNumber))
+    ) {
       continue;
     }
 
@@ -204,23 +300,31 @@ export function mergeTickets(existingTickets: any[], incomingTickets: any[], aud
 
     const existing = map.get(key);
     if (!existing) {
+      const incRev = getNumericRevision(inc) || 1;
       map.set(key, {
         ...inc,
-        revision: inc.revision || 1,
+        revision: incRev,
         updatedAt: inc.updatedAt || new Date().toISOString()
       });
       continue;
     }
 
-    const existingRev = getEntityRevision(existing);
-    const incRev = getEntityRevision(inc);
+    const cmp = compareEntityVersion(existing, inc);
 
-    if (incRev < existingRev) {
-      continue;
+    if (cmp < 0) {
+      continue; // Stale incoming
+    }
+
+    if (cmp === 0) {
+      continue; // Idempotent no-op
     }
 
     const existingIsTerminal = TERMINAL_STATUSES.includes(existing.status);
     const incomingIsTerminal = TERMINAL_STATUSES.includes(inc.status);
+
+    const existingRev = getNumericRevision(existing) || 1;
+    const incRev = getNumericRevision(inc);
+    const nextRev = incRev !== null && incRev > existingRev ? incRev : existingRev + 1;
 
     if (existingIsTerminal && !incomingIsTerminal) {
       // Protect terminal status from rollback
@@ -234,15 +338,15 @@ export function mergeTickets(existingTickets: any[], incomingTickets: any[], aud
         resolutionSummary: existing.resolutionSummary,
         verifiedAt: existing.verifiedAt,
         closedAt: existing.closedAt,
-        revision: Math.max(existingRev, incRev) + 1,
+        revision: nextRev,
         updatedAt: existing.updatedAt || new Date().toISOString()
       });
     } else {
       map.set(key, {
         ...existing,
         ...inc,
-        revision: Math.max(existingRev, incRev) + 1,
-        updatedAt: new Date().toISOString()
+        revision: nextRev,
+        updatedAt: inc.updatedAt || new Date().toISOString()
       });
     }
   }
@@ -270,26 +374,34 @@ export function mergeGenericCollection(
 
     const existing = map.get(inc.id);
     if (!existing) {
+      const incRev = getNumericRevision(inc) || 1;
       map.set(inc.id, {
         ...inc,
-        revision: inc.revision || 1,
+        revision: incRev,
         updatedAt: inc.updatedAt || new Date().toISOString()
       });
       continue;
     }
 
-    const existingRev = getEntityRevision(existing);
-    const incRev = getEntityRevision(inc);
+    const cmp = compareEntityVersion(existing, inc);
 
-    if (incRev < existingRev) {
-      continue;
+    if (cmp < 0) {
+      continue; // Stale incoming
     }
+
+    if (cmp === 0) {
+      continue; // Idempotent no-op
+    }
+
+    const existingRev = getNumericRevision(existing) || 1;
+    const incRev = getNumericRevision(inc);
+    const nextRev = incRev !== null && incRev > existingRev ? incRev : existingRev + 1;
 
     map.set(inc.id, {
       ...existing,
       ...inc,
-      revision: Math.max(existingRev, incRev) + 1,
-      updatedAt: new Date().toISOString()
+      revision: nextRev,
+      updatedAt: inc.updatedAt || new Date().toISOString()
     });
   }
 
@@ -298,6 +410,8 @@ export function mergeGenericCollection(
 
 export function mergeFleetSyncPayload(store: RuntimeStoreData, payload: any): void {
   const {
+    eventId,
+    syncEventId,
     machines,
     buildings,
     floors,
@@ -313,6 +427,18 @@ export function mergeFleetSyncPayload(store: RuntimeStoreData, payload: any): vo
     settings,
     auditLogs
   } = payload;
+
+  const currentEventId = eventId || syncEventId;
+  if (currentEventId && Array.isArray(store.processedSyncEventIds)) {
+    if (store.processedSyncEventIds.includes(currentEventId)) {
+      console.log(`[SyncEngine] Event ID ${currentEventId} already processed. Skipping duplicate delivery.`);
+      return;
+    }
+    store.processedSyncEventIds.push(currentEventId);
+    if (store.processedSyncEventIds.length > 500) {
+      store.processedSyncEventIds = store.processedSyncEventIds.slice(-500);
+    }
+  }
 
   if (Array.isArray(machines)) {
     store.machines = mergeMachines(store.machines || [], machines);

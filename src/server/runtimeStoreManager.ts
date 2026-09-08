@@ -14,6 +14,10 @@ import {
   SystemSettings,
   EntityTombstone
 } from './runtimeStoreTypes';
+import {
+  sanitizeFleetMachines,
+  normalizeEntityRevisions
+} from './syntheticGpsSanitizer';
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   criticalSla: 2,
@@ -212,19 +216,24 @@ export class RuntimeStoreManager {
         const storeId = `store-${crypto.randomBytes(6).toString('hex')}`;
         const migratedStore = createEmptyRuntimeStore(storeId);
 
-        // Copy all operational entities
-        migratedStore.machines = Array.isArray(legacyData.machines) ? legacyData.machines : [];
-        migratedStore.buildings = Array.isArray(legacyData.buildings) ? legacyData.buildings : [];
-        migratedStore.floors = Array.isArray(legacyData.floors) ? legacyData.floors : [];
-        migratedStore.locations = Array.isArray(legacyData.locations) ? legacyData.locations : [];
-        migratedStore.tickets = Array.isArray(legacyData.tickets) ? legacyData.tickets : [];
-        migratedStore.technicians = Array.isArray(legacyData.technicians) ? legacyData.technicians : [];
-        migratedStore.categories = Array.isArray(legacyData.categories) ? legacyData.categories : [];
-        migratedStore.spareParts = Array.isArray(legacyData.spareParts) ? legacyData.spareParts : [];
-        migratedStore.suppliers = Array.isArray(legacyData.suppliers) ? legacyData.suppliers : [];
-        migratedStore.partRequests = Array.isArray(legacyData.partRequests) ? legacyData.partRequests : [];
-        migratedStore.transactions = Array.isArray(legacyData.transactions) ? legacyData.transactions : [];
-        migratedStore.users = Array.isArray(legacyData.users) ? legacyData.users : [];
+        // Sanitize legacy synthetic GPS and enforce pair invariant
+        const rawMachines = Array.isArray(legacyData.machines) ? legacyData.machines : [];
+        const { machines: sanitizedMachines, summary: gpsSummary } = sanitizeFleetMachines(rawMachines);
+        console.log(`[Persistence] GPS Sanitization during legacy migration: Cleared ${gpsSummary.syntheticCleared} synthetic coordinates, Preserved ${gpsSummary.realGpsPreserved} legitimate GPS.`);
+
+        // Copy all operational entities with normalized integer revisions
+        migratedStore.machines = normalizeEntityRevisions(sanitizedMachines);
+        migratedStore.buildings = normalizeEntityRevisions(Array.isArray(legacyData.buildings) ? legacyData.buildings : []);
+        migratedStore.floors = normalizeEntityRevisions(Array.isArray(legacyData.floors) ? legacyData.floors : []);
+        migratedStore.locations = normalizeEntityRevisions(Array.isArray(legacyData.locations) ? legacyData.locations : []);
+        migratedStore.tickets = normalizeEntityRevisions(Array.isArray(legacyData.tickets) ? legacyData.tickets : []);
+        migratedStore.technicians = normalizeEntityRevisions(Array.isArray(legacyData.technicians) ? legacyData.technicians : []);
+        migratedStore.categories = normalizeEntityRevisions(Array.isArray(legacyData.categories) ? legacyData.categories : []);
+        migratedStore.spareParts = normalizeEntityRevisions(Array.isArray(legacyData.spareParts) ? legacyData.spareParts : []);
+        migratedStore.suppliers = normalizeEntityRevisions(Array.isArray(legacyData.suppliers) ? legacyData.suppliers : []);
+        migratedStore.partRequests = normalizeEntityRevisions(Array.isArray(legacyData.partRequests) ? legacyData.partRequests : []);
+        migratedStore.transactions = normalizeEntityRevisions(Array.isArray(legacyData.transactions) ? legacyData.transactions : []);
+        migratedStore.users = normalizeEntityRevisions(Array.isArray(legacyData.users) ? legacyData.users : []);
         migratedStore.auditLogs = Array.isArray(legacyData.auditLogs) ? legacyData.auditLogs : [];
         migratedStore.importBatches = Array.isArray(legacyData.importBatches) ? legacyData.importBatches : [];
         migratedStore.importRows = Array.isArray(legacyData.importRows) ? legacyData.importRows : [];
@@ -243,8 +252,8 @@ export class RuntimeStoreManager {
         migratedStore.initialized = true;
         migratedStore._persistence = {
           initialized: true,
-          schemaVersion: 3,
-          version: '5.4.4',
+          schemaVersion: 4,
+          version: '5.4.5',
           initializedAt: legacyData._persistence?.initializedAt || new Date().toISOString(),
           baselineImportedAt: legacyData._persistence?.baselineImportedAt || null,
           legacyMigrationCompletedAt: new Date().toISOString(),
@@ -255,7 +264,7 @@ export class RuntimeStoreManager {
 
         // Write atomically to authoritative runtime store
         this.atomicWriteJsonSync(runtimePath, migratedStore);
-        console.log(`[Persistence] Legacy migration complete. Migrated ${migratedStore.machines.length} machines, ${migratedStore.tickets.length} tickets.`);
+        console.log(`[Persistence] Legacy migration complete. Migrated ${migratedStore.machines.length} machines, ${migratedStore.tickets.length} tickets. Synthetic GPS cleared: ${gpsSummary.syntheticCleared}.`);
 
         return { migrated: true, status: 'COMPLETE', backupFile };
       } catch (err) {
@@ -284,15 +293,23 @@ export class RuntimeStoreManager {
         const rawBaseline = fs.readFileSync(baselinePath, 'utf8');
         const parsedBaseline = JSON.parse(rawBaseline);
 
-        newStore.machines = Array.isArray(parsedBaseline.machines) ? parsedBaseline.machines : [];
-        newStore.buildings = Array.isArray(parsedBaseline.buildings) ? parsedBaseline.buildings : [];
-        newStore.floors = Array.isArray(parsedBaseline.floors) ? parsedBaseline.floors : [];
-        newStore.locations = Array.isArray(parsedBaseline.locations) ? parsedBaseline.locations : [];
-        newStore.technicians = Array.isArray(parsedBaseline.technicians) ? parsedBaseline.technicians : [];
-        newStore.categories = Array.isArray(parsedBaseline.categories) ? parsedBaseline.categories : [];
-        newStore.spareParts = Array.isArray(parsedBaseline.spareParts) ? parsedBaseline.spareParts : [];
-        newStore.suppliers = Array.isArray(parsedBaseline.suppliers) ? parsedBaseline.suppliers : [];
-        newStore.users = Array.isArray(parsedBaseline.users) ? parsedBaseline.users : [];
+        const rawMachines = Array.isArray(parsedBaseline.machines) ? parsedBaseline.machines : [];
+        const { machines: sanitizedMachines } = sanitizeFleetMachines(rawMachines);
+        sanitizedMachines.forEach((m: any) => {
+          if (!m.publicQrToken) {
+            m.publicQrToken = m.publicQrId || (m.publicId ? m.publicId.replace(/^VM-/, '') : null) || null;
+          }
+        });
+
+        newStore.machines = normalizeEntityRevisions(sanitizedMachines);
+        newStore.buildings = normalizeEntityRevisions(Array.isArray(parsedBaseline.buildings) ? parsedBaseline.buildings : []);
+        newStore.floors = normalizeEntityRevisions(Array.isArray(parsedBaseline.floors) ? parsedBaseline.floors : []);
+        newStore.locations = normalizeEntityRevisions(Array.isArray(parsedBaseline.locations) ? parsedBaseline.locations : []);
+        newStore.technicians = normalizeEntityRevisions(Array.isArray(parsedBaseline.technicians) ? parsedBaseline.technicians : []);
+        newStore.categories = normalizeEntityRevisions(Array.isArray(parsedBaseline.categories) ? parsedBaseline.categories : []);
+        newStore.spareParts = normalizeEntityRevisions(Array.isArray(parsedBaseline.spareParts) ? parsedBaseline.spareParts : []);
+        newStore.suppliers = normalizeEntityRevisions(Array.isArray(parsedBaseline.suppliers) ? parsedBaseline.suppliers : []);
+        newStore.users = normalizeEntityRevisions(Array.isArray(parsedBaseline.users) ? parsedBaseline.users : []);
         newStore.importBatches = Array.isArray(parsedBaseline.importBatches) ? parsedBaseline.importBatches : [];
         newStore.importRows = Array.isArray(parsedBaseline.importRows) ? parsedBaseline.importRows : [];
         newStore.settings = { ...DEFAULT_SETTINGS, ...(parsedBaseline.settings || {}) };
@@ -302,6 +319,8 @@ export class RuntimeStoreManager {
         newStore.partRequests = [];
         newStore.transactions = [];
 
+        newStore._persistence.schemaVersion = 4;
+        newStore._persistence.version = '5.4.5';
         newStore._persistence.baselineImportedAt = new Date().toISOString();
       } catch (err) {
         console.warn('[Persistence] Could not parse baseline file, using clean defaults:', err);
@@ -322,6 +341,15 @@ export class RuntimeStoreManager {
 
     const runtimePath = resolveRuntimeDataPath();
     const now = new Date().toISOString();
+
+    // Fresh install / explicit baseline bypass support
+    const forceBaseline = process.env.VENDING_FRESH_INSTALL === 'true' || process.env.VENDING_SEED_FROM_BASELINE === 'true';
+    if (forceBaseline && !fs.existsSync(runtimePath)) {
+      console.log('[Persistence] Explicit baseline initialization requested (VENDING_FRESH_INSTALL / VENDING_SEED_FROM_BASELINE).');
+      this.inMemoryStore = this.initFirstRunFromBaseline();
+      this.logStartupDiagnostics('NOT_REQUIRED', 'BASELINE_FORCED');
+      return this.inMemoryStore;
+    }
 
     // 1. Run legacy migration if needed
     const migrationResult = this.migrateLegacyStore();
@@ -359,23 +387,54 @@ export class RuntimeStoreManager {
               parsed.settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
             }
 
+            // Sanitize any residual synthetic GPS coordinates and normalize revisions
+            const { machines: cleanedMachines, summary: loadGpsSummary } = sanitizeFleetMachines(parsed.machines);
+            cleanedMachines.forEach((m: any) => {
+              if (!m.publicQrToken) {
+                m.publicQrToken = m.publicQrId || (m.publicId ? m.publicId.replace(/^VM-/, '') : null) || null;
+              }
+            });
+            parsed.machines = normalizeEntityRevisions(cleanedMachines);
+            parsed.buildings = normalizeEntityRevisions(parsed.buildings);
+            parsed.floors = normalizeEntityRevisions(parsed.floors);
+            parsed.locations = normalizeEntityRevisions(parsed.locations);
+            parsed.tickets = normalizeEntityRevisions(parsed.tickets);
+            parsed.technicians = normalizeEntityRevisions(parsed.technicians);
+            parsed.categories = normalizeEntityRevisions(parsed.categories);
+            parsed.spareParts = normalizeEntityRevisions(parsed.spareParts);
+            parsed.suppliers = normalizeEntityRevisions(parsed.suppliers);
+            parsed.partRequests = normalizeEntityRevisions(parsed.partRequests);
+            parsed.transactions = normalizeEntityRevisions(parsed.transactions);
+            parsed.users = normalizeEntityRevisions(parsed.users);
+
+            let needsPersist = false;
+            if (loadGpsSummary.syntheticCleared > 0) {
+              console.log(`[Persistence] Sanitized ${loadGpsSummary.syntheticCleared} legacy synthetic machine GPS on startup.`);
+              needsPersist = true;
+            }
+
             parsed.initialized = true;
             if (!parsed._persistence) {
               parsed._persistence = {
                 initialized: true,
-                schemaVersion: 3,
-                version: '5.4.4',
+                schemaVersion: 4,
+                version: '5.4.5',
                 initializedAt: now,
                 baselineImportedAt: null,
                 legacyMigrationCompletedAt: migrationResult.migrated ? now : null,
                 lastStartupTimestamp: now,
                 runtimeStoreId: `store-${crypto.randomBytes(6).toString('hex')}`
               };
+              needsPersist = true;
             } else {
               parsed._persistence.initialized = true;
-              parsed._persistence.schemaVersion = 3;
-              parsed._persistence.version = '5.4.4';
+              parsed._persistence.schemaVersion = 4;
+              parsed._persistence.version = '5.4.5';
               parsed._persistence.lastStartupTimestamp = now;
+            }
+
+            if (needsPersist) {
+              this.atomicWriteJsonSync(runtimePath, parsed);
             }
 
             this.inMemoryStore = parsed;
@@ -418,8 +477,8 @@ export class RuntimeStoreManager {
     if (!store._persistence) {
       store._persistence = {
         initialized: true,
-        schemaVersion: 3,
-        version: '5.4.4',
+        schemaVersion: 4,
+        version: '5.4.5',
         initializedAt: now,
         baselineImportedAt: null,
         legacyMigrationCompletedAt: null,
@@ -428,6 +487,8 @@ export class RuntimeStoreManager {
       };
     }
     store._persistence.initialized = true;
+    store._persistence.schemaVersion = 4;
+    store._persistence.version = '5.4.5';
     store._persistence.lastPersistedAt = now;
 
     this.inMemoryStore = store;

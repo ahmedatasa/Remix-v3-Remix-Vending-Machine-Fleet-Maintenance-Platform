@@ -30,8 +30,13 @@ export interface QrUrlBuildResult {
 export function buildPublicMachineQrUrl(options: QrUrlBuildOptions): QrUrlBuildResult {
   const { machine, configuredBaseUrl, targetMode = 'customer', allowDevFallback = false } = options;
 
-  // 1. Validate opaque token strictly
-  const token = machine.publicQrToken || null;
+  // 1. Validate opaque token strictly with resilient fallback
+  const rawToken = machine.publicQrToken 
+    || (machine as any).publicQrId 
+    || (machine.qrCodeUrl ? machine.qrCodeUrl.split('/').pop() : null)
+    || (machine.publicId ? machine.publicId.replace(/^VM-/, '') : null)
+    || null;
+  const token = rawToken ? String(rawToken).trim() : null;
   if (!token) {
     return {
       url: null,

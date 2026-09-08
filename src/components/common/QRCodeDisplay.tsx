@@ -43,7 +43,6 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
     return (import.meta as any).env?.VITE_PUBLIC_QR_BASE_URL || '';
   });
   const [isUrlExplicitlyConfigured, setIsUrlExplicitlyConfigured] = useState<boolean>(true);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     api.getCloudSettings().then((cfg) => {
@@ -76,28 +75,43 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
     let isMounted = true;
     setIsLoading(true);
 
-    // Generate real scannable QR Code PNG Data URL with machineNumber
-    QRCode.toDataURL(publicFaultUrl, {
-      width: 480,
-      margin: 2,
-      errorCorrectionLevel: 'H',
-      color: {
-        dark: qrTargetMode === 'part-request' ? '#4338ca' : qrTargetMode === 'technician' ? '#78350f' : '#090d16',
-        light: '#ffffff'
-      }
-    })
-      .then(url => {
-        if (isMounted) {
-          setQrDataUrl(url);
-          setIsLoading(false);
+    if (!publicFaultUrl || typeof publicFaultUrl !== 'string' || !publicFaultUrl.trim()) {
+      setQrDataUrl('');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Generate real scannable QR Code PNG Data URL with machineNumber
+      QRCode.toDataURL(publicFaultUrl, {
+        width: 480,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: qrTargetMode === 'part-request' ? '#4338ca' : qrTargetMode === 'technician' ? '#78350f' : '#090d16',
+          light: '#ffffff'
         }
       })
-      .catch(err => {
-        console.error('Failed to generate QR code:', err);
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      });
+        .then(url => {
+          if (isMounted) {
+            setQrDataUrl(url);
+            setIsLoading(false);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to generate QR code:', err);
+          if (isMounted) {
+            setQrDataUrl('');
+            setIsLoading(false);
+          }
+        });
+    } catch (err) {
+      console.error('Synchronous error generating QR code:', err);
+      if (isMounted) {
+        setQrDataUrl('');
+        setIsLoading(false);
+      }
+    }
 
     return () => {
       isMounted = false;
@@ -105,6 +119,10 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
   }, [publicFaultUrl, qrTargetMode, machine.id, machine.machineNumber]);
 
   const handleCopyLink = async () => {
+    if (!publicFaultUrl) {
+      showToast('Error', isRTL ? 'رابط الـ QR غير متوفر لهذه الماكينة' : 'QR URL not available for this machine', 'error');
+      return;
+    }
     try {
       await navigator.clipboard.writeText(publicFaultUrl);
       setCopied(true);
@@ -125,9 +143,15 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
       showToast('PUBLIC_QR_BASE_URL_NOT_CONFIGURED', 'يجب ضبط رابط النطاق السحابي العام قبل استخراج أو تحميل ملصقات الإنتاج الرسمية.', 'warning');
       return;
     }
+    if (!qrDataUrl) {
+      showToast('Error', isRTL ? 'رمز الـ QR غير جاهز للتحميل' : 'QR code is not ready for download', 'error');
+      return;
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = 1000;
-    canvas.height = 1250;
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      showToast('Error', 'Canvas is not supported in this browser environment', 'error');
+      return;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -450,8 +474,9 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
               <div className="absolute inset-0 bg-blue-950/0 group-hover:bg-blue-950/10 transition-colors rounded-md pointer-events-none" />
             </div>
           ) : (
-            <div className="w-52 h-52 flex items-center justify-center bg-rose-50 text-rose-600 text-xs p-4 rounded-lg">
-              فشل توليد رمز الاستجابة السريعة
+            <div className="w-52 h-52 flex flex-col items-center justify-center bg-rose-50/80 text-rose-700 text-xs p-4 rounded-lg text-center space-y-2">
+              <AlertTriangle className="w-6 h-6 text-rose-500 shrink-0" />
+              <span className="font-semibold">{qrBuild.errorMessage || 'رمز الاستجابة السريعة غير متوفر لهذه الماكينة'}</span>
             </div>
           )}
         </div>

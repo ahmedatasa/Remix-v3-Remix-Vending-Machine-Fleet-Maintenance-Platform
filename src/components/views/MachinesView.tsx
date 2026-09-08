@@ -1491,7 +1491,14 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
                         allowDevFallback: false
                       });
                       const url = qrBuild.url;
-                      const qrDataUrl = await QRCode.toDataURL(url, { width: 250, margin: 1, errorCorrectionLevel: 'M' });
+                      let qrDataUrl = '';
+                      if (url) {
+                        try {
+                          qrDataUrl = await QRCode.toDataURL(url, { width: 250, margin: 1, errorCorrectionLevel: 'M' });
+                        } catch (e) {
+                          console.error('Error generating QR data URL:', e);
+                        }
+                      }
                       const locText = m.currentLocation?.fullDescription || 
                         `${m.currentLocation?.building?.name || 'Building'} - ${m.currentLocation?.areaZone || 'Zone'}`;
                       return { m, qrDataUrl, locText, qrToken: qrBuild.token };

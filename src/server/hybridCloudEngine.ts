@@ -771,10 +771,14 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
       });
     }
 
-    // GPS Distance Calculation & Validation
-    // FIX 6 & FIX 7: Backend validates GPS data and derives verification status.
-    const machineLat = scannedMachine.machineLatitude ?? scannedMachine.latitude ?? 24.7136;
-    const machineLon = scannedMachine.machineLongitude ?? scannedMachine.longitude ?? 46.6753;
+    // GPS Distance Calculation & Validation (ZERO FAKE GPS REMEDIATION)
+    // Machine coordinates must be strictly verified or treated as null. Never inject fake default coordinates.
+    const rawMachineLat = scannedMachine.latitude ?? scannedMachine.machineLatitude ?? null;
+    const rawMachineLon = scannedMachine.longitude ?? scannedMachine.machineLongitude ?? null;
+    const machineLat = typeof rawMachineLat === 'number' && !isNaN(rawMachineLat) ? rawMachineLat : null;
+    const machineLon = typeof rawMachineLon === 'number' && !isNaN(rawMachineLon) ? rawMachineLon : null;
+    const machineHasGps = machineLat !== null && machineLon !== null;
+
     const allowedRadius = store.settings?.technicianCheckinRadiusMeters || 100;
     const maxAcceptableAccuracy = store.settings?.technicianMaxGpsAccuracyMeters || 100;
 
@@ -814,8 +818,8 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     let distanceMeters: number | undefined;
     let gpsStatus: 'GPS_VERIFIED' | 'GPS_FAILED' | 'GPS_UNAVAILABLE' | 'MANUAL_EXCEPTION';
 
-    if (hasValidCoords && numLat !== null && numLon !== null) {
-      distanceMeters = calculateDistanceMeters(numLat, numLon, machineLat, machineLon);
+    if (machineHasGps && hasValidCoords && numLat !== null && numLon !== null) {
+      distanceMeters = calculateDistanceMeters(numLat, numLon, machineLat!, machineLon!);
       const accuracyAcceptable = numAccuracy === null || numAccuracy <= maxAcceptableAccuracy;
 
       if (distanceMeters <= allowedRadius && accuracyAcceptable) {
@@ -826,6 +830,18 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
         } else {
           gpsStatus = 'GPS_FAILED';
         }
+      }
+    } else if (!machineHasGps) {
+      // Authoritative machine has no configured GPS
+      if (cleanReason.length > 0) {
+        gpsStatus = 'MANUAL_EXCEPTION';
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'MACHINE_GPS_NOT_CONFIGURED',
+          status: 'GPS_UNAVAILABLE',
+          message: `الماكينة #${scannedMachine.machineNumber} لا تملك إحداثيات موقع جغرافية معتمدة في النظام. يرجى تقديم سبب استثناء يدوي لإتمام تسجيل الحضور.`
+        });
       }
     } else {
       if (cleanReason.length > 0) {

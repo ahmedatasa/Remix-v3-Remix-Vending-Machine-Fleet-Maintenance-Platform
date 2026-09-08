@@ -2,6 +2,7 @@ import http from 'http';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
+import { resolveRuntimeDataPath } from '../src/server/runtimePathResolver';
 
 function request(method: string, urlStr: string, headers: Record<string, string> = {}, data?: any): Promise<{ statusCode: number; data: any }> {
   return new Promise((resolve, reject) => {
@@ -69,7 +70,8 @@ async function run10StepVerification() {
   try {
   // Step 0: Baseline Check
   console.log('[Step 0] Verifying initial baseline: Local = 189, Cloud = 189...');
-  const localFile = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fleet_data.json'), 'utf8'));
+  const localRuntimePath = resolveRuntimeDataPath();
+  const localFile = JSON.parse(fs.readFileSync(localRuntimePath, 'utf8'));
   const cloudFile = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'cloud_data.json'), 'utf8'));
   console.log(`- Local File Fleet Count: ${localFile.machines.length}`);
   console.log(`- Cloud File Registry Count: ${cloudFile.cloud_machine_registry.length}`);
@@ -109,8 +111,8 @@ async function run10StepVerification() {
 
   // Step 2: Confirm local fleet becomes 190
   console.log('\n[Step 2] Confirming local fleet becomes 190...');
-  const localAfterAdd = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fleet_data.json'), 'utf8'));
-  console.log(`- Local fleet count in fleet_data.json: ${localAfterAdd.machines.length}`);
+  const localAfterAdd = JSON.parse(fs.readFileSync(localRuntimePath, 'utf8'));
+  console.log(`- Local fleet count in authoritative runtime store: ${localAfterAdd.machines.length}`);
   if (localAfterAdd.machines.length !== 190) {
     throw new Error(`Step 2 Failed: Local fleet count is ${localAfterAdd.machines.length}, expected 190!`);
   }
@@ -143,7 +145,7 @@ async function run10StepVerification() {
 
   // Step 6: Confirm: Local = 190, Cloud = 190, Duplicate machines = 0
   console.log('\n[Step 6] Confirming post-sync fleet state: Local = 190, Cloud = 190, Duplicate machines = 0...');
-  const localAfterSync = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fleet_data.json'), 'utf8'));
+  const localAfterSync = JSON.parse(fs.readFileSync(localRuntimePath, 'utf8'));
   const cloudAfterSync = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'cloud_data.json'), 'utf8'));
 
   const localIds = localAfterSync.machines.map((m: any) => m.id);
@@ -175,7 +177,7 @@ async function run10StepVerification() {
   // Step 7: Restart both local server and cloud server
   console.log('\n[Step 7] Simulating restart of both local server and cloud server databases...');
   // Verify persistence on disk by re-reading files fresh
-  const localPostRestart = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fleet_data.json'), 'utf8'));
+  const localPostRestart = JSON.parse(fs.readFileSync(localRuntimePath, 'utf8'));
   const cloudPostRestart = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'cloud_data.json'), 'utf8'));
   console.log('- Re-read persisted datasets from disk.');
 
