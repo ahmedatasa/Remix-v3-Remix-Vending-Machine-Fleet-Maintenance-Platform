@@ -28,71 +28,27 @@ import {
 
 const PORT = 3000;
 
-/**
- * PHASE 5.4.3: Authoritative Runtime Persistence Engine
- * Resolves persistent storage location outside volatile source tree if configured,
- * defaults to process.cwd()/fleet_data.json with atomic writes and first-run baseline isolation.
- */
-function getRuntimeDataFilePath(): string {
-  if (process.env.FLEET_DATA_PATH && process.env.FLEET_DATA_PATH.trim().length > 0) {
-    return path.resolve(process.env.FLEET_DATA_PATH.trim());
-  }
-  if (process.env.RUNTIME_DATA_PATH && process.env.RUNTIME_DATA_PATH.trim().length > 0) {
-    return path.resolve(process.env.RUNTIME_DATA_PATH.trim());
-  }
-  if (process.env.APPDATA) {
-    return path.join(process.env.APPDATA, 'KSUVendingFleet', 'fleet_runtime_data.json');
-  }
-  return path.join(process.cwd(), 'fleet_data.json');
-}
+import {
+  runtimeStoreManager,
+  getStore as getAuthoritativeStore,
+  saveStore as saveAuthoritativeStore,
+  DEFAULT_SETTINGS
+} from './src/server/runtimeStoreManager';
+import {
+  resolveRuntimeDataDir,
+  resolveRuntimeDataPath,
+  resolveRuntimeUploadsDir,
+  resolveBackupsDir,
+  resolveBaselineDataPath
+} from './src/server/runtimePathResolver';
+import { mergeFleetSyncPayload } from './src/server/syncMergeEngine';
+import { SystemSettings, RuntimeStoreData } from './src/server/runtimeStoreTypes';
 
-const DB_FILE_PATH = getRuntimeDataFilePath();
-const MASTER_BASELINE_FILE = path.join(process.cwd(), 'fleet_master_baseline.json');
+export type { SystemSettings, RuntimeStoreData };
 
-/**
- * Atomic JSON write: writes to a unique temporary file and then renames it.
- * This guarantees that process crashes or restarts never leave 0-byte or corrupted files.
- */
-function atomicWriteJsonSync(filePath: string, data: any): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  const tempFile = `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 8)}`;
-  const jsonStr = JSON.stringify(data, null, 2);
-  fs.writeFileSync(tempFile, jsonStr, 'utf8');
-  fs.renameSync(tempFile, filePath);
-}
+const MASTER_BASELINE_FILE = resolveBaselineDataPath();
 
-// Interface for System Settings
-export interface SystemSettings {
-  criticalSla: number;
-  highSla: number;
-  mediumSla: number;
-  lowSla: number;
-  emailAlerts: boolean;
-  smsAlerts: boolean;
-  supportPhone: string;
-  supportEmail: string;
-  supportHoursAr: string;
-  supportWhatsapp: string;
-}
-
-const DEFAULT_SETTINGS: SystemSettings = {
-  criticalSla: 2,
-  highSla: 4,
-  mediumSla: 8,
-  lowSla: 24,
-  emailAlerts: true,
-  smsAlerts: true,
-  supportPhone: '800-123-4567',
-  supportEmail: 'support@vendingfleet.com',
-  supportHoursAr: 'خدمة العملاء على مدار 24 ساعة طوال أيام الأسبوع',
-  supportWhatsapp: '+966-50-000-0000'
-};
-
-// Pure Clean Database Generator (Zero Mock / Zero Seed Records - Ready for Real Ingestion)
-function createCleanDatabase() {
+function createCleanDatabase(): any {
   return {
     buildings: [],
     floors: [],
@@ -110,6 +66,12 @@ function createCleanDatabase() {
     importBatches: [],
     importRows: [],
     settings: { ...DEFAULT_SETTINGS },
+    tombstones: [],
+    locationProposals: [],
+    fieldExceptions: [],
+    processedSyncEventIds: [],
+    lastCloudSyncCursor: 0,
+    syncQueue: [],
     isBaselineCommitted: false,
     baselineCommittedAt: null,
     baselineCommittedBy: null,
@@ -117,150 +79,25 @@ function createCleanDatabase() {
     initialized: true,
     _persistence: {
       initialized: true,
-      version: '5.4.3',
-      schemaVersion: 2,
-      initializedCleanAt: new Date().toISOString()
+      version: '5.4.4',
+      schemaVersion: 3,
+      initializedAt: new Date().toISOString(),
+      baselineImportedAt: null,
+      legacyMigrationCompletedAt: null,
+      lastStartupTimestamp: new Date().toISOString(),
+      runtimeStoreId: `store-${Date.now()}`
     }
   };
 }
 
-// In-memory cache synced with disk
-let inMemoryStore: any = null;
-
-function getStore() {
-  if (inMemoryStore) {
-    return inMemoryStore;
-  }
-
-  // 1. Authoritative Runtime Store Check
-  try {
-    if (fs.existsSync(DB_FILE_PATH)) {
-      const raw = fs.readFileSync(DB_FILE_PATH, 'utf8');
-      if (raw && raw.trim().length > 0) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          // Validate and ensure all required collection arrays exist
-          if (!parsed.settings) parsed.settings = { ...DEFAULT_SETTINGS };
-          if (!Array.isArray(parsed.machines)) parsed.machines = [];
-          if (!Array.isArray(parsed.tickets)) parsed.tickets = [];
-          if (!Array.isArray(parsed.buildings)) parsed.buildings = [];
-          if (!Array.isArray(parsed.floors)) parsed.floors = [];
-          if (!Array.isArray(parsed.locations)) parsed.locations = [];
-          if (!Array.isArray(parsed.technicians)) parsed.technicians = [];
-          if (!Array.isArray(parsed.categories)) parsed.categories = [];
-          if (!Array.isArray(parsed.spareParts)) parsed.spareParts = [];
-          if (!Array.isArray(parsed.suppliers)) parsed.suppliers = [];
-          if (!Array.isArray(parsed.partRequests)) parsed.partRequests = [];
-          if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
-          if (!Array.isArray(parsed.users)) parsed.users = [];
-          if (!Array.isArray(parsed.auditLogs)) parsed.auditLogs = [];
-          if (!Array.isArray(parsed.importBatches)) parsed.importBatches = [];
-          if (!Array.isArray(parsed.importRows)) parsed.importRows = [];
-
-          // Enforce authoritative persistence markers
-          parsed.initialized = true;
-          if (!parsed._persistence) {
-            parsed._persistence = {
-              initialized: true,
-              version: '5.4.3',
-              schemaVersion: 2,
-              firstInitializedAt: new Date().toISOString()
-            };
-          }
-          parsed._persistence.initialized = true;
-          parsed._persistence.lastStartupTimestamp = new Date().toISOString();
-
-          inMemoryStore = parsed;
-          initHybridFleetMigration(inMemoryStore, saveStore);
-          console.log(`[Persistence] Loaded authoritative runtime store from ${DB_FILE_PATH} (machines: ${inMemoryStore.machines.length}, tickets: ${inMemoryStore.tickets.length})`);
-          return inMemoryStore;
-        }
-      }
-    }
-  } catch (err) {
-    console.error('[Persistence] Error reading JSON db file:', err);
-    // Safe recovery from timestamped backup before touching baseline
-    try {
-      const dir = path.dirname(DB_FILE_PATH);
-      const backupFiles = fs.readdirSync(dir).filter(f => f.startsWith('fleet_data.backup') && f.endsWith('.json'));
-      if (backupFiles.length > 0) {
-        backupFiles.sort().reverse();
-        const latestBackup = path.join(dir, backupFiles[0]);
-        console.warn(`[Persistence] Recovering from latest backup file: ${latestBackup}`);
-        const backupRaw = fs.readFileSync(latestBackup, 'utf8');
-        const backupData = JSON.parse(backupRaw);
-        if (backupData && Array.isArray(backupData.machines)) {
-          inMemoryStore = backupData;
-          inMemoryStore.initialized = true;
-          saveStore(inMemoryStore);
-          return inMemoryStore;
-        }
-      }
-    } catch (bErr) {
-      console.error('[Persistence] Backup recovery failed:', bErr);
-    }
-  }
-
-  // 2. FIRST-RUN INITIALIZATION ONLY (When DB_FILE_PATH has never existed on this system)
-  if (fs.existsSync(MASTER_BASELINE_FILE)) {
-    try {
-      console.log(`[Persistence] Initializing fresh installation from master baseline: ${MASTER_BASELINE_FILE}`);
-      const rawBaseline = fs.readFileSync(MASTER_BASELINE_FILE, 'utf8');
-      const parsedBaseline = JSON.parse(rawBaseline);
-      if (parsedBaseline && typeof parsedBaseline === 'object') {
-        // Enforce PRINCIPLE 2: Baseline must NOT inject dynamic operational tickets
-        parsedBaseline.tickets = [];
-        parsedBaseline.initialized = true;
-        parsedBaseline._persistence = {
-          initialized: true,
-          version: '5.4.3',
-          schemaVersion: 2,
-          initializedFromBaselineAt: new Date().toISOString(),
-          lastStartupTimestamp: new Date().toISOString()
-        };
-
-        inMemoryStore = parsedBaseline;
-        initHybridFleetMigration(inMemoryStore, saveStore);
-        saveStore(inMemoryStore);
-        return inMemoryStore;
-      }
-    } catch (err) {
-      console.warn('[Persistence] Could not initialize from master baseline file:', err);
-    }
-  }
-
-  // 3. Otherwise, initialize with a clean, unpolluted database ready for real ingestion
-  inMemoryStore = createCleanDatabase();
-  initHybridFleetMigration(inMemoryStore, saveStore);
-  saveStore(inMemoryStore);
-  return inMemoryStore;
+function getStore(): RuntimeStoreData {
+  return getAuthoritativeStore();
 }
 
-function saveStore(data: any) {
-  try {
-    if (!data || typeof data !== 'object') {
-      console.error('[Persistence] CRITICAL: Attempted to save invalid store payload - aborted.');
-      return;
-    }
-    // Update persistent metadata
-    if (!data._persistence) {
-      data._persistence = {
-        initialized: true,
-        version: '5.4.3',
-        schemaVersion: 2,
-        firstInitializedAt: new Date().toISOString()
-      };
-    }
-    data._persistence.initialized = true;
-    data._persistence.lastPersistedAt = new Date().toISOString();
-    data.initialized = true;
-
-    inMemoryStore = data;
-    atomicWriteJsonSync(DB_FILE_PATH, data);
-  } catch (err) {
-    console.error('[Persistence] CRITICAL: Failed to persist store to file:', err);
-  }
+function saveStore(data?: any): void {
+  saveAuthoritativeStore(data);
 }
+
 
 async function startServer() {
   const app = express();
@@ -268,12 +105,11 @@ async function startServer() {
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true }));
 
-  // Static uploads directory for maintenance photos and evidence
-  const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-  if (!fs.existsSync(uploadsDir)) {
-    try {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    } catch {}
+  // Static uploads directory for maintenance photos and evidence in durable runtime directory
+  const uploadsDir = resolveRuntimeUploadsDir();
+  const legacyPublicUploads = path.join(process.cwd(), 'public', 'uploads');
+  if (fs.existsSync(legacyPublicUploads)) {
+    app.use('/uploads', express.static(legacyPublicUploads));
   }
   app.use('/uploads', express.static(uploadsDir));
 
@@ -708,6 +544,18 @@ async function startServer() {
     });
   });
 
+  // Authoritative Persistence Diagnostics (Phase 5.4.4)
+  apiRouter.get('/system/persistence-status', (req, res) => {
+    res.json({
+      status: 'ok',
+      runtimeDir: resolveRuntimeDataDir(),
+      runtimePath: resolveRuntimeDataPath(),
+      backupsDir: resolveBackupsDir(),
+      metadata: runtimeStoreManager.getMetadata(),
+      stats: runtimeStoreManager.getStats()
+    });
+  });
+
   // Clear / Purge All Virtual & Demo Data (Start 100% Clean)
   apiRouter.post('/system/purge-all', requireEnterpriseRole(['SUPER_ADMIN']), (req, res) => {
     const deleteCommittedBaseline = req.body?.deleteCommittedBaseline === true;
@@ -757,132 +605,10 @@ async function startServer() {
     });
   });
 
-  // Bulk Fleet Sync from Client / Excel import
+  // Bulk Fleet Sync from Client / Excel import with deterministic conflict resolution
   apiRouter.post('/fleet/sync', (req, res) => {
     const store = getStore();
-    const {
-      machines,
-      buildings,
-      floors,
-      locations,
-      tickets,
-      importBatches,
-      importRows,
-      auditLogs,
-      spareParts,
-      categories,
-      suppliers,
-      technicians,
-      partRequests,
-      transactions,
-      users,
-      settings
-    } = req.body;
-
-    // Safe Master Fleet Protection: NEVER allow overwriting or truncating the authoritative fleet machines
-    if (Array.isArray(machines) && machines.length >= (store.machines || []).length) {
-      const machineMap = new Map<string, any>((store.machines || []).map((m: any) => [m.id, m]));
-      machines.forEach((m: any) => {
-        if (m && m.id) {
-          const existing = machineMap.get(m.id);
-          if (existing) {
-            // Protect coordinates from accidental overwrite with null/empty
-            const hasExistingCoords = existing.latitude !== null && existing.latitude !== undefined;
-            const incomingHasCoords = typeof m.latitude === 'number' && !isNaN(m.latitude);
-            let finalLat = existing.latitude;
-            let finalLng = existing.longitude;
-            let finalLocationSource = existing.locationSource;
-            let finalLocationStatus = existing.locationStatus;
-            let finalLocationUpdatedAt = existing.locationUpdatedAt;
-            let finalLocationNote = existing.locationNote;
-
-            if (incomingHasCoords) {
-              finalLat = Number(m.latitude.toFixed(6));
-              finalLng = Number(m.longitude.toFixed(6));
-              finalLocationSource = m.locationSource || 'MANUAL_ENTRY';
-              finalLocationStatus = 'GPS_CONFIGURED';
-              finalLocationUpdatedAt = m.locationUpdatedAt || new Date().toISOString();
-              finalLocationNote = m.locationNote !== undefined ? m.locationNote : existing.locationNote;
-            } else if (!hasExistingCoords && m.latitude === null) {
-              finalLat = null;
-              finalLng = null;
-              finalLocationStatus = 'LOCATION_NOT_CONFIGURED';
-            }
-
-            machineMap.set(m.id, {
-              ...existing,
-              ...m,
-              latitude: finalLat,
-              longitude: finalLng,
-              machineLatitude: finalLat,
-              machineLongitude: finalLng,
-              locationSource: finalLocationSource,
-              locationStatus: finalLocationStatus,
-              locationUpdatedAt: finalLocationUpdatedAt,
-              locationNote: finalLocationNote
-            });
-          } else {
-            machineMap.set(m.id, m);
-          }
-        }
-      });
-      store.machines = Array.from(machineMap.values());
-    }
-    if (Array.isArray(buildings) && buildings.length > 0) store.buildings = buildings;
-    if (Array.isArray(floors) && floors.length > 0) store.floors = floors;
-    if (Array.isArray(locations) && locations.length > 0) store.locations = locations;
-
-    // Safe Intelligent Ticket Synchronization: NEVER downgrade resolved tickets or resurrect deleted ones
-    if (Array.isArray(tickets)) {
-      const ticketMap = new Map<string, any>((store.tickets || []).map((t: any) => [t.id || t.ticketNumber, t]));
-      tickets.forEach((incomingTck: any) => {
-        const key = incomingTck.id || incomingTck.ticketNumber;
-        if (!key) return;
-        const existing = ticketMap.get(key);
-        if (!existing) {
-          const wasDeleted = (store.auditLogs || []).some((a: any) => a.action === 'TICKET_DELETED' && a.entityId === incomingTck.ticketNumber);
-          if (!wasDeleted) {
-            ticketMap.set(key, incomingTck);
-          }
-        } else {
-          const TERMINAL_STATUSES = ['RESOLVED', 'VERIFIED', 'CLOSED'];
-          const existingIsTerminal = TERMINAL_STATUSES.includes(existing.status);
-          const incomingIsTerminal = TERMINAL_STATUSES.includes(incomingTck.status);
-
-          if (existingIsTerminal && !incomingIsTerminal) {
-            ticketMap.set(key, {
-              ...incomingTck,
-              status: existing.status,
-              resolvedAt: existing.resolvedAt,
-              resolvedBy: existing.resolvedBy,
-              rootCause: existing.rootCause,
-              resolutionSummary: existing.resolutionSummary,
-              verifiedAt: existing.verifiedAt,
-              closedAt: existing.closedAt,
-              updatedAt: existing.updatedAt
-            });
-          } else {
-            ticketMap.set(key, { ...existing, ...incomingTck });
-          }
-        }
-      });
-      store.tickets = Array.from(ticketMap.values());
-    }
-
-    if (Array.isArray(importBatches)) store.importBatches = importBatches;
-    if (Array.isArray(importRows)) store.importRows = importRows;
-    if (Array.isArray(spareParts)) store.spareParts = spareParts;
-    if (Array.isArray(categories)) store.categories = categories;
-    if (Array.isArray(suppliers)) store.suppliers = suppliers;
-    if (Array.isArray(technicians)) store.technicians = technicians;
-    if (Array.isArray(partRequests)) store.partRequests = partRequests;
-    if (Array.isArray(transactions)) store.transactions = transactions;
-    if (Array.isArray(users)) store.users = users;
-    if (settings && typeof settings === 'object') store.settings = { ...(store.settings || DEFAULT_SETTINGS), ...settings };
-    if (Array.isArray(auditLogs)) {
-      store.auditLogs = [...auditLogs, ...(store.auditLogs || [])].slice(0, 500);
-    }
-
+    mergeFleetSyncPayload(store, req.body);
     saveStore(store);
     res.json({
       status: 'ok',
@@ -1097,6 +823,7 @@ async function startServer() {
     const store = getStore();
     const id = req.params.id;
     store.buildings = (store.buildings || []).filter((b: any) => b.id !== id);
+    runtimeStoreManager.recordTombstone('Building', id, (req as any).user?.username || 'Admin', 'Deleted via API');
     saveStore(store);
     res.json({ success: true });
   });
@@ -1142,6 +869,7 @@ async function startServer() {
     const store = getStore();
     const id = req.params.id;
     store.floors = (store.floors || []).filter((f: any) => f.id !== id);
+    runtimeStoreManager.recordTombstone('Floor', id, (req as any).user?.username || 'Admin', 'Deleted via API');
     saveStore(store);
     res.json({ success: true });
   });
@@ -1191,6 +919,7 @@ async function startServer() {
     const store = getStore();
     const id = req.params.id;
     store.locations = (store.locations || []).filter((l: any) => l.id !== id);
+    runtimeStoreManager.recordTombstone('Location', id, (req as any).user?.username || 'Admin', 'Deleted via API');
     saveStore(store);
     res.json({ success: true });
   });
@@ -3322,6 +3051,11 @@ async function startServer() {
       createdAt: new Date().toISOString()
     });
 
+    runtimeStoreManager.recordTombstone('Machine', deletedMachine.id, (req as any).user?.username || 'Admin', 'Deleted via API');
+    if (deletedMachine.machineNumber && deletedMachine.machineNumber !== deletedMachine.id) {
+      runtimeStoreManager.recordTombstone('Machine', deletedMachine.machineNumber, (req as any).user?.username || 'Admin', 'Deleted via API');
+    }
+
     saveStore(store);
     res.json({ success: true, message: 'Machine deleted successfully', deletedMachine });
   });
@@ -4983,6 +4717,11 @@ async function startServer() {
       newValues: { status: 'DELETED' },
       createdAt: new Date().toISOString()
     });
+
+    runtimeStoreManager.recordTombstone('Ticket', deleted.id || deleted.ticketNumber, (req as any).user?.username || 'Admin', 'Deleted via API');
+    if (deleted.ticketNumber && deleted.ticketNumber !== deleted.id) {
+      runtimeStoreManager.recordTombstone('Ticket', deleted.ticketNumber, (req as any).user?.username || 'Admin', 'Deleted via API');
+    }
 
     saveStore(store);
     res.json({ success: true, deletedTicket: deleted });

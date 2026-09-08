@@ -441,7 +441,7 @@ class DesktopSyncWorker {
         store.processedSyncEventIds = store.processedSyncEventIds.slice(-2000);
       }
 
-      // Safe write to fleet_data.json
+      // Authoritative persistence via injected store manager abstraction
       if (appliedCount > 0 || events.length > 0) {
         saveStore(store);
       }
