@@ -253,7 +253,7 @@ export class RuntimeStoreManager {
         migratedStore._persistence = {
           initialized: true,
           schemaVersion: 4,
-          version: '5.4.5',
+          version: '5.4.5A',
           initializedAt: legacyData._persistence?.initializedAt || new Date().toISOString(),
           baselineImportedAt: legacyData._persistence?.baselineImportedAt || null,
           legacyMigrationCompletedAt: new Date().toISOString(),
@@ -320,7 +320,7 @@ export class RuntimeStoreManager {
         newStore.transactions = [];
 
         newStore._persistence.schemaVersion = 4;
-        newStore._persistence.version = '5.4.5';
+        newStore._persistence.version = '5.4.5A';
         newStore._persistence.baselineImportedAt = new Date().toISOString();
       } catch (err) {
         console.warn('[Persistence] Could not parse baseline file, using clean defaults:', err);
@@ -418,7 +418,7 @@ export class RuntimeStoreManager {
               parsed._persistence = {
                 initialized: true,
                 schemaVersion: 4,
-                version: '5.4.5',
+                version: '5.4.5A',
                 initializedAt: now,
                 baselineImportedAt: null,
                 legacyMigrationCompletedAt: migrationResult.migrated ? now : null,
@@ -429,7 +429,7 @@ export class RuntimeStoreManager {
             } else {
               parsed._persistence.initialized = true;
               parsed._persistence.schemaVersion = 4;
-              parsed._persistence.version = '5.4.5';
+              parsed._persistence.version = '5.4.5A';
               parsed._persistence.lastStartupTimestamp = now;
             }
 
@@ -461,6 +461,102 @@ export class RuntimeStoreManager {
   }
 
   /**
+   * Enforces strict save-time invariants (Phase 5.4.5A Final Integrity Closure):
+   * 1. Machine GPS pair invariant (both numbers or both null)
+   * 2. Machine dual-field pair invariant (latitude === machineLatitude && longitude === machineLongitude)
+   * 3. Zero fake/synthetic GPS invariant (formula coordinates cleared to null)
+   * 4. Strict positive integer revision invariant across all entities (no epoch timestamps, <= 0, or NaN)
+   * 5. One-time audit logging when synthetic GPS is sanitized
+   */
+  public validateAndEnforceInvariants(store: RuntimeStoreData): void {
+    if (!store || typeof store !== 'object') {
+      throw new Error('PERSISTENCE_INVARIANT_VIOLATION: Store payload is null or not an object.');
+    }
+
+    // 1. Sanitize fleet machines (Zero fake GPS + Pair invariant)
+    if (Array.isArray(store.machines)) {
+      const { machines: sanitized, summary } = sanitizeFleetMachines(store.machines);
+      store.machines = sanitized;
+
+      // If synthetic GPS was cleared and not yet audited, log one-time audit record
+      if (summary.syntheticCleared > 0 && Array.isArray(store.auditLogs)) {
+        const alreadyAudited = store.auditLogs.some(
+          (a: any) => a.action === 'SYNTHETIC_GPS_CLEARED' || a.action === 'LEGACY_SYNTHETIC_GPS_PURGED'
+        );
+        if (!alreadyAudited) {
+          store.auditLogs.push({
+            id: `adt-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+            timestamp: new Date().toISOString(),
+            actor: 'SYSTEM_SANITIZER',
+            category: 'INTEGRITY_AUDIT',
+            action: 'SYNTHETIC_GPS_CLEARED',
+            details: `Cleared ${summary.syntheticCleared} legacy synthetic GPS coordinates. Preserved ${summary.realGpsPreserved} legitimate coordinates.`,
+            metadata: summary
+          });
+        }
+      }
+
+      // Verify invariants on machines:
+      for (const m of store.machines) {
+        if (!m || typeof m !== 'object') continue;
+        const lat = m.latitude;
+        const lng = m.longitude;
+        const mLat = m.machineLatitude;
+        const mLng = m.machineLongitude;
+
+        // GPS pair invariant: either both numbers or both null
+        const isCoordsPair = (lat === null && lng === null) || (typeof lat === 'number' && typeof lng === 'number');
+        if (!isCoordsPair) {
+          throw new Error(`PERSISTENCE_INVARIANT_VIOLATION: Machine #${m.machineNumber} violates GPS pair invariant (lat=${lat}, lng=${lng}).`);
+        }
+
+        // Dual-field pair invariant: latitude === machineLatitude && longitude === machineLongitude
+        if (lat !== mLat || lng !== mLng) {
+          throw new Error(`PERSISTENCE_INVARIANT_VIOLATION: Machine #${m.machineNumber} violates dual-field pair invariant (lat=${lat}, mLat=${mLat}).`);
+        }
+      }
+    }
+
+    // 2. Normalize revisions across all entity collections to positive integers
+    const entityCollections: (keyof RuntimeStoreData)[] = [
+      'machines',
+      'buildings',
+      'floors',
+      'locations',
+      'tickets',
+      'technicians',
+      'categories',
+      'spareParts',
+      'suppliers',
+      'partRequests',
+      'transactions',
+      'users'
+    ];
+
+    for (const key of entityCollections) {
+      if (Array.isArray((store as any)[key])) {
+        (store as any)[key] = normalizeEntityRevisions((store as any)[key]);
+        for (const item of (store as any)[key]) {
+          if (!item || typeof item !== 'object') continue;
+          if (
+            typeof item.revision !== 'number' ||
+            !Number.isInteger(item.revision) ||
+            item.revision < 1 ||
+            item.revision >= 1000000000
+          ) {
+            throw new Error(`PERSISTENCE_INVARIANT_VIOLATION: Entity in ${key} has invalid revision: ${item.revision}`);
+          }
+        }
+      }
+    }
+
+    // Normalize tombstones
+    if (Array.isArray(store.tombstones)) {
+      store.tombstones = normalizeEntityRevisions(store.tombstones);
+    }
+  }
+
+  /**
    * Authoritative save method:
    * Writes ONLY to resolveRuntimeDataPath() atomically.
    * Does NOT write to process.cwd()/fleet_data.json.
@@ -472,13 +568,16 @@ export class RuntimeStoreManager {
       return;
     }
 
+    // Enforce save-time invariant gate
+    this.validateAndEnforceInvariants(store);
+
     const now = new Date().toISOString();
     store.initialized = true;
     if (!store._persistence) {
       store._persistence = {
         initialized: true,
         schemaVersion: 4,
-        version: '5.4.5',
+        version: '5.4.5A',
         initializedAt: now,
         baselineImportedAt: null,
         legacyMigrationCompletedAt: null,
@@ -488,7 +587,7 @@ export class RuntimeStoreManager {
     }
     store._persistence.initialized = true;
     store._persistence.schemaVersion = 4;
-    store._persistence.version = '5.4.5';
+    store._persistence.version = '5.4.5A';
     store._persistence.lastPersistedAt = now;
 
     this.inMemoryStore = store;
@@ -550,7 +649,7 @@ export class RuntimeStoreManager {
       deletedAt: new Date().toISOString(),
       deletedBy: deletedBy || 'System',
       reason: reason || 'Deleted by user',
-      revision: Date.now()
+      revision: 1
     });
     // Cap tombstones at 5000 to prevent unbounded growth
     if (store.tombstones.length > 5000) {

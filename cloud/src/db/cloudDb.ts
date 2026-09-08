@@ -91,19 +91,20 @@ export interface CloudCheckinRecord {
   technicianId: string;
   technicianName: string;
   timestamp: string;
-  latitude: number;
-  longitude: number;
-  accuracyMeters: number;
-  distanceMeters: number;
+  latitude: number | null;
+  longitude: number | null;
+  accuracyMeters: number | null;
+  distanceMeters: number | null;
   verified: boolean;
-  status: LocationStatus | 'VERIFIED' | 'FAILED_DISTANCE' | 'FAILED_ACCURACY' | 'MANUAL_EXCEPTION' | 'COORDINATES_MISSING';
-  exceptionApprovalId?: string;
-  proposalId?: string;
+  status: LocationStatus | 'VERIFIED' | 'FAILED_DISTANCE' | 'FAILED_ACCURACY' | 'MANUAL_EXCEPTION' | 'COORDINATES_MISSING' | 'GPS_VERIFIED' | 'GPS_FAILED';
+  exceptionApprovalId?: string | null;
+  fieldExceptionId?: string | null;
+  proposalId?: string | null;
   manualException?: {
     approvalId?: string;
     approvedBy: string;
     reason: string;
-    approverRole: string;
+    approverRole?: string;
     timestamp: string;
   };
 }

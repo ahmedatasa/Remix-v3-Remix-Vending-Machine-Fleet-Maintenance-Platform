@@ -674,13 +674,14 @@ export interface TechnicianCheckInRecord {
   machineToken: string;
   machineNumber?: string;
   timestamp: string;
-  latitude: number;
-  longitude: number;
-  accuracyMeters: number;
-  distanceMeters?: number;
+  latitude: number | null;
+  longitude: number | null;
+  accuracyMeters: number | null;
+  distanceMeters?: number | null;
   status: 'GPS_VERIFIED' | 'GPS_FAILED' | 'GPS_UNAVAILABLE' | 'MANUAL_EXCEPTION';
   manualExceptionReason?: string;
   approvedBy?: string;
+  fieldExceptionId?: string | null;
 }
 
 export interface FunctionalTestRecord {

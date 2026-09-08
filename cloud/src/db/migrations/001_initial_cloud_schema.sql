@@ -93,12 +93,13 @@ CREATE TABLE IF NOT EXISTS technician_checkins (
   ticket_id VARCHAR(128) NOT NULL,
   technician_id VARCHAR(128) NOT NULL,
   technician_name VARCHAR(255) NOT NULL,
-  latitude DOUBLE PRECISION NOT NULL,
-  longitude DOUBLE PRECISION NOT NULL,
-  accuracy_meters DOUBLE PRECISION NOT NULL,
-  distance_meters DOUBLE PRECISION NOT NULL,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  accuracy_meters DOUBLE PRECISION,
+  distance_meters DOUBLE PRECISION,
   verified BOOLEAN NOT NULL DEFAULT FALSE,
   status VARCHAR(64) NOT NULL,
+  field_exception_id VARCHAR(64),
   manual_exception JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

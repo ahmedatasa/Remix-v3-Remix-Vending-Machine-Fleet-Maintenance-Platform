@@ -75,6 +75,11 @@ export interface IFieldExceptionApprovalRepository {
   createApproval(approval: FieldExceptionApproval): Promise<FieldExceptionApproval>;
   findById(id: string): Promise<FieldExceptionApproval | null>;
   findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null>;
+  findValidForTicketMachineAndTechnician(
+    ticketId: string,
+    machineId: string,
+    technicianId?: string | null
+  ): Promise<FieldExceptionApproval | null>;
   consumeApproval(id: string): Promise<FieldExceptionApproval>;
 }
 

@@ -299,10 +299,12 @@ async function runTestSuite() {
 
   // Test 17: Revision Integer Invariant
   assert(
-    getNumericRevision({ revision: 1741234567890 }) === 1741234567890 &&
-    typeof getNumericRevision({ revision: 5 }) === 'number' &&
-    getNumericRevision({ revision: 'invalid' }) === null,
-    'Test 17: Revision Integer Invariant rejects non-numeric or malformed revision'
+    getNumericRevision({ revision: 1741234567890 }) === null &&
+    getNumericRevision({ revision: 5 }) === 5 &&
+    getNumericRevision({ revision: 'invalid' }) === null &&
+    getNumericRevision({ revision: -1 }) === null &&
+    getNumericRevision({ revision: 2.5 }) === null,
+    'Test 17: Revision Integer Invariant rejects epoch timestamps, non-integers or malformed revision'
   );
 
   // Test 18: Sync Merge Stale GPS Protection

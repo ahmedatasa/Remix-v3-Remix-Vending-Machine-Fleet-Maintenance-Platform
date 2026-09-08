@@ -479,15 +479,35 @@ export class JsonFieldExceptionApprovalRepository implements IFieldExceptionAppr
     return list.find(a => a.id === id) || null;
   }
 
-  async findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null> {
+  async findValidForTicketMachineAndTechnician(
+    ticketId: string,
+    machineId: string,
+    technicianId?: string | null
+  ): Promise<FieldExceptionApproval | null> {
     const list = this.db.getData().field_exception_approvals || [];
-    const now = new Date().getTime();
-    return list.find(a =>
-      a.ticketId === ticketId &&
-      a.integrationMachineId === machineId &&
-      a.status === 'APPROVED' &&
-      (!a.expiresAt || new Date(a.expiresAt).getTime() > now)
-    ) || null;
+    const now = Date.now();
+    const cleanTech = technicianId ? technicianId.trim() : null;
+
+    return (
+      list.find(a => {
+        if (a.ticketId !== ticketId) return false;
+        if (a.integrationMachineId !== machineId) return false;
+        if (a.status !== 'APPROVED') return false;
+        if (a.expiresAt && new Date(a.expiresAt).getTime() <= now) return false;
+
+        // Technician binding policy:
+        // If approval has a specific technician assigned, only that technician may use it
+        if (a.technicianId && a.technicianId.trim().length > 0) {
+          return cleanTech !== null && a.technicianId.trim() === cleanTech;
+        }
+        // If technicianId is null/empty, any authenticated technician may use it
+        return true;
+      }) || null
+    );
+  }
+
+  async findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null> {
+    return this.findValidForTicketMachineAndTechnician(ticketId, machineId, null);
   }
 
   async consumeApproval(id: string): Promise<FieldExceptionApproval> {
@@ -498,6 +518,9 @@ export class JsonFieldExceptionApprovalRepository implements IFieldExceptionAppr
     }
     if (approval.status !== 'APPROVED') {
       throw new Error(`EXCEPTION_APPROVAL_INVALID: لا يمكن استخدام التصريح لأن حالته الحالية: ${approval.status}`);
+    }
+    if (approval.expiresAt && new Date(approval.expiresAt).getTime() <= Date.now()) {
+      throw new Error('EXCEPTION_APPROVAL_EXPIRED: تصريح الاستثناء منتهي الصلاحية.');
     }
     approval.status = 'USED';
     approval.usedAt = new Date().toISOString();

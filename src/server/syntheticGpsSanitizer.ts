@@ -171,10 +171,18 @@ export function normalizeEntityRevisions(entities: any[]): any[] {
   return entities.map(item => {
     if (!item || typeof item !== 'object') return item;
     const rev = item.revision;
-    const isIntRev = typeof rev === 'number' && !isNaN(rev) && isFinite(rev) && rev >= 1;
+    // Strict positive integer: must be integer >= 1, and NOT epoch-like (e.g. timestamp >= 10^9)
+    const isStrictIntRev =
+      typeof rev === 'number' &&
+      !isNaN(rev) &&
+      isFinite(rev) &&
+      Number.isInteger(rev) &&
+      rev >= 1 &&
+      rev < 1000000000;
+
     return {
       ...item,
-      revision: isIntRev ? Math.floor(rev) : 1
+      revision: isStrictIntRev ? rev : 1
     };
   });
 }

@@ -79,7 +79,7 @@ technicianRoutes.get('/technician/me', requireCloudTechnicianAuth, (req: Request
  */
 technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnicianAuth, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
-  const { ticketId, machineToken, coordinates, manualException } = req.body;
+  const { ticketId, machineToken, coordinates, manualExceptionReason } = req.body;
 
   if (!ticketId || !machineToken) {
     return res.status(400).json({
@@ -95,7 +95,7 @@ technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnic
       technicianId: tech.id,
       technicianName: tech.fullName,
       coordinates,
-      manualException,
+      manualExceptionReason,
       clientIp: req.ip
     });
 
@@ -114,6 +114,10 @@ technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnic
     }
     if (msg.startsWith('MACHINE_NOT_FOUND:')) {
       return res.status(404).json({ error: 'MACHINE_NOT_FOUND', message: msg.replace('MACHINE_NOT_FOUND: ', '') });
+    }
+    if (msg.includes('MACHINE_GPS_NOT_CONFIGURED:')) {
+      const clean = msg.replace('GPS_VALIDATION_FAILED: ', '').replace('MACHINE_GPS_NOT_CONFIGURED: ', '');
+      return res.status(400).json({ error: 'MACHINE_GPS_NOT_CONFIGURED', status: 'GPS_UNAVAILABLE', message: clean });
     }
     if (msg.startsWith('GPS_VALIDATION_FAILED:')) {
       return res.status(400).json({ error: 'GPS_VALIDATION_FAILED', message: msg.replace('GPS_VALIDATION_FAILED: ', '') });

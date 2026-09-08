@@ -24,11 +24,19 @@ import { sanitizeMachineGps } from './syntheticGpsSanitizer';
  */
 
 /**
- * Extracts a valid positive integer revision, or returns null if not present.
+ * Extracts a valid positive integer revision, or returns null if not present or epoch-like.
  */
 export function getNumericRevision(entity: any): number | null {
-  if (typeof entity?.revision === 'number' && !isNaN(entity.revision) && isFinite(entity.revision) && entity.revision >= 1) {
-    return Math.floor(entity.revision);
+  const rev = entity?.revision;
+  if (
+    typeof rev === 'number' &&
+    !isNaN(rev) &&
+    isFinite(rev) &&
+    Number.isInteger(rev) &&
+    rev >= 1 &&
+    rev < 1000000000
+  ) {
+    return rev;
   }
   return null;
 }

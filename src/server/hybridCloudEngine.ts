@@ -815,66 +815,110 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     }
 
     const cleanReason = (manualExceptionReason || '').trim();
-    let distanceMeters: number | undefined;
+    let distanceMeters: number | null = null;
     let gpsStatus: 'GPS_VERIFIED' | 'GPS_FAILED' | 'GPS_UNAVAILABLE' | 'MANUAL_EXCEPTION';
+    let isGpsSuccess = false;
 
     if (machineHasGps && hasValidCoords && numLat !== null && numLon !== null) {
-      distanceMeters = calculateDistanceMeters(numLat, numLon, machineLat!, machineLon!);
+      const dist = calculateDistanceMeters(numLat, numLon, machineLat!, machineLon!);
+      distanceMeters = dist;
       const accuracyAcceptable = numAccuracy === null || numAccuracy <= maxAcceptableAccuracy;
 
-      if (distanceMeters <= allowedRadius && accuracyAcceptable) {
+      if (dist <= allowedRadius && accuracyAcceptable) {
         gpsStatus = 'GPS_VERIFIED';
+        isGpsSuccess = true;
       } else {
-        if (cleanReason.length > 0) {
-          gpsStatus = 'MANUAL_EXCEPTION';
-        } else {
-          gpsStatus = 'GPS_FAILED';
-        }
+        gpsStatus = 'GPS_FAILED';
       }
     } else if (!machineHasGps) {
-      // Authoritative machine has no configured GPS
-      if (cleanReason.length > 0) {
+      gpsStatus = 'GPS_UNAVAILABLE';
+    } else {
+      gpsStatus = 'GPS_UNAVAILABLE';
+    }
+
+    let consumedApproval: any = null;
+
+    if (!isGpsSuccess) {
+      // Must find an approved, valid, unexpired FieldExceptionApproval in store.fieldExceptions
+      const nowMs = Date.now();
+      const exceptions: any[] = Array.isArray(store.fieldExceptions) ? store.fieldExceptions : [];
+
+      const matchIndex = exceptions.findIndex((a: any) => {
+        if (!a || typeof a !== 'object') return false;
+        const matchesTicket = a.ticketId === ticket.id || a.ticketId === ticket.ticketNumber;
+        const matchesMachine =
+          a.integrationMachineId === scannedMachine.id ||
+          a.integrationMachineId === scannedMachine.machineNumber ||
+          a.machineId === scannedMachine.id;
+        if (!matchesTicket || !matchesMachine) return false;
+        if (a.status !== 'APPROVED') return false;
+        if (a.expiresAt && new Date(a.expiresAt).getTime() <= nowMs) return false;
+
+        // Technician binding policy:
+        if (a.technicianId && a.technicianId.trim().length > 0) {
+          return a.technicianId.trim() === tech.id || a.technicianId.trim() === tech.employeeCode;
+        }
+        return true;
+      });
+
+      if (matchIndex >= 0) {
+        consumedApproval = exceptions[matchIndex];
+        // Consume approval atomically
+        consumedApproval.status = 'USED';
+        consumedApproval.usedAt = new Date().toISOString();
+        consumedApproval.updatedAt = new Date().toISOString();
         gpsStatus = 'MANUAL_EXCEPTION';
       } else {
+        // Authorization DENIED
+        logAudit(
+          store,
+          'SECURITY_ALERT',
+          'TECHNICIAN_CHECKIN_FAILED_UNAUTHORIZED_EXCEPTION',
+          {
+            ticketId: ticket.id,
+            machineId: scannedMachine.id,
+            technicianId: tech.id,
+            reasonSupplied: cleanReason,
+            gpsStatus,
+            distanceMeters,
+            numAccuracy
+          },
+          tech.fullName
+        );
+        saveStore(store);
+
+        if (!machineHasGps) {
+          return res.status(400).json({
+            success: false,
+            error: 'MACHINE_GPS_NOT_CONFIGURED',
+            status: 'GPS_UNAVAILABLE',
+            message: `الماكينة #${scannedMachine.machineNumber} لا تملك إحداثيات موقع جغرافية معتمدة في النظام. يلزم وجود تصريح استثناء معتمد لإتمام تسجيل الحضور.`
+          });
+        }
+
+        if (gpsStatus === 'GPS_FAILED') {
+          const isAccuracyIssue = numAccuracy !== null && numAccuracy > maxAcceptableAccuracy;
+          return res.status(400).json({
+            success: false,
+            error: 'GPS_VERIFICATION_FAILED',
+            status: 'GPS_FAILED',
+            distanceMeters,
+            accuracyMeters: numAccuracy,
+            allowedRadius,
+            maxAcceptableAccuracy,
+            message: isAccuracyIssue
+              ? `دقة إشارة الموقع ضعيفة جداً (${numAccuracy}م أكبر من الحد المسموح ${maxAcceptableAccuracy}م). يلزم وجود تصريح استثناء معتمد لإتمام الحضور.`
+              : `المسافة إلى الماكينة (${distanceMeters}م) تتجاوز النطاق المسموح به (${allowedRadius}م). يلزم وجود تصريح استثناء معتمد لإتمام الحضور.`
+          });
+        }
+
         return res.status(400).json({
           success: false,
-          error: 'MACHINE_GPS_NOT_CONFIGURED',
+          error: 'GPS_UNAVAILABLE',
           status: 'GPS_UNAVAILABLE',
-          message: `الماكينة #${scannedMachine.machineNumber} لا تملك إحداثيات موقع جغرافية معتمدة في النظام. يرجى تقديم سبب استثناء يدوي لإتمام تسجيل الحضور.`
+          message: 'إحداثيات الموقع الجغرافي غير متوفرة أو غير صالحة. يلزم وجود تصريح استثناء معتمد لإتمام تسجيل الحضور.'
         });
       }
-    } else {
-      if (cleanReason.length > 0) {
-        gpsStatus = 'MANUAL_EXCEPTION';
-      } else {
-        gpsStatus = 'GPS_UNAVAILABLE';
-      }
-    }
-
-    // FIX 6: Reject checkin if GPS failed and no manual exception was provided
-    if (gpsStatus === 'GPS_FAILED') {
-      const isAccuracyIssue = numAccuracy !== null && numAccuracy > maxAcceptableAccuracy;
-      return res.status(400).json({
-        success: false,
-        error: 'GPS_VERIFICATION_FAILED',
-        status: 'GPS_FAILED',
-        distanceMeters,
-        accuracyMeters: numAccuracy,
-        allowedRadius,
-        maxAcceptableAccuracy,
-        message: isAccuracyIssue
-          ? `دقة إشارة الموقع ضعيفة جداً (${numAccuracy}م أكبر من الحد المسموح ${maxAcceptableAccuracy}م). يرجى تحسين الإشارة أو تقديم سبب استثناء يدوي.`
-          : `المسافة إلى الماكينة (${distanceMeters}م) تتجاوز النطاق المسموح به (${allowedRadius}م). يرجى التواجد أمام الماكينة أو تقديم سبب استثناء يدوي.`
-      });
-    }
-
-    if (gpsStatus === 'GPS_UNAVAILABLE') {
-      return res.status(400).json({
-        success: false,
-        error: 'GPS_UNAVAILABLE',
-        status: 'GPS_UNAVAILABLE',
-        message: 'إحداثيات الموقع الجغرافي غير متوفرة أو غير صالحة. يرجى تفعيل الـ GPS في جهازك أو إدخال سبب استثناء يدوي.'
-      });
     }
 
     const now = new Date().toISOString();
@@ -886,14 +930,35 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
       machineToken: scannedMachine.publicQrToken || machineToken,
       machineNumber: scannedMachine.machineNumber,
       timestamp: now,
-      latitude: numLat || 0,
-      longitude: numLon || 0,
-      accuracyMeters: numAccuracy || 0,
-      distanceMeters,
+      latitude: hasValidCoords ? numLat : null,
+      longitude: hasValidCoords ? numLon : null,
+      accuracyMeters: numAccuracy,
+      distanceMeters: distanceMeters !== null ? distanceMeters : null,
       status: gpsStatus,
-      manualExceptionReason: cleanReason || undefined,
-      approvedBy: gpsStatus === 'MANUAL_EXCEPTION' ? 'Pending Manager Approval' : undefined
+      manualExceptionReason: cleanReason || consumedApproval?.reason || undefined,
+      approvedBy: consumedApproval ? (consumedApproval.approvedByActorName || consumedApproval.approvedBy || 'SUPERVISOR') : undefined,
+      fieldExceptionId: consumedApproval ? consumedApproval.id : null
     };
+
+    if (consumedApproval) {
+      store.syncQueue.push({
+        id: `evt-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+        eventType: 'FIELD_EXCEPTION_USED',
+        aggregateType: 'TICKET',
+        aggregateId: ticket.id,
+        payload: {
+          exceptionId: consumedApproval.id,
+          ticketId: ticket.id,
+          machineId: scannedMachine.id,
+          technicianId: tech.id,
+          technicianName: tech.fullName
+        },
+        createdAt: now,
+        processedAt: null,
+        syncStatus: 'PENDING',
+        retryCount: 0
+      });
+    }
 
     ticket.technicianCheckIn = checkInRecord;
     ticket.gpsVerificationStatus = gpsStatus;
@@ -940,7 +1005,7 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
       message:
         gpsStatus === 'GPS_VERIFIED'
           ? 'تم التحقق الجغرافي الميداني بنجاح.'
-          : 'تم قبول الاستثناء الميداني اليدوي بانتظار اعتماد الإدارة.'
+          : 'تم التحقق الميداني بناءً على تصريح استثناء معتمد.'
     });
   };
   router.post('/technician/checkin', requireTechnicianAuth, technicianCheckinLimiter, handleTechnicianCheckin);

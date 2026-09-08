@@ -299,12 +299,13 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
         technicianId: r.technician_id,
         technicianName: r.technician_name,
         timestamp: toIsoDate(r.created_at || r.timestamp),
-        latitude: r.latitude,
-        longitude: r.longitude,
-        accuracyMeters: r.accuracy_meters,
-        distanceMeters: r.distance_meters,
+        latitude: r.latitude !== null && r.latitude !== undefined ? Number(r.latitude) : null,
+        longitude: r.longitude !== null && r.longitude !== undefined ? Number(r.longitude) : null,
+        accuracyMeters: r.accuracy_meters !== null && r.accuracy_meters !== undefined ? Number(r.accuracy_meters) : null,
+        distanceMeters: r.distance_meters !== null && r.distance_meters !== undefined ? Number(r.distance_meters) : null,
         verified: r.verified,
         status: r.status,
+        fieldExceptionId: r.field_exception_id || (r.manual_exception?.approvalId) || undefined,
         manualException: r.manual_exception || undefined
       })),
       actions: actionsRes.rows.map(r => ({
@@ -407,20 +408,21 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
       INSERT INTO technician_checkins (
         id, ticket_id, technician_id, technician_name,
         latitude, longitude, accuracy_meters, distance_meters,
-        verified, status, manual_exception, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP);
+        verified, status, field_exception_id, manual_exception, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP);
     `;
     await this.pool.query(query, [
       checkin.id,
       checkin.ticketId,
       checkin.technicianId,
       checkin.technicianName,
-      checkin.latitude,
-      checkin.longitude,
-      checkin.accuracyMeters,
-      checkin.distanceMeters,
+      checkin.latitude !== null && checkin.latitude !== undefined ? checkin.latitude : null,
+      checkin.longitude !== null && checkin.longitude !== undefined ? checkin.longitude : null,
+      checkin.accuracyMeters !== null && checkin.accuracyMeters !== undefined ? checkin.accuracyMeters : null,
+      checkin.distanceMeters !== null && checkin.distanceMeters !== undefined ? checkin.distanceMeters : null,
       checkin.verified,
       checkin.status,
+      checkin.fieldExceptionId || checkin.exceptionApprovalId || null,
       checkin.manualException ? JSON.stringify(checkin.manualException) : null
     ]);
   }
@@ -1001,19 +1003,48 @@ export class PostgresFieldExceptionApprovalRepository implements IFieldException
     return this.mapRow(res.rows[0]);
   }
 
-  async findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null> {
-    const query = `
-      SELECT * FROM field_exception_approvals
-      WHERE ticket_id = $1
-        AND integration_machine_id = $2
-        AND status = 'APPROVED'
-        AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
-      ORDER BY created_at DESC
-      LIMIT 1;
-    `;
-    const res = await this.pool.query(query, [ticketId, machineId]);
+  async findValidForTicketMachineAndTechnician(
+    ticketId: string,
+    machineId: string,
+    technicianId?: string | null
+  ): Promise<FieldExceptionApproval | null> {
+    const cleanTech = technicianId ? technicianId.trim() : null;
+    let query: string;
+    let params: any[];
+
+    if (cleanTech) {
+      query = `
+        SELECT * FROM field_exception_approvals
+        WHERE ticket_id = $1
+          AND integration_machine_id = $2
+          AND status = 'APPROVED'
+          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+          AND (technician_id IS NULL OR technician_id = $3)
+        ORDER BY created_at DESC
+        LIMIT 1;
+      `;
+      params = [ticketId, machineId, cleanTech];
+    } else {
+      query = `
+        SELECT * FROM field_exception_approvals
+        WHERE ticket_id = $1
+          AND integration_machine_id = $2
+          AND status = 'APPROVED'
+          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+          AND technician_id IS NULL
+        ORDER BY created_at DESC
+        LIMIT 1;
+      `;
+      params = [ticketId, machineId];
+    }
+
+    const res = await this.pool.query(query, params);
     if (res.rows.length === 0) return null;
     return this.mapRow(res.rows[0]);
+  }
+
+  async findValidForTicketAndMachine(ticketId: string, machineId: string): Promise<FieldExceptionApproval | null> {
+    return this.findValidForTicketMachineAndTechnician(ticketId, machineId, null);
   }
 
   async consumeApproval(id: string): Promise<FieldExceptionApproval> {
@@ -1022,7 +1053,7 @@ export class PostgresFieldExceptionApprovalRepository implements IFieldException
        SET status = 'USED',
            used_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND status = 'APPROVED'
+       WHERE id = $1 AND status = 'APPROVED' AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
        RETURNING *;`,
       [id]
     );
@@ -1030,6 +1061,9 @@ export class PostgresFieldExceptionApprovalRepository implements IFieldException
       const existing = await this.findById(id);
       if (!existing) {
         throw new Error('EXCEPTION_APPROVAL_NOT_FOUND: تصريح الاستثناء غير موجود.');
+      }
+      if (existing.expiresAt && new Date(existing.expiresAt).getTime() <= Date.now()) {
+        throw new Error('EXCEPTION_APPROVAL_EXPIRED: تصريح الاستثناء منتهي الصلاحية.');
       }
       throw new Error(`EXCEPTION_APPROVAL_INVALID: لا يمكن استخدام التصريح لأن حالته الحالية: ${existing.status}`);
     }

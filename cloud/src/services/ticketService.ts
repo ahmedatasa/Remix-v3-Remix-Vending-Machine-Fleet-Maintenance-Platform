@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import type { CloudTicket } from '../db/cloudDb';
+import type { CloudTicket, CloudCheckinRecord } from '../db/cloudDb';
 import { getCloudRepository } from '../repositories';
 import { GpsService, GpsCoordinates } from './gpsService';
 import { StorageUploadResult } from '../storage/cloudStorage';
@@ -218,11 +218,12 @@ export class TicketService {
     technicianId: string;
     technicianName: string;
     coordinates?: GpsCoordinates | null;
-    manualException?: { approvedBy: string; reason: string; approverRole?: string };
+    manualExceptionReason?: string;
+    manualException?: any; // Explicitly IGNORED for security (client cannot claim authorization)
     clientIp?: string;
   }): Promise<{ checkin: any; ticket: CloudTicket }> {
     const repo = getCloudRepository();
-    const { ticketId, machineToken, technicianId, technicianName, coordinates, manualException, clientIp } = params;
+    const { ticketId, machineToken, technicianId, technicianName, coordinates, manualExceptionReason, clientIp } = params;
 
     const ticket = await repo.tickets.findById(ticketId);
     if (!ticket) {
@@ -234,45 +235,61 @@ export class TicketService {
       throw new Error('MACHINE_NOT_FOUND: رمز الماكينة غير صالح أو غير مرتبط بسجل معتمد.');
     }
 
-    // Check for pre-authorized field exception if GPS validation needs it
-    let effectiveManualException = manualException;
-    let consumedApprovalId: string | undefined;
+    // Step 1: Attempt standard GPS validation WITHOUT any manual exception first
+    const initialValidation = GpsService.validateFieldPresence(coordinates, machine, undefined);
 
-    if (!effectiveManualException) {
-      const activeApproval = await repo.fieldExceptions.findValidForTicketAndMachine(ticketId, machine.integrationMachineId);
+    let effectiveManualException: { approvedBy: string; reason: string; approverRole?: string } | undefined;
+    let consumedApprovalId: string | undefined;
+    let finalValidation = initialValidation;
+
+    if (initialValidation.verified) {
+      // Normal GPS verified check-in
+      finalValidation = initialValidation;
+    } else {
+      // Step 2: GPS failed or machine unconfigured -> Look up authoritative persisted FieldExceptionApproval
+      // MUST be bound to ticket, machine, and technician (or unassigned technician)
+      const activeApproval = await repo.fieldExceptions.findValidForTicketMachineAndTechnician(
+        ticketId,
+        machine.integrationMachineId,
+        technicianId
+      );
+
       if (activeApproval) {
         effectiveManualException = {
           approvedBy: activeApproval.approvedByActorName,
           reason: activeApproval.reason,
           approverRole: 'SUPERVISOR'
         };
+        finalValidation = GpsService.validateFieldPresence(coordinates, machine, effectiveManualException);
         consumedApprovalId = activeApproval.id;
+      } else {
+        // Step 3: No valid active approval found -> DENY authorization
+        await repo.audit.log({
+          actorType: 'TECHNICIAN',
+          actorId: technicianId,
+          actorName: technicianName,
+          action: 'TECHNICIAN_CHECKIN_FAILED',
+          entity: 'TICKET',
+          result: 'FAILURE',
+          details: {
+            ticketId,
+            initialValidation,
+            coordinates,
+            reasonSupplied: manualExceptionReason,
+            ip: clientIp
+          },
+          ip: clientIp
+        });
+
+        if (typeof machine.latitude !== 'number' || typeof machine.longitude !== 'number') {
+          throw new Error('GPS_VALIDATION_FAILED: MACHINE_GPS_NOT_CONFIGURED: لم يتم ضبط الإحداثيات الجغرافية لهذه الماكينة في سجل الأسطول بعد. يلزم وجود تصريح استثناء معتمد لإتمام التحقق.');
+        }
+
+        throw new Error(`GPS_VALIDATION_FAILED: ${initialValidation.message}`);
       }
     }
 
-    // Authoritative Backend GPS Validation
-    const validation = GpsService.validateFieldPresence(coordinates, machine, effectiveManualException);
-
-    if (!validation.verified) {
-      await repo.audit.log({
-        actorType: 'TECHNICIAN',
-        actorId: technicianId,
-        actorName: technicianName,
-        action: 'TECHNICIAN_CHECKIN_FAILED',
-        entity: 'TICKET',
-        result: 'FAILURE',
-        details: {
-          ticketId,
-          validation,
-          coordinates,
-          ip: clientIp
-        },
-        ip: clientIp
-      });
-      throw new Error(`GPS_VALIDATION_FAILED: ${validation.message}`);
-    }
-
-    // If an approved field exception was consumed, mark it used in database
+    // If an approved field exception was consumed, mark it used in database atomically
     if (consumedApprovalId) {
       await repo.fieldExceptions.consumeApproval(consumedApprovalId);
       await repo.syncEvents.pushEvent('FIELD_EXCEPTION_USED', ticketId, {
@@ -285,20 +302,30 @@ export class TicketService {
     }
 
     const now = new Date().toISOString();
-    const checkinRecord = {
+    const hasValidCoords = Boolean(
+      coordinates &&
+      typeof coordinates.latitude === 'number' &&
+      !isNaN(coordinates.latitude) &&
+      typeof coordinates.longitude === 'number' &&
+      !isNaN(coordinates.longitude)
+    );
+
+    const checkinRecord: CloudCheckinRecord = {
       id: `chk-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
       ticketId,
       technicianId,
       technicianName,
       timestamp: now,
-      latitude: coordinates?.latitude || 0,
-      longitude: coordinates?.longitude || 0,
-      accuracyMeters: validation.accuracyMeters,
-      distanceMeters: validation.distanceMeters,
+      latitude: hasValidCoords ? coordinates!.latitude : null,
+      longitude: hasValidCoords ? coordinates!.longitude : null,
+      accuracyMeters: (coordinates && typeof coordinates.accuracyMeters === 'number' && !isNaN(coordinates.accuracyMeters)) ? coordinates.accuracyMeters : null,
+      distanceMeters: (typeof finalValidation.distanceMeters === 'number' && finalValidation.distanceMeters >= 0) ? finalValidation.distanceMeters : null,
       verified: true,
-      status: validation.status,
-      fieldExceptionId: consumedApprovalId,
+      status: finalValidation.status as any,
+      exceptionApprovalId: consumedApprovalId || null,
+      fieldExceptionId: consumedApprovalId || null,
       manualException: effectiveManualException ? {
+        approvalId: consumedApprovalId,
         approvedBy: effectiveManualException.approvedBy,
         reason: effectiveManualException.reason,
         approverRole: effectiveManualException.approverRole || 'SUPERVISOR',
@@ -327,8 +354,10 @@ export class TicketService {
       result: 'SUCCESS',
       details: {
         ticketId,
-        status: validation.status,
-        distanceMeters: validation.distanceMeters,
+        status: finalValidation.status,
+        distanceMeters: checkinRecord.distanceMeters,
+        accuracyMeters: checkinRecord.accuracyMeters,
+        fieldExceptionId: consumedApprovalId,
         ip: clientIp
       },
       ip: clientIp
