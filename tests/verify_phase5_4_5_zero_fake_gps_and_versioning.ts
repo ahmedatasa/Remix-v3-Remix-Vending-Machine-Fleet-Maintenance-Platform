@@ -26,6 +26,9 @@
  * 21. Baseline Fresh Install Clean GPS: Baseline seed has 0 synthetic GPS records
  */
 
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import {
   isLegacySyntheticGps,
   sanitizeMachineGps,
@@ -39,7 +42,7 @@ import {
   mergeMachines,
   mergeTickets
 } from '../src/server/syncMergeEngine';
-import { runtimeStoreManager } from '../src/server/runtimeStoreManager';
+import { runtimeStoreManager, RuntimeStoreManager } from '../src/server/runtimeStoreManager';
 
 let passedCount = 0;
 let failedCount = 0;
@@ -58,6 +61,13 @@ async function runTestSuite() {
   console.log('======================================================================');
   console.log('PHASE 5.4.5: ZERO FAKE GPS & DETERMINISTIC VERSIONING VERIFICATION');
   console.log('======================================================================\n');
+
+  // Set isolated VENDING_DATA_DIR
+  const testSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vending-test-zero-gps-'));
+  process.env.VENDING_DATA_DIR = testSandboxDir;
+  RuntimeStoreManager.resetInstance();
+
+  try {
 
   // Test 1: Synthetic GPS Detection
   const syntheticMachine = {
@@ -390,6 +400,13 @@ async function runTestSuite() {
   console.log('\n======================================================================');
   console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED`);
   console.log('======================================================================\n');
+  } finally {
+    try {
+      fs.rmSync(testSandboxDir, { recursive: true, force: true });
+    } catch {}
+    delete process.env.VENDING_DATA_DIR;
+    RuntimeStoreManager.resetInstance();
+  }
 
   if (failedCount > 0) {
     process.exit(1);

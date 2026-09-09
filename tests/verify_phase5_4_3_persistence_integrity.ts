@@ -1,18 +1,25 @@
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 console.log('======================================================================');
 console.log('PHASE 5.4.3: VERIFICATION OF PERSISTENCE INTEGRITY & TICKET LIFECYCLE');
 console.log('======================================================================');
 
-const DB_FILE = path.join(process.cwd(), 'fleet_data.json');
+const ORIGINAL_DB_FILE = path.join(process.cwd(), 'fleet_data.json');
 const BASELINE_FILE = path.join(process.cwd(), 'fleet_master_baseline.json');
 
 // --- Pre-flight checks ---
-assert(fs.existsSync(DB_FILE), 'fleet_data.json must exist');
+assert(fs.existsSync(ORIGINAL_DB_FILE), 'fleet_data.json must exist');
 assert(fs.existsSync(BASELINE_FILE), 'fleet_master_baseline.json must exist');
 
+// Use isolated sandbox directory so tracked fleet_data.json is never mutated
+const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vending-test-persistence-'));
+const DB_FILE = path.join(sandboxDir, 'fleet_data.json');
+fs.copyFileSync(ORIGINAL_DB_FILE, DB_FILE);
+
+try {
 const dbRaw = fs.readFileSync(DB_FILE, 'utf8');
 const db = JSON.parse(dbRaw);
 
@@ -143,3 +150,8 @@ console.log(`  Tickets count: ${reloadedDb3.tickets.length}`);
 console.log('\n======================================================================');
 console.log('ALL PHASE 5.4.3 PERSISTENCE INTEGRITY TESTS PASSED SUCCESSFULLY (6/6)');
 console.log('======================================================================');
+} finally {
+  try {
+    fs.rmSync(sandboxDir, { recursive: true, force: true });
+  } catch {}
+}

@@ -99,11 +99,15 @@ export const cloudConfig: CloudConfig = {
   syncIntervalSeconds: parseInt(process.env.SYNC_INTERVAL || '60', 10),
   technicianCheckinRadiusMeters: parseInt(process.env.TECHNICIAN_CHECKIN_RADIUS_METERS || '100', 10),
   technicianMaxGpsAccuracyMeters: parseInt(process.env.TECHNICIAN_MAX_GPS_ACCURACY_METERS || '100', 10),
-  cloudDatabaseFile: path.resolve(process.cwd(), process.env.CLOUD_DATABASE_FILE || 'cloud_data.json'),
+  get cloudDatabaseFile(): string {
+    return path.resolve(process.cwd(), process.env.CLOUD_DATABASE_FILE || 'cloud_data.json');
+  },
   get storageProvider(): 'local' | 's3' | 'r2' | 'supabase' {
     return (process.env.CLOUD_STORAGE_PROVIDER as any) || 'local';
   },
-  storageLocalDir: path.resolve(process.cwd(), process.env.CLOUD_STORAGE_DIR || 'cloud_storage'),
+  get storageLocalDir(): string {
+    return path.resolve(process.cwd(), process.env.CLOUD_STORAGE_DIR || 'cloud_storage');
+  },
   get storageBucket(): string | undefined {
     return process.env.CLOUD_STORAGE_BUCKET;
   },

@@ -4,6 +4,9 @@
  */
 
 import assert from 'assert';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { CloudDatabase } from '../cloud/src/db/cloudDb';
 import { JsonCloudRepositoryManager } from '../cloud/src/repositories/jsonRepository';
 import { LocationService } from '../cloud/src/services/locationService';
@@ -32,6 +35,12 @@ async function runMatrix() {
   console.log('PHASE 5.4.5A: FINAL INTEGRITY CLOSURE TEST MATRIX (A - K)');
   console.log('======================================================================\n');
 
+  // Set isolated VENDING_DATA_DIR so runtime store tests do not touch ~/.local/share or repo
+  const testSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vending-test-closure-'));
+  process.env.VENDING_DATA_DIR = testSandboxDir;
+  RuntimeStoreManager.resetInstance();
+
+  try {
   // Initialize in-memory cloud database and repository
   const db = new CloudDatabase(':memory:');
   const repo = new JsonCloudRepositoryManager(db);
@@ -373,8 +382,14 @@ async function runMatrix() {
   console.log('\n======================================================================');
   console.log(`TEST MATRIX SUMMARY: ${passed} PASSED, ${failed} FAILED`);
   console.log('======================================================================\n');
-
-  resetActiveRepository();
+  } finally {
+    resetActiveRepository();
+    try {
+      fs.rmSync(testSandboxDir, { recursive: true, force: true });
+    } catch {}
+    delete process.env.VENDING_DATA_DIR;
+    RuntimeStoreManager.resetInstance();
+  }
 
   if (failed > 0) {
     process.exit(1);

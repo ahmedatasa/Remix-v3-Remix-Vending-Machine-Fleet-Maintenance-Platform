@@ -1,16 +1,24 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import http from 'http';
 import https from 'https';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { startCloudServer, stopCloudServer } from '../cloud/src/server';
-import { cloudDb } from '../cloud/src/db/cloudDb';
+import { cloudDb, resetCloudDbInstance } from '../cloud/src/db/cloudDb';
 import { desktopSyncWorker } from '../src/services/desktopSyncWorker';
 
 const TEST_CLOUD_PORT = 3105;
 const CLOUD_URL = `http://127.0.0.1:${TEST_CLOUD_PORT}`;
-const FLEET_DATA_PATH = path.join(process.cwd(), 'fleet_data.json');
+
+// Isolate test resources so tracked fleet_data.json, cloud_data.json, and evidence storage are never mutated
+const testSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vending-phase4-sync-'));
+const FLEET_DATA_PATH = path.join(testSandboxDir, 'fleet_data.json');
+fs.copyFileSync(path.join(process.cwd(), 'fleet_data.json'), FLEET_DATA_PATH);
+process.env.CLOUD_DATABASE_FILE = path.join(testSandboxDir, 'cloud_data.json');
+process.env.CLOUD_STORAGE_DIR = path.join(testSandboxDir, 'cloud_storage');
+resetCloudDbInstance();
 
 function request(method: string, urlStr: string, headers: Record<string, string> = {}, body?: any): Promise<{ status: number; data: any; headers: any }> {
   return new Promise((resolve, reject) => {
@@ -72,6 +80,7 @@ async function runTests() {
     }
   }
 
+  try {
   // --- 1. CRITICAL SAFETY CHECK: 189 MACHINES ---
   console.log('--- 1. Checking 189-Machine Authoritative Fleet Baseline ---');
   const initialData = JSON.parse(fs.readFileSync(FLEET_DATA_PATH, 'utf-8'));
@@ -339,6 +348,17 @@ async function runTests() {
   console.log('\n====================================================');
   console.log(`🎉 ALL PHASE 4 VERIFICATION TESTS PASSED! (${testPassed} passed, ${testFailed} failed)`);
   console.log('====================================================');
+  } finally {
+    try {
+      await stopCloudServer();
+    } catch {}
+    try {
+      fs.rmSync(testSandboxDir, { recursive: true, force: true });
+    } catch {}
+    delete process.env.CLOUD_DATABASE_FILE;
+    delete process.env.CLOUD_STORAGE_DIR;
+    resetCloudDbInstance();
+  }
 }
 
 runTests().catch(err => {

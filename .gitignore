@@ -13,3 +13,11 @@ fleet_runtime_data.json
 fleet_data.backup*
 fleet-backup-*
 *.tmp.*
+
+# Runtime and Test Evidence Storage (preserve fixtures under TCK-TEST-001)
+cloud_storage/evidence/*
+!cloud_storage/evidence/TCK-TEST-001/
+
+# Prevent literal SQLite in-memory artifact leakage
+:memory:
+

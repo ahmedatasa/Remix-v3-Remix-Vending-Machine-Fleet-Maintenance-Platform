@@ -10333,6 +10333,101 @@
   ],
   "tickets": [
     {
+      "id": "tck-1788881293803-119338",
+      "ticketNumber": "TCK-2026-0015",
+      "cloudTicketId": "cld-tck-1788881293372-2737f6cf",
+      "cloudReportId": "idemp-1788881293369",
+      "publicTrackingToken": "TRK-MTSTQFY4-40C33C82",
+      "machineId": "mch-imp-1788442674014-1",
+      "machineNumber": "1",
+      "machine": {
+        "id": "mch-imp-1788442674014-1",
+        "machineNumber": "1",
+        "serialNumber": "1640056931",
+        "machineType": "Zaki Vending Machine",
+        "currentLocation": {
+          "id": "loc-1788442674014-1",
+          "buildingId": "bld-1788442674014-1",
+          "floorId": "flr-1788442674014-1",
+          "floor": {
+            "id": "flr-1788442674014-1",
+            "buildingId": "bld-1788442674014-1",
+            "floorNumber": 1,
+            "levelOrder": 1,
+            "floorName": "الدور",
+            "createdAt": "2026-09-03T13:37:54.013Z"
+          },
+          "building": {
+            "id": "bld-1788442674014-1",
+            "code": "BLD-01",
+            "name": "القاده",
+            "createdAt": "2026-09-03T13:37:54.013Z",
+            "updatedAt": "2026-09-03T13:37:54.013Z"
+          },
+          "areaZone": "شمال",
+          "fullDescription": "القاده — الدور — شمال",
+          "isActive": true,
+          "createdAt": "2026-09-03T13:37:54.013Z"
+        }
+      },
+      "title": "عطل مُبلغ عنه: BEVERAGE_DISPENSE",
+      "description": "الماكينة لم تسقط عبوة الماء بعد خصم المبلغ عبر مدى",
+      "category": "BEVERAGE_DISPENSE",
+      "priority": "MEDIUM",
+      "status": "RESOLVED",
+      "reporterName": "طالب جامعي",
+      "reporterPhone": "0551122334",
+      "reporterEmail": "",
+      "source": "PUBLIC_QR",
+      "createdAt": "2026-09-08T15:28:13.372Z",
+      "updatedAt": "2026-09-08T15:28:13.772Z",
+      "actions": [
+        {
+          "id": "act-1788881293757-249248",
+          "ticketId": "cld-tck-1788881293372-2737f6cf",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-08T15:28:13.757Z"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "evi-1788881293751-01394e",
+          "ticketId": "cld-tck-1788881293372-2737f6cf",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788881293372-2737f6cf/1788881293751-3ff848b27b094b0677a7775c1a50f2de.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788881293372-2737f6cf/1788881293751-3ff848b27b094b0677a7775c1a50f2de.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-08T15:28:13.751Z"
+        }
+      ],
+      "checkins": [
+        {
+          "id": "chk-1788881293740-2495be",
+          "ticketId": "cld-tck-1788881293372-2737f6cf",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-08T15:28:13.740Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        }
+      ],
+      "functionalTests": [],
+      "resolutionSummary": "تم استبدال الحساس وفحص الماكينة وعودتها للخدمة بنجاح",
+      "resolvedBy": "ahmed",
+      "resolvedAt": "2026-09-08T15:28:13.772Z"
+    },
+    {
       "id": "tck-1788783096072-4f3971",
       "ticketNumber": "TCK-2026-0014",
       "cloudTicketId": "cld-tck-1788783095632-fcb77d92",
@@ -10390,6 +10485,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-07T12:11:36.028Z"
+        },
+        {
+          "id": "act-1788783096028-4df9c0",
+          "ticketId": "cld-tck-1788783095632-fcb77d92",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-07T12:11:36.028Z"
         }
       ],
       "evidence": [
@@ -10405,9 +10509,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-07T12:11:36.022Z"
+        },
+        {
+          "id": "evi-1788783096022-959ba0",
+          "ticketId": "cld-tck-1788783095632-fcb77d92",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788783095632-fcb77d92/1788783096022-51485d62b6cf759351e10939c2ef3a30.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788783095632-fcb77d92/1788783096022-51485d62b6cf759351e10939c2ef3a30.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-07T12:11:36.022Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788783096011-3e2829",
+          "ticketId": "cld-tck-1788783095632-fcb77d92",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-07T12:11:36.011Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788783096011-3e2829",
           "ticketId": "cld-tck-1788783095632-fcb77d92",
@@ -10494,6 +10624,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-07T10:55:42.141Z"
+        },
+        {
+          "id": "act-1788778542141-6f5239",
+          "ticketId": "cld-tck-1788778541754-96a5d75e",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-07T10:55:42.141Z"
         }
       ],
       "evidence": [
@@ -10522,9 +10661,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-07T10:55:42.135Z"
+        },
+        {
+          "id": "evi-1788778542135-03ed16",
+          "ticketId": "cld-tck-1788778541754-96a5d75e",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788778541754-96a5d75e/1788778542134-78b1c0a1a1eb56557543b646c2326930.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788778541754-96a5d75e/1788778542134-78b1c0a1a1eb56557543b646c2326930.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-07T10:55:42.135Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788778542124-085a8b",
+          "ticketId": "cld-tck-1788778541754-96a5d75e",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-07T10:55:42.124Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788778542124-085a8b",
           "ticketId": "cld-tck-1788778541754-96a5d75e",
@@ -10633,6 +10798,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-07T09:21:25.366Z"
+        },
+        {
+          "id": "act-1788772885366-926a97",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-07T09:21:25.366Z"
         }
       ],
       "evidence": [
@@ -10674,9 +10848,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-07T09:21:25.357Z"
+        },
+        {
+          "id": "evi-1788772885357-a59266",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788772884971-6e699e4a/1788772885356-6279ae0533e65c533f81e21b4395be9a.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788772884971-6e699e4a/1788772885356-6279ae0533e65c533f81e21b4395be9a.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-07T09:21:25.357Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788772885349-6dd15c",
+          "ticketId": "cld-tck-1788772884971-6e699e4a",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-07T09:21:25.349Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788772885349-6dd15c",
           "ticketId": "cld-tck-1788772884971-6e699e4a",
@@ -10838,6 +11038,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-06T15:04:13.650Z"
+        },
+        {
+          "id": "act-1788707053650-563439",
+          "ticketId": "cld-tck-1788707053277-dd117f0b",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-06T15:04:13.650Z"
         }
       ],
       "evidence": [
@@ -10879,9 +11088,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-06T15:04:13.645Z"
+        },
+        {
+          "id": "evi-1788707053645-e9d742",
+          "ticketId": "cld-tck-1788707053277-dd117f0b",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788707053277-dd117f0b/1788707053644-6bcc82a4c54bd47da8c69a9167ec3015.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788707053277-dd117f0b/1788707053644-6bcc82a4c54bd47da8c69a9167ec3015.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-06T15:04:13.645Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788707053637-8c637f",
+          "ticketId": "cld-tck-1788707053277-dd117f0b",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-06T15:04:13.637Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788707053637-8c637f",
           "ticketId": "cld-tck-1788707053277-dd117f0b",
@@ -11003,6 +11238,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-06T10:54:44.775Z"
+        },
+        {
+          "id": "act-1788692084775-16b46b",
+          "ticketId": "cld-tck-1788692084363-aa7f032c",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-06T10:54:44.775Z"
         }
       ],
       "evidence": [
@@ -11044,9 +11288,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-06T10:54:44.770Z"
+        },
+        {
+          "id": "evi-1788692084770-ded56a",
+          "ticketId": "cld-tck-1788692084363-aa7f032c",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788692084363-aa7f032c/1788692084770-0f0537173049114df0d1d8e09f5dc7a7.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788692084363-aa7f032c/1788692084770-0f0537173049114df0d1d8e09f5dc7a7.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-06T10:54:44.770Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788692084764-66db34",
+          "ticketId": "cld-tck-1788692084363-aa7f032c",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-06T10:54:44.764Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788692084764-66db34",
           "ticketId": "cld-tck-1788692084363-aa7f032c",
@@ -11272,6 +11542,15 @@
           "actionType": "MOTOR_CALIBRATION",
           "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
           "timestamp": "2026-09-06T09:40:55.790Z"
+        },
+        {
+          "id": "act-1788687655790-3ba9ff",
+          "ticketId": "cld-tck-1788687655430-c325cfb9",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "actionType": "MOTOR_CALIBRATION",
+          "description": "تمت إعادة ضبط ومعايرة محرك سير إسقاط العبوات",
+          "timestamp": "2026-09-06T09:40:55.790Z"
         }
       ],
       "evidence": [
@@ -11326,9 +11605,35 @@
           "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
           "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
           "timestamp": "2026-09-06T09:40:55.787Z"
+        },
+        {
+          "id": "evi-1788687655787-7ed607",
+          "ticketId": "cld-tck-1788687655430-c325cfb9",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "objectKey": "evidence/cld-tck-1788687655430-c325cfb9/1788687655786-4a5da477bcb072ede3f1d33915905d98.png",
+          "url": "http://127.0.0.1:3001/cloud-storage/evidence/cld-tck-1788687655430-c325cfb9/1788687655786-4a5da477bcb072ede3f1d33915905d98.png",
+          "mimeType": "image/png",
+          "sizeBytes": 70,
+          "sha256": "6b7fa434f92a8b80aab02d9bf1a12e49ffcae424e4013a1c4f68b67e3d2bbcd0",
+          "caption": "صورة توثيق بوابة خروج المشروبات بعد الإصلاح",
+          "timestamp": "2026-09-06T09:40:55.787Z"
         }
       ],
       "checkins": [
+        {
+          "id": "chk-1788687655781-2db81d",
+          "ticketId": "cld-tck-1788687655430-c325cfb9",
+          "technicianId": "tch-1788444652245",
+          "technicianName": "ahmed",
+          "timestamp": "2026-09-06T09:40:55.781Z",
+          "latitude": 24.71361,
+          "longitude": 46.67531,
+          "accuracyMeters": 8,
+          "distanceMeters": 2,
+          "verified": true,
+          "status": "VERIFIED"
+        },
         {
           "id": "chk-1788687655781-2db81d",
           "ticketId": "cld-tck-1788687655430-c325cfb9",
@@ -12663,6 +12968,17 @@
   ],
   "suppliers": [],
   "partRequests": [
+    {
+      "id": "prq-1788881293764-22d87e",
+      "ticketId": "cld-tck-1788881293372-2737f6cf",
+      "technicianId": "tch-1788444652245",
+      "technicianName": "ahmed",
+      "partName": "حساس خروج العبوات البصري",
+      "quantityRequested": 1,
+      "reason": "الحساس القديم متهالك ويحتاج استبدال دوري",
+      "status": "REQUESTED",
+      "timestamp": "2026-09-08T15:28:13.764Z"
+    },
     {
       "id": "prq-1788783096034-688f64",
       "ticketId": "cld-tck-1788783095632-fcb77d92",
@@ -25419,9 +25735,15 @@
     "cld-evt-1788783096024-e89829cb",
     "cld-evt-1788783096030-732bd0ad",
     "cld-evt-1788783096037-a7002fa2",
-    "cld-evt-1788783096044-a62c48ac"
+    "cld-evt-1788783096044-a62c48ac",
+    "cld-evt-1788881293385-316ba4a3",
+    "cld-evt-1788881293744-ade17b09",
+    "cld-evt-1788881293753-e8e14b03",
+    "cld-evt-1788881293759-6b47a807",
+    "cld-evt-1788881293767-fa277c54",
+    "cld-evt-1788881293774-19adaf5d"
   ],
-  "lastCloudSyncCursor": 42,
+  "lastCloudSyncCursor": 48,
   "initialized": true,
   "isAuthoritative": true,
   "_persistence": {

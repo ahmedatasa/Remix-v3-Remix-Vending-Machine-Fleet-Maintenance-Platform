@@ -259,6 +259,7 @@ export class CloudDatabase {
   private filePath: string;
   private data: CloudDatabaseData;
   private isWriting = false;
+  private isInMemory = false;
 
   constructor(filePath?: string) {
     const isStagingOrProduction =
@@ -274,6 +275,7 @@ export class CloudDatabase {
     }
 
     this.filePath = filePath || cloudConfig.cloudDatabaseFile;
+    this.isInMemory = this.filePath === ':memory:';
     this.data = this.loadInitial();
   }
 
@@ -293,6 +295,9 @@ export class CloudDatabase {
   }
 
   private loadInitial(): CloudDatabaseData {
+    if (this.isInMemory) {
+      return this.getDefaultData();
+    }
     try {
       if (fs.existsSync(this.filePath)) {
         const raw = fs.readFileSync(this.filePath, 'utf8');
@@ -320,7 +325,7 @@ export class CloudDatabase {
       process.env.NODE_ENV === 'staging' ||
       process.env.NODE_ENV === 'production';
 
-    if (!isStagingOrProduction) {
+    if (!isStagingOrProduction && !this.isInMemory) {
       this.persistSync(def);
     }
     return def;
@@ -331,6 +336,7 @@ export class CloudDatabase {
   }
 
   public save(): void {
+    if (this.isInMemory) return;
     if (this.isWriting) return;
     this.isWriting = true;
     try {
@@ -341,6 +347,9 @@ export class CloudDatabase {
   }
 
   private persistSync(dataToSave: CloudDatabaseData): void {
+    if (this.isInMemory || this.filePath === ':memory:') {
+      return;
+    }
     const isStagingOrProduction =
       cloudConfig.isProduction ||
       cloudConfig.isStaging ||
