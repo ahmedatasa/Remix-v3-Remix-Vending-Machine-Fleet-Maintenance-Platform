@@ -53,7 +53,7 @@ export function validateCoordinates(
   const latNum = Number(String(latInput).trim());
   const lngNum = Number(String(lngInput).trim());
 
-  if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+  if (isNaN(latNum) || !isFinite(latNum) || latNum < -90 || latNum > 90) {
     return {
       isValid: false,
       valid: false,
@@ -64,7 +64,7 @@ export function validateCoordinates(
     };
   }
 
-  if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+  if (isNaN(lngNum) || !isFinite(lngNum) || lngNum < -180 || lngNum > 180) {
     return {
       isValid: false,
       valid: false,
@@ -120,4 +120,21 @@ export function normalizeCoordinates(lat: number, lng: number): { latitude: numb
     latitude: Number(lat.toFixed(6)),
     longitude: Number(lng.toFixed(6))
   };
+}
+
+/**
+ * Parses coordinate input strings and returns validation result.
+ */
+export function parseCoordinateInput(latStr: string, lngStr: string): GeoCoordinatesValidationResult {
+  return validateCoordinates(latStr, lngStr);
+}
+
+/**
+ * Formats coordinates for display with 6 decimal places.
+ */
+export function formatCoordinates(lat: number | null | undefined, lng: number | null | undefined): string {
+  if (lat === null || lat === undefined || lng === null || lng === undefined) {
+    return 'غير محدد';
+  }
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 }

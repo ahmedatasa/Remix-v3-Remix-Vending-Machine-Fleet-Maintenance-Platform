@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { GeoLocationMapPicker } from './GeoLocationMapPicker';
 import { validateCoordinates } from '../../utils/geoValidation';
 import { LocationSource } from '../../types';
+import { getGpsAccuracyQuality } from '../../config/mapConfig';
 
 export interface GeoLocationFormSectionProps {
   latitude: number | null;
@@ -392,78 +393,95 @@ export const GeoLocationFormSection: React.FC<GeoLocationFormSectionProps> = ({
         entityType={entityType}
         buildingReferenceCoords={buildingReferenceCoords}
         onConfirm={(coords) => {
-          setLatInput(String(coords.latitude));
-          setLngInput(String(coords.longitude));
-          setValidationError(null);
-          onCoordinatesChange({
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            source: 'MAP_PICKER'
-          });
+          if (coords.latitude === null || coords.longitude === null) {
+            setLatInput('');
+            setLngInput('');
+            setValidationError(null);
+            onCoordinatesChange({
+              latitude: null,
+              longitude: null,
+              source: 'NONE'
+            });
+          } else {
+            setLatInput(coords.latitude.toFixed(6));
+            setLngInput(coords.longitude.toFixed(6));
+            setValidationError(null);
+            onCoordinatesChange({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              source: coords.source || 'MAP_PICKER'
+            });
+          }
         }}
       />
 
       {/* Device GPS Confirmation Preview Modal */}
-      {deviceGpsPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
-                <CheckCircle2 className="w-5 h-5" />
+      {deviceGpsPreview && (() => {
+        const quality = getGpsAccuracyQuality(deviceGpsPreview.accuracy);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-100">
+                    تأكيد التقاط موقع الجهاز المباشر (GPS)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    تم قراءة إحداثيات جهازك الحالية بنجاح عبر نظام GPS
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-100">
-                  تأكيد التقاط موقع الجهاز المباشر (GPS)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  تم قراءة إحداثيات جهازك الحالية بنجاح عبر نظام GPS
-                </p>
-              </div>
-            </div>
 
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-slate-400">خط العرض (Latitude):</span>
-                <span className="text-emerald-400 font-bold">{deviceGpsPreview.lat}</span>
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs font-mono">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">خط العرض (Latitude):</span>
+                  <span className="text-emerald-400 font-bold">{deviceGpsPreview.lat}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">خط الطول (Longitude):</span>
+                  <span className="text-emerald-400 font-bold">{deviceGpsPreview.lng}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                  <span className="text-slate-400">دقة الإشارة (Accuracy):</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-200">± {deviceGpsPreview.accuracy} متر</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${quality.badgeBgClass} ${quality.textClass} ${quality.badgeBorderClass}`}>
+                      {quality.labelAr}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">خط الطول (Longitude):</span>
-                <span className="text-emerald-400 font-bold">{deviceGpsPreview.lng}</span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-slate-800/80">
-                <span className="text-slate-400">دقة الإشارة (Accuracy):</span>
-                <span className={deviceGpsPreview.accuracy <= 30 ? 'text-emerald-400' : 'text-amber-400'}>
-                  ± {deviceGpsPreview.accuracy} متر
-                </span>
-              </div>
-            </div>
 
-            <p className="text-[11px] text-slate-400">
-              بالنقر على "تأكيد واستخدام"، سيتم اعتماد هذه الإحداثيات وتوثيق المصدر كـ <strong>DEVICE_GPS</strong>.
-            </p>
+              <p className="text-[11px] text-slate-400">
+                بالنقر على "تأكيد واستخدام"، سيتم اعتماد هذه الإحداثيات وتوثيق المصدر كـ <strong>DEVICE_GPS</strong>.
+              </p>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDeviceGpsPreview(null)}
-              >
-                إلغاء
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                icon={CheckCircle2}
-                onClick={handleConfirmDeviceGps}
-              >
-                تأكيد واستخدام هذا الموقع
-              </Button>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeviceGpsPreview(null)}
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={CheckCircle2}
+                  onClick={handleConfirmDeviceGps}
+                >
+                  تأكيد واستخدام هذا الموقع
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Building Reference Location Confirmation Modal (Section 16) */}
       {isBuildingRefModalOpen && buildingReferenceCoords && (

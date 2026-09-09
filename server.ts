@@ -728,24 +728,57 @@ async function startServer() {
     const data = req.body;
     const now = new Date().toISOString();
 
-    // Check location modifications
-    let lat = oldBld.latitude;
-    let lng = oldBld.longitude;
+    // Coordinate pair validation
+    const hasLat = data.latitude !== undefined;
+    const hasLng = data.longitude !== undefined;
+    if (hasLat || hasLng) {
+      const isLatNull = data.latitude === null;
+      const isLngNull = data.longitude === null;
+      const isLatNum = typeof data.latitude === 'number' && !isNaN(data.latitude) && isFinite(data.latitude);
+      const isLngNum = typeof data.longitude === 'number' && !isNaN(data.longitude) && isFinite(data.longitude);
+
+      if (isLatNull && isLngNull) {
+        // Both null: valid clear / unconfigured
+      } else if (isLatNum && isLngNum) {
+        if (data.latitude < -90 || data.latitude > 90 || data.longitude < -180 || data.longitude > 180) {
+          return res.status(400).json({ error: 'Coordinates out of range: latitude [-90, 90], longitude [-180, 180]' });
+        }
+      } else {
+        return res.status(400).json({ error: 'Invalid coordinate pair: latitude and longitude must both be valid numbers within range or both null' });
+      }
+    }
+
+    // Determine if coordinates or location metadata actually changed
+    let coordinatesActuallyChanged = false;
+    if (hasLat && hasLng) {
+      const isBothNull = data.latitude === null && data.longitude === null;
+      const wasBothNull = (oldBld.latitude === null || oldBld.latitude === undefined) &&
+                          (oldBld.longitude === null || oldBld.longitude === undefined);
+
+      if (isBothNull && wasBothNull) {
+        coordinatesActuallyChanged = false;
+      } else if (
+        typeof data.latitude === 'number' &&
+        typeof data.longitude === 'number' &&
+        typeof oldBld.latitude === 'number' &&
+        typeof oldBld.longitude === 'number'
+      ) {
+        coordinatesActuallyChanged =
+          Number(data.latitude.toFixed(6)) !== Number(oldBld.latitude.toFixed(6)) ||
+          Number(data.longitude.toFixed(6)) !== Number(oldBld.longitude.toFixed(6));
+      } else {
+        coordinatesActuallyChanged = true;
+      }
+    }
+
+    let lat = oldBld.latitude ?? null;
+    let lng = oldBld.longitude ?? null;
     let locationSource = oldBld.locationSource || 'NONE';
     let locationStatus = oldBld.locationStatus || (lat !== null && lng !== null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED');
     let locationNote = data.locationNote !== undefined ? data.locationNote : (oldBld.locationNote || '');
 
-    const locationChanged =
-      data.latitude !== undefined ||
-      data.longitude !== undefined ||
-      data.locationSource !== undefined ||
-      data.locationNote !== undefined;
-
-    if (data.latitude !== undefined || data.longitude !== undefined) {
-      const isNewLatNum = typeof data.latitude === 'number' && !isNaN(data.latitude);
-      const isNewLngNum = typeof data.longitude === 'number' && !isNaN(data.longitude);
-
-      if (isNewLatNum && isNewLngNum) {
+    if (coordinatesActuallyChanged) {
+      if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         lat = Number(data.latitude.toFixed(6));
         lng = Number(data.longitude.toFixed(6));
         locationSource = data.locationSource || 'MANUAL_ENTRY';
@@ -756,8 +789,20 @@ async function startServer() {
         locationSource = 'NONE';
         locationStatus = 'LOCATION_NOT_CONFIGURED';
       }
-    } else if (data.locationSource !== undefined) {
+    } else if (data.locationSource !== undefined && (lat !== null && lng !== null)) {
       locationSource = data.locationSource;
+    }
+
+    const locationNoteChanged = data.locationNote !== undefined && data.locationNote !== (oldBld.locationNote || '');
+    const locationChanged = coordinatesActuallyChanged || locationNoteChanged;
+
+    let finalLocationUpdatedAt: string | null = null;
+    if (lat === null || lng === null) {
+      finalLocationUpdatedAt = null;
+    } else if (coordinatesActuallyChanged) {
+      finalLocationUpdatedAt = now;
+    } else {
+      finalLocationUpdatedAt = oldBld.locationUpdatedAt || null;
     }
 
     store.buildings[idx] = {
@@ -768,23 +813,23 @@ async function startServer() {
       locationSource,
       locationStatus,
       locationNote,
-      locationUpdatedAt: locationChanged ? now : oldBld.locationUpdatedAt,
+      locationUpdatedAt: finalLocationUpdatedAt,
       locationUpdatedByActorId: data.locationUpdatedByActorId || oldBld.locationUpdatedByActorId || 'admin',
       locationUpdatedByActorName: data.locationUpdatedByActorName || oldBld.locationUpdatedByActorName || 'Super Administrator',
       updatedAt: now
     };
 
-    // Audit location changes (Section 20)
+    // Audit location changes
     const prevCoordsExist = oldBld.latitude !== null && oldBld.latitude !== undefined && oldBld.longitude !== null && oldBld.longitude !== undefined;
     const newCoordsExist = lat !== null && lng !== null;
 
-    if (locationChanged) {
+    if (coordinatesActuallyChanged) {
       let auditAction = 'BUILDING_LOCATION_MANUALLY_UPDATED';
       if (prevCoordsExist && !newCoordsExist) {
         auditAction = 'BUILDING_LOCATION_CLEARED';
       } else if (locationSource === 'DEVICE_GPS') {
         auditAction = 'BUILDING_LOCATION_DEVICE_GPS_UPDATED';
-      } else if (locationSource === 'MAP_PICKER') {
+      } else if (locationSource === 'MAP_PICKER' || locationSource === 'MAP_SELECTION') {
         auditAction = 'BUILDING_LOCATION_MAP_UPDATED';
       }
 
@@ -2955,37 +3000,72 @@ async function startServer() {
     const data = req.body;
     const now = new Date().toISOString();
 
-    // Check location modifications
-    let lat = oldMachine.latitude;
-    let lng = oldMachine.longitude;
+    // Coordinate pair validation
+    const hasLat = data.latitude !== undefined;
+    const hasLng = data.longitude !== undefined;
+    if (hasLat || hasLng) {
+      const isLatNull = data.latitude === null;
+      const isLngNull = data.longitude === null;
+      const isLatNum = typeof data.latitude === 'number' && !isNaN(data.latitude) && isFinite(data.latitude);
+      const isLngNum = typeof data.longitude === 'number' && !isNaN(data.longitude) && isFinite(data.longitude);
+
+      if (isLatNull && isLngNull) {
+        // Both null: valid clear / unconfigured
+      } else if (isLatNum && isLngNum) {
+        if (data.latitude < -90 || data.latitude > 90 || data.longitude < -180 || data.longitude > 180) {
+          return res.status(400).json({ error: 'Coordinates out of range: latitude [-90, 90], longitude [-180, 180]' });
+        }
+      } else {
+        return res.status(400).json({ error: 'Invalid coordinate pair: latitude and longitude must both be valid numbers within range or both null' });
+      }
+    }
+
+    // Determine if coordinates actually changed
+    let coordinatesActuallyChanged = false;
+    if (hasLat && hasLng) {
+      const isBothNull = data.latitude === null && data.longitude === null;
+      const wasBothNull = (oldMachine.latitude === null || oldMachine.latitude === undefined) &&
+                          (oldMachine.longitude === null || oldMachine.longitude === undefined);
+
+      if (isBothNull && wasBothNull) {
+        coordinatesActuallyChanged = false;
+      } else if (
+        typeof data.latitude === 'number' &&
+        typeof data.longitude === 'number' &&
+        typeof oldMachine.latitude === 'number' &&
+        typeof oldMachine.longitude === 'number'
+      ) {
+        coordinatesActuallyChanged =
+          Number(data.latitude.toFixed(6)) !== Number(oldMachine.latitude.toFixed(6)) ||
+          Number(data.longitude.toFixed(6)) !== Number(oldMachine.longitude.toFixed(6));
+      } else {
+        coordinatesActuallyChanged = true;
+      }
+    }
+
+    let lat = oldMachine.latitude ?? null;
+    let lng = oldMachine.longitude ?? null;
     let locationSource = oldMachine.locationSource || 'NONE';
     let locationStatus = oldMachine.locationStatus || (lat !== null && lng !== null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED');
     let locationNote = data.locationNote !== undefined ? data.locationNote : (oldMachine.locationNote || '');
 
-    const locationChanged =
-      data.latitude !== undefined ||
-      data.longitude !== undefined ||
-      data.locationSource !== undefined ||
-      data.locationNote !== undefined;
-
-    if (data.latitude !== undefined || data.longitude !== undefined) {
-      const isNewLatNum = typeof data.latitude === 'number' && !isNaN(data.latitude);
-      const isNewLngNum = typeof data.longitude === 'number' && !isNaN(data.longitude);
-
-      if (isNewLatNum && isNewLngNum) {
+    if (coordinatesActuallyChanged) {
+      if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         lat = Number(data.latitude.toFixed(6));
         lng = Number(data.longitude.toFixed(6));
         locationSource = data.locationSource || 'MANUAL_ENTRY';
         locationStatus = 'GPS_CONFIGURED';
-      } else if (data.latitude === null || data.longitude === null) {
+      } else {
         lat = null;
         lng = null;
         locationSource = 'NONE';
         locationStatus = 'LOCATION_NOT_CONFIGURED';
       }
-    } else if (data.locationSource !== undefined) {
+    } else if (data.locationSource !== undefined && (lat !== null && lng !== null)) {
       locationSource = data.locationSource;
     }
+
+    const locationNoteChanged = data.locationNote !== undefined && data.locationNote !== (oldMachine.locationNote || '');
 
     // Resolve locationId if updated
     let currentLocation = oldMachine.currentLocation;
@@ -3000,7 +3080,7 @@ async function startServer() {
     let finalLocationUpdatedAt: string | null = null;
     if (lat === null || lng === null) {
       finalLocationUpdatedAt = null;
-    } else if (locationChanged) {
+    } else if (coordinatesActuallyChanged) {
       finalLocationUpdatedAt = now;
     } else {
       finalLocationUpdatedAt = oldMachine.locationUpdatedAt || null;
@@ -3029,11 +3109,20 @@ async function startServer() {
     };
     store.machines[idx] = updated;
 
-    if (locationChanged) {
+    if (coordinatesActuallyChanged) {
+      const prevHadCoords = oldMachine.latitude !== null && oldMachine.latitude !== undefined &&
+                            oldMachine.longitude !== null && oldMachine.longitude !== undefined;
+      const newHasCoords = lat !== null && lng !== null;
+
+      let action = 'MACHINE_LOCATION_UPDATED';
+      if (prevHadCoords && !newHasCoords) {
+        action = 'MACHINE_LOCATION_CLEARED';
+      }
+
       if (!Array.isArray(store.auditLogs)) store.auditLogs = [];
       store.auditLogs.unshift({
         id: `aud-${Date.now()}`,
-        action: 'MACHINE_LOCATION_UPDATED',
+        action,
         entityName: 'Machine',
         entityId: updated.machineNumber,
         userName: data.locationUpdatedByActorName || 'Super Administrator',

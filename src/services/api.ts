@@ -2356,8 +2356,31 @@ export const api = {
           }
         }
 
-        const isClearingGps = updates.latitude === null && updates.longitude === null;
-        const isSettingGps = typeof updates.latitude === 'number' && typeof updates.longitude === 'number';
+        const prevHadGps = oldMachine.latitude !== null && oldMachine.latitude !== undefined &&
+                            oldMachine.longitude !== null && oldMachine.longitude !== undefined;
+        const hasCoordsPayload = updates.latitude !== undefined || updates.longitude !== undefined;
+
+        let coordinatesActuallyChanged = false;
+        if (hasCoordsPayload) {
+          const isBothNull = updates.latitude === null && updates.longitude === null;
+          if (isBothNull && !prevHadGps) {
+            coordinatesActuallyChanged = false;
+          } else if (
+            typeof updates.latitude === 'number' &&
+            typeof updates.longitude === 'number' &&
+            typeof oldMachine.latitude === 'number' &&
+            typeof oldMachine.longitude === 'number'
+          ) {
+            coordinatesActuallyChanged =
+              Number(updates.latitude.toFixed(6)) !== Number(oldMachine.latitude.toFixed(6)) ||
+              Number(updates.longitude.toFixed(6)) !== Number(oldMachine.longitude.toFixed(6));
+          } else {
+            coordinatesActuallyChanged = true;
+          }
+        }
+
+        const isClearingGps = coordinatesActuallyChanged && prevHadGps && updates.latitude === null && updates.longitude === null;
+        const isSettingGps = coordinatesActuallyChanged && typeof updates.latitude === 'number' && typeof updates.longitude === 'number';
 
         let newLocationSource = oldMachine.locationSource || 'NONE';
         let newLocationStatus = oldMachine.locationStatus || (oldMachine.latitude != null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED');
@@ -2366,7 +2389,7 @@ export const api = {
         if (isClearingGps) {
           newLocationSource = 'NONE';
           newLocationStatus = 'LOCATION_NOT_CONFIGURED';
-          newLocationUpdatedAt = new Date().toISOString();
+          newLocationUpdatedAt = null;
         } else if (isSettingGps) {
           newLocationSource = updates.locationSource || 'MANUAL_ENTRY';
           newLocationStatus = 'GPS_CONFIGURED';
@@ -3466,48 +3489,63 @@ export const api = {
       if (updates.address !== undefined) bld.address = updates.address.trim();
       if (updates.isActive !== undefined) bld.isActive = updates.isActive;
 
-      const locationChanged =
-        updates.latitude !== undefined ||
-        updates.longitude !== undefined ||
-        updates.locationSource !== undefined ||
-        updates.locationNote !== undefined;
+      const hadCoords = oldValues.latitude !== null && oldValues.latitude !== undefined &&
+                        oldValues.longitude !== null && oldValues.longitude !== undefined;
+      const hasCoordsPayload = updates.latitude !== undefined || updates.longitude !== undefined;
 
-      if (updates.latitude !== undefined || updates.longitude !== undefined) {
-        const isLatNum = typeof updates.latitude === 'number' && !isNaN(updates.latitude);
-        const isLngNum = typeof updates.longitude === 'number' && !isNaN(updates.longitude);
+      let coordinatesActuallyChanged = false;
+      if (hasCoordsPayload) {
+        const isBothNull = updates.latitude === null && updates.longitude === null;
+        if (isBothNull && !hadCoords) {
+          coordinatesActuallyChanged = false;
+        } else if (
+          typeof updates.latitude === 'number' &&
+          typeof updates.longitude === 'number' &&
+          typeof oldValues.latitude === 'number' &&
+          typeof oldValues.longitude === 'number'
+        ) {
+          coordinatesActuallyChanged =
+            Number(updates.latitude.toFixed(6)) !== Number(oldValues.latitude.toFixed(6)) ||
+            Number(updates.longitude.toFixed(6)) !== Number(oldValues.longitude.toFixed(6));
+        } else {
+          coordinatesActuallyChanged = true;
+        }
+      }
+
+      if (coordinatesActuallyChanged) {
+        const isLatNum = typeof updates.latitude === 'number' && !isNaN(updates.latitude) && isFinite(updates.latitude);
+        const isLngNum = typeof updates.longitude === 'number' && !isNaN(updates.longitude) && isFinite(updates.longitude);
         if (isLatNum && isLngNum) {
           bld.latitude = Number(updates.latitude.toFixed(6));
           bld.longitude = Number(updates.longitude.toFixed(6));
           bld.locationSource = updates.locationSource || 'MANUAL_ENTRY';
           bld.locationStatus = 'GPS_CONFIGURED';
+          bld.locationUpdatedAt = new Date().toISOString();
         } else {
           bld.latitude = null;
           bld.longitude = null;
           bld.locationSource = 'NONE';
           bld.locationStatus = 'LOCATION_NOT_CONFIGURED';
+          bld.locationUpdatedAt = null;
         }
-      } else if (updates.locationSource !== undefined) {
+      } else if (updates.locationSource !== undefined && (bld.latitude !== null && bld.longitude !== null)) {
         bld.locationSource = updates.locationSource;
       }
 
       if (updates.locationNote !== undefined) bld.locationNote = updates.locationNote;
-      if (locationChanged) {
-        bld.locationUpdatedAt = new Date().toISOString();
-        bld.locationUpdatedByActorName = updates.locationUpdatedByActorName || 'Super Administrator';
-      }
+      if (updates.locationUpdatedByActorName) bld.locationUpdatedByActorName = updates.locationUpdatedByActorName;
 
       bld.updatedAt = new Date().toISOString();
 
       // Audit location change specifically if location changed
-      if (locationChanged) {
-        const hadCoords = oldValues.latitude !== null && oldValues.latitude !== undefined && oldValues.longitude !== null && oldValues.longitude !== undefined;
+      if (coordinatesActuallyChanged) {
         const hasCoords = bld.latitude !== null && bld.longitude !== null;
         let auditAction = 'BUILDING_LOCATION_MANUALLY_UPDATED';
         if (hadCoords && !hasCoords) {
           auditAction = 'BUILDING_LOCATION_CLEARED';
         } else if (bld.locationSource === 'DEVICE_GPS') {
           auditAction = 'BUILDING_LOCATION_DEVICE_GPS_UPDATED';
-        } else if (bld.locationSource === 'MAP_PICKER') {
+        } else if (bld.locationSource === 'MAP_PICKER' || bld.locationSource === 'MAP_SELECTION') {
           auditAction = 'BUILDING_LOCATION_MAP_UPDATED';
         }
 
