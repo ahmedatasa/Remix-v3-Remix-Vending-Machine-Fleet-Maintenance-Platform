@@ -19,7 +19,7 @@ async function runTests() {
 
   // TEST 1: Coordinate Pair Validation & Anti-Coercion
   console.log('--- TEST 1: Coordinate Pair Validation & Anti-Coercion ---');
-  
+
   // Valid coordinate cases
   const valid1 = validateCoordinates(24.7136, 46.6753);
   assert(valid1.isValid && valid1.latitude === 24.7136 && valid1.longitude === 46.6753, 'Valid Riyadh coordinates pass');
@@ -165,7 +165,7 @@ async function runTests() {
   }
 
   assert(coordinatesActuallyChanged === false, 'Unrelated edit with both null coordinates reports coordinatesActuallyChanged = false');
-  
+
   if (!coordinatesActuallyChanged) {
     // Keep location fields unchanged
     assert(m1.latitude === null && m1.longitude === null, 'Coordinates remain null');
@@ -182,7 +182,7 @@ async function runTests() {
 
   const isBothNum = typeof newCoordsPayload.latitude === 'number' && typeof newCoordsPayload.longitude === 'number';
   assert(isBothNum, 'New map picker coordinates are numbers');
-  
+
   m1.latitude = newCoordsPayload.latitude;
   m1.longitude = newCoordsPayload.longitude;
   m1.locationSource = normalizeExplicitLocationSource(newCoordsPayload.locationSource);
