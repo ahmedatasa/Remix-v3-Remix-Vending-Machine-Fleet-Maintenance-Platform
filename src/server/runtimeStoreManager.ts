@@ -60,8 +60,8 @@ function createEmptyRuntimeStore(storeId?: string): RuntimeStoreData {
     initialized: true,
     _persistence: {
       initialized: true,
-      schemaVersion: 3,
-      version: '5.4.4',
+      schemaVersion: 4,
+      version: '5.4.5A',
       initializedAt: now,
       baselineImportedAt: null,
       legacyMigrationCompletedAt: null,
@@ -234,7 +234,45 @@ export class RuntimeStoreManager {
         migratedStore.partRequests = normalizeEntityRevisions(Array.isArray(legacyData.partRequests) ? legacyData.partRequests : []);
         migratedStore.transactions = normalizeEntityRevisions(Array.isArray(legacyData.transactions) ? legacyData.transactions : []);
         migratedStore.users = normalizeEntityRevisions(Array.isArray(legacyData.users) ? legacyData.users : []);
-        migratedStore.auditLogs = Array.isArray(legacyData.auditLogs) ? legacyData.auditLogs : [];
+        migratedStore.auditLogs = Array.isArray(legacyData.auditLogs) ? [...legacyData.auditLogs] : [];
+
+        // Phase 5.4.5C: Persist exactly ONE batch audit event if legacy migration cleared synthetic GPS
+        if (gpsSummary.syntheticCleared > 0) {
+          const migrationTimestamp = new Date().toISOString();
+          const migrationSourceSafe = path.basename(legacyPath);
+          const alreadyAudited = migratedStore.auditLogs.some(
+            (a: any) => a.action === 'SYNTHETIC_GPS_CLEARED' || a.action === 'LEGACY_SYNTHETIC_GPS_PURGED'
+          );
+          if (!alreadyAudited) {
+            migratedStore.auditLogs.push({
+              id: `adt-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+              timestamp: migrationTimestamp,
+              createdAt: migrationTimestamp,
+              actor: 'SYSTEM',
+              actorType: 'SYSTEM',
+              actorName: 'SYSTEM_SANITIZER',
+              category: 'INTEGRITY_AUDIT',
+              action: 'SYNTHETIC_GPS_CLEARED',
+              entity: 'FLEET',
+              entityType: 'FLEET',
+              entityId: 'FLEET',
+              result: 'SUCCESS',
+              details: {
+                syntheticCleared: gpsSummary.syntheticCleared,
+                realGpsPreserved: gpsSummary.realGpsPreserved,
+                schemaVersion: 4,
+                migrationSource: migrationSourceSafe,
+                timestamp: migrationTimestamp
+              },
+              metadata: {
+                ...gpsSummary,
+                schemaVersion: 4,
+                migrationSource: migrationSourceSafe
+              }
+            });
+          }
+        }
+
         migratedStore.importBatches = Array.isArray(legacyData.importBatches) ? legacyData.importBatches : [];
         migratedStore.importRows = Array.isArray(legacyData.importRows) ? legacyData.importRows : [];
         migratedStore.settings = { ...DEFAULT_SETTINGS, ...(legacyData.settings || {}) };
@@ -411,6 +449,39 @@ export class RuntimeStoreManager {
             if (loadGpsSummary.syntheticCleared > 0) {
               console.log(`[Persistence] Sanitized ${loadGpsSummary.syntheticCleared} legacy synthetic machine GPS on startup.`);
               needsPersist = true;
+              if (Array.isArray(parsed.auditLogs)) {
+                const alreadyAudited = parsed.auditLogs.some(
+                  (a: any) => a.action === 'SYNTHETIC_GPS_CLEARED' || a.action === 'LEGACY_SYNTHETIC_GPS_PURGED'
+                );
+                if (!alreadyAudited) {
+                  const nowTs = new Date().toISOString();
+                  parsed.auditLogs.push({
+                    id: `adt-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+                    timestamp: nowTs,
+                    createdAt: nowTs,
+                    actor: 'SYSTEM',
+                    actorType: 'SYSTEM',
+                    actorName: 'SYSTEM_SANITIZER',
+                    category: 'INTEGRITY_AUDIT',
+                    action: 'SYNTHETIC_GPS_CLEARED',
+                    entity: 'FLEET',
+                    entityType: 'FLEET',
+                    entityId: 'FLEET',
+                    result: 'SUCCESS',
+                    details: {
+                      syntheticCleared: loadGpsSummary.syntheticCleared,
+                      realGpsPreserved: loadGpsSummary.realGpsPreserved,
+                      schemaVersion: 4,
+                      migrationSource: 'fleet_runtime_data.json',
+                      timestamp: nowTs
+                    },
+                    metadata: {
+                      ...loadGpsSummary,
+                      schemaVersion: 4
+                    }
+                  });
+                }
+              }
             }
 
             parsed.initialized = true;
@@ -484,14 +555,32 @@ export class RuntimeStoreManager {
           (a: any) => a.action === 'SYNTHETIC_GPS_CLEARED' || a.action === 'LEGACY_SYNTHETIC_GPS_PURGED'
         );
         if (!alreadyAudited) {
+          const nowTs = new Date().toISOString();
+          const migrationSourceSafe = store._persistence?.migrationSource ? path.basename(store._persistence.migrationSource) : 'fleet_data.json';
           store.auditLogs.push({
             id: `adt-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
-            timestamp: new Date().toISOString(),
-            actor: 'SYSTEM_SANITIZER',
+            timestamp: nowTs,
+            createdAt: nowTs,
+            actor: 'SYSTEM',
+            actorType: 'SYSTEM',
+            actorName: 'SYSTEM_SANITIZER',
             category: 'INTEGRITY_AUDIT',
             action: 'SYNTHETIC_GPS_CLEARED',
-            details: `Cleared ${summary.syntheticCleared} legacy synthetic GPS coordinates. Preserved ${summary.realGpsPreserved} legitimate coordinates.`,
-            metadata: summary
+            entity: 'FLEET',
+            entityType: 'FLEET',
+            entityId: 'FLEET',
+            result: 'SUCCESS',
+            details: {
+              syntheticCleared: summary.syntheticCleared,
+              realGpsPreserved: summary.realGpsPreserved,
+              schemaVersion: store._persistence?.schemaVersion || 4,
+              migrationSource: migrationSourceSafe,
+              timestamp: nowTs
+            },
+            metadata: {
+              ...summary,
+              schemaVersion: store._persistence?.schemaVersion || 4
+            }
           });
         }
       }
@@ -665,13 +754,18 @@ export class RuntimeStoreManager {
 
   private logStartupDiagnostics(legacyMigrationStatus: string, baselineImportStatus: string): void {
     const stats = this.getStats();
+    const metadata = this.getMetadata();
+    const schemaVersion = metadata?.schemaVersion ?? 4;
+    const persistenceVersion = metadata?.version ?? '5.4.5A';
+
     console.log('======================================================================');
-    console.log('PHASE 5.4.4: AUTHORITATIVE RUNTIME STORE INITIALIZED');
+    console.log('AUTHORITATIVE RUNTIME STORE INITIALIZED');
     console.log('======================================================================');
     console.log(`Runtime data directory: ${this.getRuntimeDataDir()}`);
     console.log(`Runtime data file:      ${this.getRuntimeDataPath()}`);
     console.log(`Runtime initialized:    YES`);
-    console.log(`Schema version:         3`);
+    console.log(`Schema version:         ${schemaVersion}`);
+    console.log(`Persistence version:    ${persistenceVersion}`);
     console.log(`Legacy migration:       ${legacyMigrationStatus}`);
     console.log(`Baseline import:        ${baselineImportStatus}`);
     console.log(`Machine count:          ${stats.machinesCount}`);

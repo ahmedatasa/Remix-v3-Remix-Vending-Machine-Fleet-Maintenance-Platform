@@ -102,6 +102,9 @@ export function resolveBackupsDir(): string {
  * Used ONLY for one-time legacy migration.
  */
 export function resolveLegacyDataPath(): string {
+  if (process.env.VENDING_LEGACY_DATA_PATH && process.env.VENDING_LEGACY_DATA_PATH.trim().length > 0) {
+    return path.resolve(process.env.VENDING_LEGACY_DATA_PATH.trim());
+  }
   return path.join(process.cwd(), 'fleet_data.json');
 }
 

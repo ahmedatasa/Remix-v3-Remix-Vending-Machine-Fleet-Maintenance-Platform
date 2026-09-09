@@ -256,31 +256,39 @@ async function runTestSuite() {
     // TEST 10: One-Time Legacy Migration Engine
     // ------------------------------------------------------------------
     console.log('\n--- TEST 10: Legacy Migration Engine ---');
-    // Create another isolated directory to test fresh migration from legacy fleet_data.json
-    const migrationSandboxDir = path.join(os.tmpdir(), `vending-test-migration-${Date.now()}`);
-    fs.mkdirSync(migrationSandboxDir, { recursive: true });
-    process.env.VENDING_DATA_DIR = migrationSandboxDir;
+    let migrationSandboxDir: string | null = null;
+    try {
+      migrationSandboxDir = path.join(os.tmpdir(), `vending-test-migration-${Date.now()}`);
+      fs.mkdirSync(migrationSandboxDir, { recursive: true });
+      process.env.VENDING_DATA_DIR = migrationSandboxDir;
 
-    RuntimeStoreManager.resetInstance();
-    const migrationManager = RuntimeStoreManager.getInstance();
+      RuntimeStoreManager.resetInstance();
+      const migrationManager = RuntimeStoreManager.getInstance();
 
-    // Call migrateLegacyStore
-    const migrationResult = migrationManager.migrateLegacyStore();
-    assert(migrationResult.migrated === true, 'Legacy migration executed successfully');
-    assert(migrationResult.status === 'COMPLETE', 'Migration status is COMPLETE');
-    assert(fs.existsSync(migrationManager.getRuntimeDataPath()), 'Migrated fleet_runtime_data.json created');
+      // Call migrateLegacyStore
+      const migrationResult = migrationManager.migrateLegacyStore();
+      assert(migrationResult.migrated === true, 'Legacy migration executed successfully');
+      assert(migrationResult.status === 'COMPLETE', 'Migration status is COMPLETE');
+      assert(fs.existsSync(migrationManager.getRuntimeDataPath()), 'Migrated fleet_runtime_data.json created');
 
-    const migratedStore = migrationManager.load();
-    assert(migratedStore.machines.length === 189, `189 machines migrated from legacy data (got ${migratedStore.machines.length})`);
-    const legacyExpectedTickets = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fleet_data.json'), 'utf8')).tickets?.length || 15;
-    assert(migratedStore.tickets.length === legacyExpectedTickets, `All ${legacyExpectedTickets} operational tickets migrated from legacy data (got ${migratedStore.tickets.length})`);
-    assert(migratedStore._persistence.legacyMigrationCompletedAt !== null, 'legacyMigrationCompletedAt recorded in metadata');
-    assert(migratedStore._persistence.schemaVersion >= 3, 'Migrated schema version upgraded to >= 3');
+      const migratedStore = migrationManager.load();
+      assert(migratedStore.machines.length === 189, `189 machines migrated from legacy data (got ${migratedStore.machines.length})`);
+      const legacyExpectedTickets = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'fleet_data.json'), 'utf8')).tickets?.length || 15;
+      assert(migratedStore.tickets.length === legacyExpectedTickets, `All ${legacyExpectedTickets} operational tickets migrated from legacy data (got ${migratedStore.tickets.length})`);
+      assert(migratedStore._persistence.legacyMigrationCompletedAt !== null, 'legacyMigrationCompletedAt recorded in metadata');
+      assert(migratedStore._persistence.schemaVersion >= 3, 'Migrated schema version upgraded to >= 3');
 
-    // Re-running migration is idempotent and skipped
-    const secondMigration = migrationManager.migrateLegacyStore();
-    assert(secondMigration.migrated === false, 'Subsequent migration skipped because runtime store is already initialized');
-    assert(secondMigration.status === 'SKIPPED_ALREADY_INITIALIZED', 'Idempotent migration status SKIPPED_ALREADY_INITIALIZED');
+      // Re-running migration is idempotent and skipped
+      const secondMigration = migrationManager.migrateLegacyStore();
+      assert(secondMigration.migrated === false, 'Subsequent migration skipped because runtime store is already initialized');
+      assert(secondMigration.status === 'SKIPPED_ALREADY_INITIALIZED', 'Idempotent migration status SKIPPED_ALREADY_INITIALIZED');
+    } finally {
+      if (migrationSandboxDir) {
+        try {
+          fs.rmSync(migrationSandboxDir, { recursive: true, force: true });
+        } catch {}
+      }
+    }
 
     console.log('\n======================================================================');
     console.log(`ALL ASSERTIONS PASSED: ${passedAssertions} / ${totalAssertions} assertions verified`);
