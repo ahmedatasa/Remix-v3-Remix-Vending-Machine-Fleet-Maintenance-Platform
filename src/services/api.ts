@@ -7,6 +7,7 @@ import {
   MaintenanceAction, TicketAttachment, TicketNote, TicketTimelineItem, TechnicianKPIs,
   InventoryTransactionType, TransactionType, MachinePartHistoryRecord, PartUsageRecord
 } from '../types';
+import { normalizeExplicitLocationSource } from '../utils/geoValidation';
 
 const API_BASE_URL = '/api/v1';
 
@@ -2286,7 +2287,7 @@ export const api = {
         importProvenance: machine.importProvenance,
         latitude: machine.latitude !== undefined ? machine.latitude : null,
         longitude: machine.longitude !== undefined ? machine.longitude : null,
-        locationSource: machine.latitude != null && machine.longitude != null ? (machine.locationSource || 'MANUAL_ENTRY') : 'NONE',
+        locationSource: machine.latitude != null && machine.longitude != null ? normalizeExplicitLocationSource(machine.locationSource || 'MANUAL_ENTRY') : 'NONE',
         locationStatus: machine.latitude != null && machine.longitude != null ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED',
         locationNote: machine.locationNote || '',
         locationUpdatedAt: machine.latitude != null && machine.longitude != null ? new Date().toISOString() : undefined,
@@ -2391,7 +2392,7 @@ export const api = {
           newLocationStatus = 'LOCATION_NOT_CONFIGURED';
           newLocationUpdatedAt = null;
         } else if (isSettingGps) {
-          newLocationSource = updates.locationSource || 'MANUAL_ENTRY';
+          newLocationSource = normalizeExplicitLocationSource(updates.locationSource || 'MANUAL_ENTRY');
           newLocationStatus = 'GPS_CONFIGURED';
           newLocationUpdatedAt = new Date().toISOString();
         }
@@ -3394,7 +3395,7 @@ export const api = {
         address: building.address,
         latitude: typeof building.latitude === 'number' ? building.latitude : null,
         longitude: typeof building.longitude === 'number' ? building.longitude : null,
-        locationSource: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? (building.locationSource || 'MANUAL_ENTRY') : 'NONE',
+        locationSource: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? normalizeExplicitLocationSource(building.locationSource || 'MANUAL_ENTRY') : 'NONE',
         locationStatus: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED',
         locationNote: building.locationNote || '',
         locationUpdatedAt: typeof building.latitude === 'number' && typeof building.longitude === 'number' ? new Date().toISOString() : undefined,
@@ -3518,7 +3519,7 @@ export const api = {
         if (isLatNum && isLngNum) {
           bld.latitude = Number(updates.latitude.toFixed(6));
           bld.longitude = Number(updates.longitude.toFixed(6));
-          bld.locationSource = updates.locationSource || 'MANUAL_ENTRY';
+          bld.locationSource = normalizeExplicitLocationSource(updates.locationSource || 'MANUAL_ENTRY');
           bld.locationStatus = 'GPS_CONFIGURED';
           bld.locationUpdatedAt = new Date().toISOString();
         } else {
@@ -3528,8 +3529,6 @@ export const api = {
           bld.locationStatus = 'LOCATION_NOT_CONFIGURED';
           bld.locationUpdatedAt = null;
         }
-      } else if (updates.locationSource !== undefined && (bld.latitude !== null && bld.longitude !== null)) {
-        bld.locationSource = updates.locationSource;
       }
 
       if (updates.locationNote !== undefined) bld.locationNote = updates.locationNote;

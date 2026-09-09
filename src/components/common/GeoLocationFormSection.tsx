@@ -409,7 +409,7 @@ export const GeoLocationFormSection: React.FC<GeoLocationFormSectionProps> = ({
             onCoordinatesChange({
               latitude: coords.latitude,
               longitude: coords.longitude,
-              source: coords.source || 'MAP_PICKER'
+              source: coords.source || 'MAP_SELECTION'
             });
           }
         }}

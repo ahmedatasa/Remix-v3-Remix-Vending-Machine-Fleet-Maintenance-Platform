@@ -43,6 +43,7 @@ import {
 } from './src/server/runtimePathResolver';
 import { mergeFleetSyncPayload } from './src/server/syncMergeEngine';
 import { SystemSettings, RuntimeStoreData } from './src/server/runtimeStoreTypes';
+import { normalizeExplicitLocationSource } from './src/utils/geoValidation';
 
 export type { SystemSettings, RuntimeStoreData };
 
@@ -677,7 +678,7 @@ async function startServer() {
     // Ensure normalized location fields overwrite raw spread data
     newBld.latitude = lat;
     newBld.longitude = lng;
-    newBld.locationSource = hasGps ? (data.locationSource || 'MANUAL_ENTRY') : 'NONE';
+    newBld.locationSource = hasGps ? normalizeExplicitLocationSource(data.locationSource || 'MANUAL_ENTRY') : 'NONE';
     newBld.locationStatus = hasGps ? 'GPS_CONFIGURED' : 'LOCATION_NOT_CONFIGURED';
 
     if (!store.buildings) store.buildings = [];
@@ -686,9 +687,9 @@ async function startServer() {
     // Audit initial location if configured
     if (hasGps) {
       if (!store.auditLogs) store.auditLogs = [];
-      const auditAction = data.locationSource === 'DEVICE_GPS'
+      const auditAction = newBld.locationSource === 'DEVICE_GPS'
         ? 'BUILDING_LOCATION_DEVICE_GPS_UPDATED'
-        : data.locationSource === 'MAP_PICKER'
+        : (newBld.locationSource === 'MAP_PICKER' || newBld.locationSource === 'MAP_SELECTION')
         ? 'BUILDING_LOCATION_MAP_UPDATED'
         : 'BUILDING_LOCATION_MANUALLY_UPDATED';
 
@@ -781,7 +782,7 @@ async function startServer() {
       if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         lat = Number(data.latitude.toFixed(6));
         lng = Number(data.longitude.toFixed(6));
-        locationSource = data.locationSource || 'MANUAL_ENTRY';
+        locationSource = normalizeExplicitLocationSource(data.locationSource || 'MANUAL_ENTRY');
         locationStatus = 'GPS_CONFIGURED';
       } else {
         lat = null;
@@ -789,8 +790,6 @@ async function startServer() {
         locationSource = 'NONE';
         locationStatus = 'LOCATION_NOT_CONFIGURED';
       }
-    } else if (data.locationSource !== undefined && (lat !== null && lng !== null)) {
-      locationSource = data.locationSource;
     }
 
     const locationNoteChanged = data.locationNote !== undefined && data.locationNote !== (oldBld.locationNote || '');
@@ -2902,7 +2901,7 @@ async function startServer() {
       lat = Number(providedLat.toFixed(6));
       lng = Number(providedLng.toFixed(6));
       locationStatus = data.locationStatus || 'GPS_CONFIGURED';
-      locationSource = data.locationSource || 'MANUAL_ENTRY';
+      locationSource = normalizeExplicitLocationSource(data.locationSource || 'MANUAL_ENTRY');
       locationUpdatedAt = now;
     }
 
@@ -3053,7 +3052,7 @@ async function startServer() {
       if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         lat = Number(data.latitude.toFixed(6));
         lng = Number(data.longitude.toFixed(6));
-        locationSource = data.locationSource || 'MANUAL_ENTRY';
+        locationSource = normalizeExplicitLocationSource(data.locationSource || 'MANUAL_ENTRY');
         locationStatus = 'GPS_CONFIGURED';
       } else {
         lat = null;
@@ -3061,8 +3060,6 @@ async function startServer() {
         locationSource = 'NONE';
         locationStatus = 'LOCATION_NOT_CONFIGURED';
       }
-    } else if (data.locationSource !== undefined && (lat !== null && lng !== null)) {
-      locationSource = data.locationSource;
     }
 
     const locationNoteChanged = data.locationNote !== undefined && data.locationNote !== (oldMachine.locationNote || '');

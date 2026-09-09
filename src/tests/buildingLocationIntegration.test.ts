@@ -110,8 +110,8 @@ async function runBuildingLocationTests() {
       'Building locationStatus is GPS_CONFIGURED'
     );
     assert(
-      bldWithGps.locationSource === 'MAP_PICKER',
-      'Building locationSource persisted as MAP_PICKER'
+      bldWithGps.locationSource === 'MAP_SELECTION',
+      'Building locationSource normalized from legacy MAP_PICKER to MAP_SELECTION'
     );
     assert(
       bldWithGps.locationNote === 'Pin placed precisely at main rotunda entrance',

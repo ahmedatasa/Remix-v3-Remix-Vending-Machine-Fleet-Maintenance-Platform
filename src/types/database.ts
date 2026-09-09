@@ -226,8 +226,8 @@ export interface ChronicFailureConfig {
 export type LocationSource =
   | 'NONE'
   | 'MANUAL_ENTRY'
-  | 'MAP_PICKER'
-  | 'MAP_SELECTION'
+  | 'MAP_PICKER' // Legacy compatibility only (deprecated: normalized to MAP_SELECTION on write)
+  | 'MAP_SELECTION' // Canonical map-selection source
   | 'DEVICE_GPS'
   | 'TECHNICIAN_PROPOSAL_APPROVED'
   | 'BUILDING_LOCATION_REFERENCE'

@@ -3,6 +3,8 @@
  * Shared validation rules across Machines, Buildings, and Field Operations.
  */
 
+import type { LocationSource } from '../types/database';
+
 export interface GeoCoordinatesValidationResult {
   isValid: boolean;
   valid: boolean;
@@ -137,4 +139,17 @@ export function formatCoordinates(lat: number | null | undefined, lng: number | 
     return 'غير محدد';
   }
   return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+/**
+ * Normalizes an explicitly provided LocationSource for a NEW location write.
+ * MAP_PICKER is accepted as a backward-compatible legacy alias and normalized to MAP_SELECTION.
+ * Non-map sources (e.g. DEVICE_GPS, MANUAL_ENTRY, NONE) remain unchanged.
+ */
+export function normalizeExplicitLocationSource(source?: LocationSource | string | null): LocationSource {
+  if (!source) return 'NONE';
+  if (source === 'MAP_PICKER' || source === 'MAP_SELECTION') {
+    return 'MAP_SELECTION';
+  }
+  return source as LocationSource;
 }
