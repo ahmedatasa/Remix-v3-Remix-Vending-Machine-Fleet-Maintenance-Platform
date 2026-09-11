@@ -191,10 +191,9 @@ async function startServer() {
   app.use('/sync', cloudProxy);
   app.use('/cloud-api', cloudProxy);
 
-  // Mount Hybrid Cloud Operations router as fallback/direct integration
+  // Initialize Hybrid Cloud Operations router; mount occurs after auth gate
   const hybridRouter = createHybridRouter(getStore, saveStore);
   initHybridFleetMigration(getStore(), saveStore);
-  apiRouter.use(hybridRouter);
 
   // Server-authoritative authentication middleware and enterprise RBAC guard
   const requireAuth = createRequireAuth(getStore);
@@ -222,14 +221,68 @@ async function startServer() {
       return next();
     }
 
-    // M2M Sync endpoints with dedicated HMAC / sync secret checks
-    if (p === '/sync/push' || p === '/sync/pending' || p === '/sync/acknowledge') {
-      return next();
-    }
+    // /api*/sync/* are administrative UI endpoints and require
+    // the authenticated main-server user session.
+    // Real Desktop M2M sync uses the top-level /sync Cloud proxy.
 
     // All administrative routes require valid user session
     return requireAuth(req, res, next);
   });
+
+  // Hybrid routes are mounted only after the authoritative auth gate.
+  // Public/technician paths are explicitly exempted above.
+  apiRouter.use((req, res, next) => {
+    const rawPath = req.path || '';
+    const p = (rawPath.replace(/^\/v1/, '') || '/').replace(/\/+$/, '') || '/';
+
+    // Public and technician routes keep their dedicated security model.
+    if (p.startsWith('/public') || p.startsWith('/technician/')) {
+      return next();
+    }
+
+    // Maintenance-management workflows.
+    if (
+      /^\/admin\/tickets\/[^/]+\/(verify|close)$/.test(p) ||
+      /^\/admin\/machines\/[^/]+\/regenerate-qr-token$/.test(p)
+    ) {
+      return requireEnterpriseRole([
+        'SUPER_ADMIN',
+        'ADMIN',
+        'MAINTENANCE_MANAGER'
+      ])(req, res, next);
+    }
+
+    // Warehouse / part-request administrative workflows.
+    if (p.startsWith('/admin/part-requests/')) {
+      return requireEnterpriseRole([
+        'SUPER_ADMIN',
+        'ADMIN',
+        'MAINTENANCE_MANAGER',
+        'WAREHOUSE',
+        'WAREHOUSE_OFFICER'
+      ])(req, res, next);
+    }
+
+    // System/cloud settings and UI-driven sync operations are admin-only.
+    if (p === '/admin/cloud-settings' || p.startsWith('/sync/')) {
+      return requireEnterpriseRole([
+        'SUPER_ADMIN',
+        'ADMIN'
+      ])(req, res, next);
+    }
+
+    // Any other Hybrid /admin route defaults to system administrators only.
+    if (p.startsWith('/admin/')) {
+      return requireEnterpriseRole([
+        'SUPER_ADMIN',
+        'ADMIN'
+      ])(req, res, next);
+    }
+
+    return next();
+  });
+
+  apiRouter.use(hybridRouter);
 
   // Health
   apiRouter.get('/health', (req, res) => {

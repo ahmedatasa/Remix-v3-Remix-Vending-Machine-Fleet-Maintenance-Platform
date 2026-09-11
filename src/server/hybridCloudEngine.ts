@@ -283,7 +283,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.get('/public/config', handlePublicConfig);
-  router.get('/api/v1/public/config', handlePublicConfig);
 
   /**
    * Public Machine Lookup by Opaque Token
@@ -310,7 +309,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
   };
   router.get('/public/m/:token', handlePublicMachineLookup);
   router.get('/public/machine/:token', handlePublicMachineLookup);
-  router.get('/api/v1/public/m/:token', handlePublicMachineLookup);
 
   /**
    * Public Customer Fault Report Submission
@@ -471,7 +469,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
   };
   router.post('/public/m/:token/report', customerReportLimiter, handlePublicFaultReport);
   router.post('/public/submit-qr-fault', customerReportLimiter, handlePublicFaultReport);
-  router.post('/api/v1/public/m/:token/report', customerReportLimiter, handlePublicFaultReport);
 
   /**
    * Public Ticket Status Tracking
@@ -508,7 +505,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     res.json(sanitized);
   };
   router.get('/public/ticket/:trackingToken', ticketTrackingLimiter, handlePublicTicketTracking);
-  router.get('/api/v1/public/ticket/:trackingToken', ticketTrackingLimiter, handlePublicTicketTracking);
 
   // =========================================================================
   // 2. TECHNICIAN AUTHENTICATION & MOBILE SESSIONS
@@ -648,7 +644,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/technician/login', technicianLoginLimiter, handleTechnicianLogin);
-  router.post('/api/v1/technician/login', technicianLoginLimiter, handleTechnicianLogin);
 
   /**
    * Middleware to require authenticated technician session
@@ -1009,7 +1004,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/technician/checkin', requireTechnicianAuth, technicianCheckinLimiter, handleTechnicianCheckin);
-  router.post('/api/v1/technician/checkin', requireTechnicianAuth, technicianCheckinLimiter, handleTechnicianCheckin);
 
   /**
    * Upload Maintenance Evidence (Photo / Test Record)
@@ -1096,7 +1090,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     }
   };
   router.post('/technician/evidence', requireTechnicianAuth, handleTechnicianEvidence);
-  router.post('/api/v1/technician/evidence', requireTechnicianAuth, handleTechnicianEvidence);
 
   /**
    * Record Functional Test
@@ -1159,7 +1152,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/technician/functional-test', requireTechnicianAuth, handleFunctionalTest);
-  router.post('/api/v1/technician/functional-test', requireTechnicianAuth, handleFunctionalTest);
 
   /**
    * Record Maintenance Action
@@ -1231,7 +1223,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/technician/action', requireTechnicianAuth, handleTechnicianAction);
-  router.post('/api/v1/technician/action', requireTechnicianAuth, handleTechnicianAction);
 
   /**
    * Request Spare Part
@@ -1331,7 +1322,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/technician/request-part', requireTechnicianAuth, handleTechnicianPartRequest);
-  router.post('/api/v1/technician/request-part', requireTechnicianAuth, handleTechnicianPartRequest);
 
   /**
    * Complete & Resolve Ticket
@@ -1412,7 +1402,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/technician/resolve', requireTechnicianAuth, handleTechnicianResolve);
-  router.post('/api/v1/technician/resolve', requireTechnicianAuth, handleTechnicianResolve);
 
   // =========================================================================
   // 3. ADMIN & MANAGEMENT WORKFLOWS (Manager Verification, Warehouse Issuing)
@@ -1458,7 +1447,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     res.json({ success: true, ticket });
   };
   router.post('/admin/tickets/:id/verify', handleManagerVerify);
-  router.post('/api/v1/admin/tickets/:id/verify', handleManagerVerify);
 
   /**
    * Manager Closes Ticket -> CLOSED
@@ -1493,7 +1481,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     res.json({ success: true, ticket });
   };
   router.post('/admin/tickets/:id/close', handleManagerClose);
-  router.post('/api/v1/admin/tickets/:id/close', handleManagerClose);
 
   /**
    * Warehouse Approves Part Request -> APPROVED
@@ -1528,7 +1515,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     res.json({ success: true, partRequest: partReq });
   };
   router.post('/admin/part-requests/:id/approve', handlePartRequestApprove);
-  router.post('/api/v1/admin/part-requests/:id/approve', handlePartRequestApprove);
 
   /**
    * Warehouse Issues Part -> ISSUED
@@ -1642,7 +1628,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/admin/part-requests/:id/issue', handlePartRequestIssue);
-  router.post('/api/v1/admin/part-requests/:id/issue', handlePartRequestIssue);
 
   /**
    * Regenerate Machine QR Token (Admin Only)
@@ -1684,7 +1669,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/admin/machines/:id/regenerate-qr-token', handleRegenerateMachineQrToken);
-  router.post('/api/v1/admin/machines/:id/regenerate-qr-token', handleRegenerateMachineQrToken);
 
   /**
    * Cloud & Sync Settings API
@@ -1703,7 +1687,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.get('/admin/cloud-settings', handleGetCloudSettings);
-  router.get('/api/v1/admin/cloud-settings', handleGetCloudSettings);
 
   const handleUpdateCloudSettings = (req: Request, res: Response) => {
     const store = getStore();
@@ -1730,7 +1713,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/admin/cloud-settings', handleUpdateCloudSettings);
-  router.post('/api/v1/admin/cloud-settings', handleUpdateCloudSettings);
 
   // =========================================================================
   // 4. SYNCHRONIZATION QUEUE & EVENT CONSUMPTION (Desktop <-> Cloud Gateway)
@@ -1750,7 +1732,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.get('/sync/pending', handleGetPendingSyncEvents);
-  router.get('/api/v1/sync/pending', handleGetPendingSyncEvents);
 
   /**
    * Acknowledge Processed Sync Events
@@ -1779,7 +1760,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.post('/sync/acknowledge', handleAcknowledgeSyncEvents);
-  router.post('/api/v1/sync/acknowledge', handleAcknowledgeSyncEvents);
 
   /**
    * Push Local Changes to Sync Queue
@@ -1810,7 +1790,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     res.json({ success: true, addedCount, totalQueue: store.syncQueue.length });
   };
   router.post('/sync/push', handlePushSyncEvents);
-  router.post('/api/v1/sync/push', handlePushSyncEvents);
 
   /**
    * Sync Queue Health & Status
@@ -1834,7 +1813,6 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     });
   };
   router.get('/sync/status', handleGetSyncStatus);
-  router.get('/api/v1/sync/status', handleGetSyncStatus);
 
   return router;
 }
