@@ -6,7 +6,7 @@ import { getCloudRepository } from '../repositories';
 export const syncRoutes = Router();
 
 // Require M2M sync client authentication on all sync endpoints
-syncRoutes.use(requireSyncAuth);
+syncRoutes.use('/sync', requireSyncAuth);
 
 /**
  * POST /sync/bootstrap
