@@ -13,6 +13,8 @@ export interface CloudConfig {
   adminOrigin: string[];
   databaseUrl?: string;
   sessionSecret: string;
+  managementClientId: string;
+  managementClientSecret: string;
   syncClientId: string;
   syncClientSecret: string;
   syncIntervalSeconds: number;
@@ -94,6 +96,8 @@ export const cloudConfig: CloudConfig = {
     return process.env.CLOUD_DATABASE_URL || process.env.DATABASE_URL;
   },
   sessionSecret: process.env.CLOUD_SESSION_SECRET || 'ksu_vending_cloud_session_secret_2026',
+  managementClientId: (process.env.CLOUD_MANAGEMENT_CLIENT_ID || '').trim(),
+  managementClientSecret: (process.env.CLOUD_MANAGEMENT_CLIENT_SECRET || '').trim(),
   syncClientId: (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim(),
   syncClientSecret: (process.env.SYNC_CLIENT_SECRET || '').trim(),
   syncIntervalSeconds: parseInt(process.env.SYNC_INTERVAL || '60', 10),

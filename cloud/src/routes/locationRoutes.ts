@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { LocationService } from '../services/locationService';
 import { requireCloudTechnicianAuth } from '../middleware/technicianAuth';
+import { requireCloudManagementAuth } from '../middleware/managementAuth';
 
 export const locationRoutes = Router();
 
@@ -49,7 +50,7 @@ locationRoutes.post('/api/locations/propose', requireCloudTechnicianAuth, async 
  * GET /api/locations/pending
  * Management retrieves pending proposals
  */
-locationRoutes.get('/api/locations/pending', async (req: Request, res: Response) => {
+locationRoutes.get('/api/locations/pending', requireCloudManagementAuth, async (req: Request, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
     const proposals = await LocationService.listPendingProposals(limit);
@@ -67,15 +68,15 @@ locationRoutes.get('/api/locations/pending', async (req: Request, res: Response)
  * POST /api/locations/proposals/:id/approve
  * Approves a location proposal and updates the machine
  */
-locationRoutes.post('/api/locations/proposals/:id/approve', async (req: Request, res: Response) => {
+locationRoutes.post('/api/locations/proposals/:id/approve', requireCloudManagementAuth, async (req: Request, res: Response) => {
   const proposalId = req.params.id;
-  const { approverId = 'SYSTEM_ADMIN', approverName = 'مدير النظام' } = req.body;
+  const actor = (req as any).managementActor;
 
   try {
     const result = await LocationService.approveProposal({
       proposalId,
-      approverId,
-      approverName,
+      approverId: actor.id,
+      approverName: actor.name,
       clientIp: req.ip
     });
 
@@ -94,16 +95,18 @@ locationRoutes.post('/api/locations/proposals/:id/approve', async (req: Request,
  * POST /api/locations/proposals/:id/reject
  * Rejects a location proposal
  */
-locationRoutes.post('/api/locations/proposals/:id/reject', async (req: Request, res: Response) => {
+locationRoutes.post('/api/locations/proposals/:id/reject', requireCloudManagementAuth, async (req: Request, res: Response) => {
   const proposalId = req.params.id;
-  const { actorId = 'SYSTEM_ADMIN', actorName = 'مدير النظام', reason } = req.body;
+  const actor = (req as any).managementActor;
+  const { reason, rejectionReason } = req.body;
+  const resolvedReason = reason || rejectionReason;
 
   try {
     const proposal = await LocationService.rejectProposal({
       proposalId,
-      actorId,
-      actorName,
-      reason,
+      actorId: actor.id,
+      actorName: actor.name,
+      reason: resolvedReason,
       clientIp: req.ip
     });
 
@@ -121,15 +124,14 @@ locationRoutes.post('/api/locations/proposals/:id/reject', async (req: Request, 
  * PUT /api/locations/machines/:idOrToken
  * Manually update machine location (map picker or coordinates entry)
  */
-locationRoutes.put('/api/locations/machines/:idOrToken', async (req: Request, res: Response) => {
+locationRoutes.put('/api/locations/machines/:idOrToken', requireCloudManagementAuth, async (req: Request, res: Response) => {
   const idOrToken = req.params.idOrToken;
+  const actor = (req as any).managementActor;
   const {
     latitude,
     longitude,
     locationSource = 'MANUAL_ENTRY',
-    locationNote,
-    actorId = 'SYSTEM_ADMIN',
-    actorName = 'مدير النظام'
+    locationNote
   } = req.body;
 
   try {
@@ -139,8 +141,8 @@ locationRoutes.put('/api/locations/machines/:idOrToken', async (req: Request, re
       longitude: longitude !== null && longitude !== undefined ? Number(longitude) : null,
       locationSource,
       locationNote,
-      actorId,
-      actorName,
+      actorId: actor.id,
+      actorName: actor.name,
       clientIp: req.ip
     });
 
@@ -158,15 +160,15 @@ locationRoutes.put('/api/locations/machines/:idOrToken', async (req: Request, re
  * DELETE /api/locations/machines/:idOrToken
  * Clear machine location coordinates
  */
-locationRoutes.delete('/api/locations/machines/:idOrToken', async (req: Request, res: Response) => {
+locationRoutes.delete('/api/locations/machines/:idOrToken', requireCloudManagementAuth, async (req: Request, res: Response) => {
   const idOrToken = req.params.idOrToken;
-  const { actorId = 'SYSTEM_ADMIN', actorName = 'مدير النظام' } = req.body;
+  const actor = (req as any).managementActor;
 
   try {
     const machine = await LocationService.clearLocation({
       machineIdOrToken: idOrToken,
-      actorId,
-      actorName,
+      actorId: actor.id,
+      actorName: actor.name,
       clientIp: req.ip
     });
 
@@ -184,14 +186,13 @@ locationRoutes.delete('/api/locations/machines/:idOrToken', async (req: Request,
  * POST /api/locations/field-exceptions
  * Issue a secure field exception approval
  */
-locationRoutes.post('/api/locations/field-exceptions', async (req: Request, res: Response) => {
+locationRoutes.post('/api/locations/field-exceptions', requireCloudManagementAuth, async (req: Request, res: Response) => {
+  const actor = (req as any).managementActor;
   const {
     ticketId,
     machineIdOrToken,
     technicianId,
     reason,
-    approvedByActorId = 'SUPERVISOR',
-    approvedByActorName = 'مشرف الصيانة الميدانية',
     validHours = 4
   } = req.body;
 
@@ -201,8 +202,8 @@ locationRoutes.post('/api/locations/field-exceptions', async (req: Request, res:
       machineIdOrToken,
       technicianId,
       reason,
-      approvedByActorId,
-      approvedByActorName,
+      approvedByActorId: actor.id,
+      approvedByActorName: actor.name,
       validHours: Number(validHours) || 4,
       clientIp: req.ip
     });
@@ -221,7 +222,7 @@ locationRoutes.post('/api/locations/field-exceptions', async (req: Request, res:
  * GET /api/locations/machines/:idOrToken
  * Fetch machine location details and pending proposals
  */
-locationRoutes.get('/api/locations/machines/:idOrToken', async (req: Request, res: Response) => {
+locationRoutes.get('/api/locations/machines/:idOrToken', requireCloudManagementAuth, async (req: Request, res: Response) => {
   try {
     const details = await LocationService.getMachineLocationDetails(req.params.idOrToken);
     res.json({

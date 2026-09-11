@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { MachineLocationPicker } from './MachineLocationPicker';
 import { useNotification } from '../../context/NotificationContext';
 import { Machine } from '../../types';
+import { api } from '../../services/api';
 
 interface LocationProposal {
   id: string;
@@ -43,14 +44,15 @@ export const LocationProposalsModal: React.FC<LocationProposalsModalProps> = ({
   const fetchProposals = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/locations/pending');
-      if (res.ok) {
-        const data = await res.json();
-        setProposals(data.proposals || []);
-      }
-    } catch {
-      // If endpoint not accessible via current host, graceful empty state
+      const data = await api.getPendingLocationProposals();
+      setProposals(data.proposals || []);
+    } catch (err: any) {
       setProposals([]);
+      showToast(
+        'تعذر تحميل المقترحات',
+        err.message || 'فشل تحميل مقترحات مواقع الماكينات',
+        'error'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -65,19 +67,7 @@ export const LocationProposalsModal: React.FC<LocationProposalsModalProps> = ({
   const handleApprove = async (proposal: LocationProposal) => {
     setProcessingId(proposal.id);
     try {
-      const res = await fetch(`/api/locations/proposals/${proposal.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actorId: 'MGR-ADMIN',
-          actorName: 'مدير الصيانة'
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'فشل اعتماد المقترح');
-      }
+      await api.approveLocationProposal(proposal.id);
 
       showToast('تم الاعتماد', 'تم اعتماد إحداثيات الماكينة بنجاح وتحديث السجل الرسمي.', 'success');
       await fetchProposals();
@@ -93,20 +83,10 @@ export const LocationProposalsModal: React.FC<LocationProposalsModalProps> = ({
     if (!rejectingProposal) return;
     setProcessingId(rejectingProposal.id);
     try {
-      const res = await fetch(`/api/locations/proposals/${rejectingProposal.id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rejectionReason: rejectionReason || 'موقع غير دقيق أو لم يتم التحقق منه ميدانياً',
-          actorId: 'MGR-ADMIN',
-          actorName: 'مدير الصيانة'
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'فشل رفض المقترح');
-      }
+      await api.rejectLocationProposal(
+        rejectingProposal.id,
+        rejectionReason || 'موقع غير دقيق أو لم يتم التحقق منه ميدانياً'
+      );
 
       showToast('تم الرفض', 'تم رفض مقترح الموقع وتسجيل سبب الرفض في سجل التدقيق.', 'info');
       setRejectingProposal(null);

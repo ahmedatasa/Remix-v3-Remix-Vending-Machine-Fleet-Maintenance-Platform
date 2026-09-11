@@ -640,14 +640,16 @@ export const MachinesView: React.FC<MachinesViewProps> = ({ onNavigate }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            icon={MapPin}
-            onClick={() => setIsProposalsModalOpen(true)}
-          >
-            مقترحات المواقع / Location Proposals
-          </Button>
+          {canEditMachines && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={MapPin}
+              onClick={() => setIsProposalsModalOpen(true)}
+            >
+              مقترحات المواقع / Location Proposals
+            </Button>
+          )}
 
           <Button
             variant="outline"

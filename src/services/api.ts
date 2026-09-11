@@ -8318,6 +8318,51 @@ export const api = {
     }
   },
 
+  // Secure Cloud Location Management APIs
+  async getPendingLocationProposals(limit = 50) {
+    const safeLimit = Number.isFinite(Number(limit))
+      ? Math.max(1, Math.min(100, Math.trunc(Number(limit))))
+      : 50;
+
+    return await apiFetch<any>(
+      `/location-management/pending?limit=${safeLimit}`
+    );
+  },
+
+  async approveLocationProposal(proposalId: string) {
+    if (!proposalId || !proposalId.trim()) {
+      throw new Error('معرف مقترح الموقع مطلوب');
+    }
+
+    return await apiFetch<any>(
+      `/location-management/proposals/${encodeURIComponent(proposalId)}/approve`,
+      {
+        method: 'POST'
+      }
+    );
+  },
+
+  async rejectLocationProposal(
+    proposalId: string,
+    reason: string
+  ) {
+    if (!proposalId || !proposalId.trim()) {
+      throw new Error('معرف مقترح الموقع مطلوب');
+    }
+
+    const cleanReason = String(reason || '').trim();
+
+    return await apiFetch<any>(
+      `/location-management/proposals/${encodeURIComponent(proposalId)}/reject`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          reason: cleanReason
+        })
+      }
+    );
+  },
+
   // Hybrid Cloud & Sync Queue APIs
   async getCloudSettings() {
     try {

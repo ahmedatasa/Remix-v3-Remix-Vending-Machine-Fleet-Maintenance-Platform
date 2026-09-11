@@ -185,6 +185,235 @@ async function startServer() {
   };
 
   // Mount Cloud proxy routes on the main app
+
+  /**
+   * Trusted Main Server -> Standalone Cloud location-management proxy.
+   *
+   * Browser authentication terminates at the Main Server.
+   * Cloud management credentials remain server-side only.
+   * Actor identity comes exclusively from the authenticated Main session.
+   */
+  const cloudLocationManagementProxy = (
+    req: express.Request,
+    res: express.Response
+  ) => {
+    const managementClientId =
+      (process.env.CLOUD_MANAGEMENT_CLIENT_ID || '').trim();
+
+    const managementClientSecret =
+      (process.env.CLOUD_MANAGEMENT_CLIENT_SECRET || '').trim();
+
+    if (!managementClientId || !managementClientSecret) {
+      return res.status(503).json({
+        error: 'CLOUD_MANAGEMENT_NOT_CONFIGURED',
+        message: 'Cloud management connection is not configured.'
+      });
+    }
+
+    const authenticatedUser = (req as any).user || {};
+    const rawUser = (req as any).rawUser || {};
+
+    const actorId = String(
+      authenticatedUser.id ||
+      rawUser.id ||
+      ''
+    ).trim();
+
+    const actorName = String(
+      authenticatedUser.fullName ||
+      authenticatedUser.name ||
+      authenticatedUser.username ||
+      rawUser.fullName ||
+      rawUser.name ||
+      rawUser.username ||
+      actorId
+    ).trim();
+
+    const actorRole = String(
+      (req as any).userRole ||
+      authenticatedUser.role ||
+      rawUser.role ||
+      ''
+    ).trim().toUpperCase();
+
+    if (!actorId || !actorName || !actorRole) {
+      return res.status(500).json({
+        error: 'MANAGEMENT_ACTOR_CONTEXT_UNAVAILABLE',
+        message: 'Authenticated management actor context is unavailable.'
+      });
+    }
+
+    const targetBaseUrl =
+      (process.env.CLOUD_API_URL || 'http://127.0.0.1:3001')
+        .replace(/\/+$/, '');
+
+    let parsedTarget: URL;
+
+    try {
+      parsedTarget = new URL(targetBaseUrl);
+    } catch {
+      return res.status(503).json({
+        error: 'CLOUD_MANAGEMENT_CONFIGURATION_INVALID',
+        message: 'Cloud management target URL is invalid.'
+      });
+    }
+
+    if (
+      parsedTarget.protocol !== 'http:' &&
+      parsedTarget.protocol !== 'https:'
+    ) {
+      return res.status(503).json({
+        error: 'CLOUD_MANAGEMENT_CONFIGURATION_INVALID',
+        message: 'Cloud management target protocol is invalid.'
+      });
+    }
+
+    const isHttps = parsedTarget.protocol === 'https:';
+    const client = isHttps ? https : http;
+
+    /*
+     * Express removes /location-management while this middleware runs.
+     *
+     * /api/v1/location-management/pending
+     * becomes Cloud:
+     * /api/locations/pending
+     */
+    const relativeUrl =
+      req.url && req.url !== '/'
+        ? req.url
+        : '';
+
+    const targetPath =
+      `/api/locations${relativeUrl}`;
+
+    /*
+     * Defense in depth:
+     * discard any browser-supplied audit identity.
+     */
+    const forwardedBody =
+      req.body &&
+      typeof req.body === 'object' &&
+      !Array.isArray(req.body)
+        ? { ...req.body }
+        : req.body;
+
+    if (
+      forwardedBody &&
+      typeof forwardedBody === 'object' &&
+      !Array.isArray(forwardedBody)
+    ) {
+      delete forwardedBody.actorId;
+      delete forwardedBody.actorName;
+      delete forwardedBody.approverId;
+      delete forwardedBody.approverName;
+      delete forwardedBody.approvedByActorId;
+      delete forwardedBody.approvedByActorName;
+    }
+
+    const hasBody =
+      forwardedBody &&
+      typeof forwardedBody === 'object' &&
+      Object.keys(forwardedBody).length > 0 &&
+      req.method !== 'GET' &&
+      req.method !== 'HEAD';
+
+    const payload =
+      hasBody
+        ? JSON.stringify(forwardedBody)
+        : '';
+
+    /*
+     * Build fresh headers.
+     * Never forward browser Authorization or arbitrary browser headers.
+     */
+    const headers: Record<string, string | number> = {
+      Accept: 'application/json',
+
+      'x-management-client-id':
+        managementClientId,
+
+      'x-management-client-secret':
+        managementClientSecret,
+
+      'x-management-actor-id':
+        actorId,
+
+      'x-management-actor-name-b64':
+        Buffer
+          .from(actorName, 'utf8')
+          .toString('base64url'),
+
+      'x-management-actor-role':
+        actorRole,
+
+      'x-forwarded-for':
+        req.ip ||
+        req.socket.remoteAddress ||
+        '',
+
+      'x-forwarded-proto':
+        req.secure ? 'https' : 'http'
+    };
+
+    if (hasBody) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] =
+        Buffer.byteLength(payload);
+    }
+
+    const proxyReq = client.request(
+      {
+        protocol: parsedTarget.protocol,
+        hostname: parsedTarget.hostname,
+        port:
+          parsedTarget.port ||
+          (isHttps ? 443 : 80),
+        path: targetPath,
+        method: req.method,
+        headers,
+        timeout: 10000
+      },
+      (proxyRes) => {
+        res.status(proxyRes.statusCode || 502);
+
+        const contentType =
+          proxyRes.headers['content-type'];
+
+        if (contentType) {
+          res.setHeader(
+            'content-type',
+            contentType
+          );
+        }
+
+        proxyRes.pipe(res);
+      }
+    );
+
+    proxyReq.on('timeout', () => {
+      proxyReq.destroy(
+        new Error('Cloud management request timeout')
+      );
+    });
+
+    proxyReq.on('error', () => {
+      if (!res.headersSent) {
+        return res.status(503).json({
+          error: 'CLOUD_MANAGEMENT_UNAVAILABLE',
+          message: 'Cloud management service is unavailable.'
+        });
+      }
+
+      res.end();
+    });
+
+    if (hasBody) {
+      proxyReq.write(payload);
+    }
+
+    proxyReq.end();
+  };
+
   app.use('/public', cloudProxy);
   app.use('/technician', cloudProxy);
   app.use('/cloud-storage', cloudProxy);
@@ -281,6 +510,17 @@ async function startServer() {
 
     return next();
   });
+
+  // Authenticated Main Server -> Cloud location-management workflow.
+  apiRouter.use(
+    '/location-management',
+    requireEnterpriseRole([
+      'SUPER_ADMIN',
+      'ADMIN',
+      'MAINTENANCE_MANAGER'
+    ]),
+    cloudLocationManagementProxy
+  );
 
   apiRouter.use(hybridRouter);
 
