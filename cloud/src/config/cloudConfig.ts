@@ -94,8 +94,8 @@ export const cloudConfig: CloudConfig = {
     return process.env.CLOUD_DATABASE_URL || process.env.DATABASE_URL;
   },
   sessionSecret: process.env.CLOUD_SESSION_SECRET || 'ksu_vending_cloud_session_secret_2026',
-  syncClientId: process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026',
-  syncClientSecret: process.env.SYNC_CLIENT_SECRET || 'sec_ksu_vending_sync_2026_d92f8a1c',
+  syncClientId: (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim(),
+  syncClientSecret: (process.env.SYNC_CLIENT_SECRET || '').trim(),
   syncIntervalSeconds: parseInt(process.env.SYNC_INTERVAL || '60', 10),
   technicianCheckinRadiusMeters: parseInt(process.env.TECHNICIAN_CHECKIN_RADIUS_METERS || '100', 10),
   technicianMaxGpsAccuracyMeters: parseInt(process.env.TECHNICIAN_MAX_GPS_ACCURACY_METERS || '100', 10),

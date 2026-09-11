@@ -45,6 +45,8 @@ interface AuthContextType extends RolePermissions {
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitialSetupRequired: boolean;
+  isAdminRecoveryRequired: boolean;
+  authState: 'INITIAL_SETUP' | 'SYSTEM_READY' | 'ADMIN_RECOVERY_REQUIRED';
   companyName: string;
   accessToken: string | null;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
@@ -72,6 +74,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return localStorage.getItem('vending_fleet_access_token');
   });
   const [isInitialSetupRequired, setIsInitialSetupRequired] = useState<boolean>(false);
+  const [isAdminRecoveryRequired, setIsAdminRecoveryRequired] = useState<boolean>(false);
+  const [authState, setAuthState] = useState<'INITIAL_SETUP' | 'SYSTEM_READY' | 'ADMIN_RECOVERY_REQUIRED'>('SYSTEM_READY');
   const [companyName, setCompanyName] = useState<string>(() => {
     return localStorage.getItem('vending_fleet_company_name') || '';
   });
@@ -84,14 +88,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setCompanyName(status.companyName);
         localStorage.setItem('vending_fleet_company_name', status.companyName);
       }
-      if (!status.hasUsers) {
-        setIsInitialSetupRequired(true);
+      const state = status.state || (status.setupRequired ? 'INITIAL_SETUP' : (status.recoveryRequired ? 'ADMIN_RECOVERY_REQUIRED' : 'SYSTEM_READY'));
+      setAuthState(state);
+      setIsInitialSetupRequired(state === 'INITIAL_SETUP');
+      setIsAdminRecoveryRequired(state === 'ADMIN_RECOVERY_REQUIRED');
+
+      if (state === 'INITIAL_SETUP') {
         setUser(null);
         setAccessToken(null);
         localStorage.removeItem('vending_fleet_user');
         localStorage.removeItem('vending_fleet_access_token');
-      } else {
-        setIsInitialSetupRequired(false);
       }
     } catch (err) {
       console.warn('Could not refresh auth status:', err);
@@ -109,37 +115,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem('vending_fleet_company_name', status.companyName);
         }
 
-        if (!status.hasUsers) {
+        const state = status.state || (status.setupRequired ? 'INITIAL_SETUP' : (status.recoveryRequired ? 'ADMIN_RECOVERY_REQUIRED' : 'SYSTEM_READY'));
+        setAuthState(state);
+        setIsInitialSetupRequired(state === 'INITIAL_SETUP');
+        setIsAdminRecoveryRequired(state === 'ADMIN_RECOVERY_REQUIRED');
+
+        if (state === 'INITIAL_SETUP') {
           // Pure Clean Slate: No registered users exist yet. Must run initial System Admin onboarding!
-          setIsInitialSetupRequired(true);
           setUser(null);
           setAccessToken(null);
           localStorage.removeItem('vending_fleet_user');
           localStorage.removeItem('vending_fleet_access_token');
         } else {
-          setIsInitialSetupRequired(false);
-          const savedUser = localStorage.getItem('vending_fleet_user');
-          if (savedUser) {
+          const savedToken = localStorage.getItem('vending_fleet_access_token');
+          if (savedToken) {
             try {
-              const parsed = JSON.parse(savedUser);
-              // Verify saved user still exists in current registered users
-              const allUsers = await api.getUsers();
-              const found = allUsers.find((u: User) => u.id === parsed.id || u.email?.toLowerCase() === parsed.email?.toLowerCase());
-              if (found && found.isActive) {
-                setUser(found);
-              } else if (allUsers.length > 0) {
-                // If saved user is invalid or deleted, log out
+              const res = await api.getMe();
+              if (res && res.success && res.user && res.user.isActive) {
+                setUser(res.user);
+                setAccessToken(savedToken);
+                localStorage.setItem('vending_fleet_user', JSON.stringify(res.user));
+              } else {
                 setUser(null);
+                setAccessToken(null);
                 localStorage.removeItem('vending_fleet_user');
+                localStorage.removeItem('vending_fleet_access_token');
               }
             } catch {
               setUser(null);
+              setAccessToken(null);
               localStorage.removeItem('vending_fleet_user');
+              localStorage.removeItem('vending_fleet_access_token');
             }
+          } else {
+            setUser(null);
+            setAccessToken(null);
+            localStorage.removeItem('vending_fleet_user');
           }
         }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
+      } catch (err: any) {
+        console.warn('Auth initialization warning:', err?.message || err);
+        setUser(null);
+        setAccessToken(null);
+        try {
+          localStorage.removeItem('vending_fleet_user');
+          localStorage.removeItem('vending_fleet_access_token');
+        } catch {}
       } finally {
         setIsLoading(false);
       }
@@ -213,6 +234,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = () => {
+    api.logout().catch(() => {});
     setUser(null);
     setAccessToken(null);
     localStorage.removeItem('vending_fleet_user');
@@ -347,6 +369,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isAuthenticated: !!user,
       isLoading,
       isInitialSetupRequired,
+      isAdminRecoveryRequired,
+      authState,
       companyName,
       accessToken,
       login,

@@ -27,7 +27,7 @@ export async function requireSyncAuth(req: Request, res: Response, next: NextFun
     });
   }
 
-  if (clientId !== cloudConfig.syncClientId || clientSecret !== cloudConfig.syncClientSecret) {
+  if (!cloudConfig.syncClientSecret || clientId !== cloudConfig.syncClientId || clientSecret !== cloudConfig.syncClientSecret) {
     await repo.audit.log({
       actorType: 'DESKTOP_SYNC',
       actorId: clientId,

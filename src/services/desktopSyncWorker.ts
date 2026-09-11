@@ -27,8 +27,8 @@ class DesktopSyncWorker {
   public getOptions(): Required<SyncWorkerOptions> {
     return {
       cloudApiUrl: (process.env.CLOUD_API_URL || 'http://127.0.0.1:3001').trim().replace(/\/+$/, ''),
-      syncClientId: process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026',
-      syncClientSecret: process.env.SYNC_CLIENT_SECRET || 'sec_ksu_vending_sync_2026_d92f8a1c',
+      syncClientId: (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim(),
+      syncClientSecret: (process.env.SYNC_CLIENT_SECRET || '').trim(),
       intervalSeconds: parseInt(process.env.SYNC_INTERVAL || '60', 10)
     };
   }
@@ -131,6 +131,15 @@ class DesktopSyncWorker {
 
     this.isSyncing = true;
     const opts = this.getOptions();
+
+    if (!opts.syncClientSecret) {
+      this.isSyncing = false;
+      return {
+        connected: false,
+        message: 'Sync secret is not configured in environment (SYNC_CLIENT_SECRET is missing)',
+        syncedEventsCount: 0
+      };
+    }
 
     try {
       const store = getStore();

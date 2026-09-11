@@ -119,12 +119,18 @@ export interface User {
   name?: string;
   phone?: string;
   role: UserRole;
-  password?: string;
+  password?: string; // DEPRECATED: Do not use or populate in responses
+  passwordHash?: string; // Server-authoritative bcrypt hash
   isActive: boolean;
+  status?: string;
   isDeleted?: boolean;
   lastLoginAt?: string;
   createdAt: string;
   updatedAt?: string;
+  employeeCode?: string;
+  department?: string;
+  assignedRegion?: string;
+  avatarUrl?: string;
 }
 
 export interface Building {

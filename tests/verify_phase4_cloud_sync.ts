@@ -18,6 +18,7 @@ const FLEET_DATA_PATH = path.join(testSandboxDir, 'fleet_data.json');
 fs.copyFileSync(path.join(process.cwd(), 'fleet_data.json'), FLEET_DATA_PATH);
 process.env.CLOUD_DATABASE_FILE = path.join(testSandboxDir, 'cloud_data.json');
 process.env.CLOUD_STORAGE_DIR = path.join(testSandboxDir, 'cloud_storage');
+process.env.SYNC_CLIENT_SECRET = 'sec_ksu_vending_sync_2026_d92f8a1c';
 resetCloudDbInstance();
 
 function request(method: string, urlStr: string, headers: Record<string, string> = {}, body?: any): Promise<{ status: number; data: any; headers: any }> {

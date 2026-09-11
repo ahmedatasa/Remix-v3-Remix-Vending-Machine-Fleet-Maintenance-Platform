@@ -31,22 +31,28 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
     login,
     registerInitialAdmin,
     isInitialSetupRequired,
+    isAdminRecoveryRequired,
+    authState,
     companyName: storedCompanyName,
     isLoading
   } = useAuth();
   const { language, isRTL } = useLanguage();
   const isAr = language === 'ar';
 
-  // Mode: 'setup' for initial System Admin registration, 'login' for standard login
-  const [mode, setMode] = useState<'setup' | 'login'>(isInitialSetupRequired ? 'setup' : 'login');
+  // Mode: 'setup' strictly for true initial System Admin registration, 'login' for standard login
+  const [mode, setMode] = useState<'setup' | 'login'>(
+    isInitialSetupRequired && authState === 'INITIAL_SETUP' ? 'setup' : 'login'
+  );
 
   useEffect(() => {
-    if (isInitialSetupRequired) {
+    if (isInitialSetupRequired && authState === 'INITIAL_SETUP') {
       setMode('setup');
+    } else {
+      setMode('login');
     }
-  }, [isInitialSetupRequired]);
+  }, [isInitialSetupRequired, authState]);
 
-  // Login Form States
+  // Login Form States - strictly unpopulated
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -100,8 +106,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
       setSetupError(isAr ? 'يرجى إدخال بريد إلكتروني صالح' : 'Please enter a valid email address');
       return;
     }
-    if (!password || password.length < 6) {
-      setSetupError(isAr ? 'كلمة المرور يجب أن لا تقل عن 6 خانات' : 'Password must be at least 6 characters');
+    if (!password || password.length < 10) {
+      setSetupError(
+        isAr
+          ? 'كلمة المرور يجب ألا تقل عن 10 خانات لضمان أمان النظام'
+          : 'Password must be at least 10 characters for system security'
+      );
       return;
     }
     if (password !== confirmPassword) {
@@ -176,9 +186,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-xl relative z-10">
         <div className="bg-slate-900/90 border border-slate-800 py-7 px-6 shadow-2xl rounded-2xl sm:px-10 backdrop-blur-xl">
-          {/* Tab / Switcher between Setup and Login if not strictly forced */}
-          {!isInitialSetupRequired && (
+          {/* Tab / Switcher between Setup and Login when system setup is open */}
+          {isInitialSetupRequired && authState === 'INITIAL_SETUP' && (
             <div className="flex items-center justify-center mb-6 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setMode('setup')}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  mode === 'setup'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {isAr ? 'تهيئة مدير النظام' : 'Admin Setup'}
+              </button>
               <button
                 type="button"
                 onClick={() => setMode('login')}
@@ -189,17 +210,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
                 }`}
               >
                 {isAr ? 'تسجيل الدخول' : 'Sign In'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('setup')}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  mode === 'setup'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {isAr ? 'تسجيل مدير نظام جديد' : 'New Admin Registration'}
               </button>
             </div>
           )}
@@ -452,13 +462,39 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
           {/* MODE: STANDARD LOGIN */}
           {mode === 'login' && (
             <div>
-              {loginError && (
-                <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{loginError}</span>
+              {isAdminRecoveryRequired && (
+                <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span>
+                    {isAr
+                      ? 'بيانات اعتماد مدير النظام تتطلب استعادة الوصول محلياً من الخادم.'
+                      : 'Administrator credentials require recovery on the server.'}
+                  </span>
                 </div>
               )}
 
+              {loginError && (
+                <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{loginError}</span>
+                  </div>
+                  {isInitialSetupRequired && authState === 'INITIAL_SETUP' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginError('');
+                        setMode('setup');
+                      }}
+                      className="self-start text-xs font-semibold text-blue-400 hover:text-blue-300 underline mt-0.5 cursor-pointer"
+                    >
+                      {isAr ? 'المنظومة بانتظار التهيئة الأولية: اضغط هنا لتسجيل مدير النظام' : 'System requires initial setup: click here to register admin'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Standard Minimalist Login Form */}
               <form className="space-y-4" onSubmit={handleLoginSubmit}>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -499,6 +535,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
                     </div>
                     <input
                       type="password"
+                      required
                       placeholder="••••••••"
                       value={loginPassword}
                       onChange={e => setLoginPassword(e.target.value)}
@@ -523,22 +560,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccessLogin }) => {
                   </Button>
                 </div>
               </form>
-
-              {/* Helper note */}
-              <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
-                <button
-                  type="button"
-                  onClick={() => setMode('setup')}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>
-                    {isAr
-                      ? 'هل تريد تسجيل مدير نظام جديد لشركة أخرى؟'
-                      : 'Want to register a new admin for another company?'}
-                  </span>
-                </button>
-              </div>
             </div>
           )}
         </div>

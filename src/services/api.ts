@@ -1999,11 +1999,17 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
     }
   } catch {}
 
+  const isPublicAuthEndpoint =
+    endpoint === '/auth/status' ||
+    endpoint === '/auth/login' ||
+    endpoint === '/auth/setup-initial-admin' ||
+    endpoint.startsWith('/public');
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(userRole ? { 'X-User-Role': userRole } : {}),
-    ...(userId ? { 'X-User-Id': userId } : {}),
+    ...(!isPublicAuthEndpoint && token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(!isPublicAuthEndpoint && userRole ? { 'X-User-Role': userRole } : {}),
+    ...(!isPublicAuthEndpoint && userId ? { 'X-User-Id': userId } : {}),
     ...options.headers,
   };
 
@@ -2015,10 +2021,31 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
     if (response.ok) {
       return await response.json();
     }
-  } catch {
-    // Graceful fallback to client-side reactive store if backend server is offline or proxying
+    let errorData: any = null;
+    try {
+      errorData = await response.json();
+    } catch {}
+
+    // If session is expired or invalid on a protected route, clear stored session credentials
+    if (response.status === 401 && (errorData?.code === 'UNAUTHORIZED' || errorData?.code === 'USER_NOT_FOUND')) {
+      try {
+        localStorage.removeItem('vending_fleet_access_token');
+        localStorage.removeItem('vending_fleet_user');
+      } catch {}
+    }
+
+    const errorMsg = errorData?.error || errorData?.message || `API call failed with status ${response.status}`;
+    const error: any = new Error(errorMsg);
+    error.status = response.status;
+    error.code = errorData?.code;
+    error.data = errorData;
+    throw error;
+  } catch (err: any) {
+    if (err.status) {
+      throw err;
+    }
+    throw new Error(`تعذر الاتصال بخادم النظام: ${err.message || 'شبكة غير متاحة'}`);
   }
-  throw new Error(`API call failed for ${endpoint}`);
 }
 
 // Enterprise API Client Interface
@@ -7444,27 +7471,13 @@ export const api = {
 
   // Auth & Initial Super Admin Setup
   async getAuthStatus() {
-    try {
-      return await apiFetch<{
-        hasUsers: boolean;
-        userCount: number;
-        companyName: string;
-        superAdminName: string | null;
-        superAdminEmail: string | null;
-        settings?: any;
-      }>('/auth/status');
-    } catch {
-      const users = store.users || [];
-      const superAdmin = users.find(u => u.role === 'SUPER_ADMIN' || u.role === 'ADMIN');
-      const compName = (typeof window !== 'undefined' ? localStorage.getItem('vending_fleet_company_name') : '') || '';
-      return {
-        hasUsers: users.length > 0,
-        userCount: users.length,
-        companyName: compName,
-        superAdminName: superAdmin?.fullName || null,
-        superAdminEmail: superAdmin?.email || null
-      };
-    }
+    return await apiFetch<{
+      state: 'INITIAL_SETUP' | 'SYSTEM_READY' | 'ADMIN_RECOVERY_REQUIRED';
+      setupRequired: boolean;
+      recoveryRequired: boolean;
+      hasUsers: boolean;
+      companyName?: string;
+    }>('/auth/status');
   },
 
   async registerInitialAdmin(data: {
@@ -7475,68 +7488,60 @@ export const api = {
     password?: string;
     city?: string;
   }) {
-    try {
-      const res = await apiFetch<any>('/auth/setup-initial-admin', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
-      if (res && res.user) {
-        store.users = [res.user];
-        store.save();
-      }
-      return res;
-    } catch {
-      const adminUser: User = {
-        id: `usr-admin-${Date.now()}`,
-        email: data.email.trim().toLowerCase(),
-        fullName: data.fullName.trim(),
-        phone: data.phone || '',
-        role: 'SUPER_ADMIN',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString()
-      };
-      store.users = [adminUser];
-      store.save();
-      return {
-        success: true,
-        user: adminUser,
-        token: `jwt-admin-${Date.now()}`,
-        companyName: data.companyName
-      };
-    }
+    return await apiFetch<any>('/auth/setup-initial-admin', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async setupInitialAdmin(data: {
+    companyName: string;
+    fullName: string;
+    email: string;
+    phone?: string;
+    password?: string;
+    city?: string;
+  }) {
+    return await this.registerInitialAdmin(data);
   },
 
   async login(email: string, password?: string) {
+    if (!email || !email.trim()) {
+      throw new Error('يرجى إدخال البريد الإلكتروني');
+    }
+    if (!password || !password.trim()) {
+      throw new Error('يرجى إدخال كلمة المرور');
+    }
+    return await apiFetch<any>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim(), password })
+    });
+  },
+
+  async getMe() {
+    return await apiFetch<{ success: boolean; user: User }>('/auth/me');
+  },
+
+  async logout() {
     try {
-      return await apiFetch<any>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
-      });
+      await apiFetch<any>('/auth/logout', { method: 'POST' });
     } catch {
-      const cleanEmail = email.trim().toLowerCase();
-      const user = store.users.find(u => u.email.trim().toLowerCase() === cleanEmail);
-      if (!user) {
-        throw new Error('البريد الإلكتروني غير مسجل');
-      }
-      user.lastLoginAt = new Date().toISOString();
-      store.save();
-      return {
-        success: true,
-        user,
-        token: `jwt-${user.id}-${Date.now()}`
-      };
+      // Best effort backend session cleanup
     }
   },
 
-  async resetUsers() {
-    try {
-      await apiFetch('/auth/reset-users', { method: 'POST' });
-    } catch {}
-    store.users = [];
-    store.save();
-    return { success: true };
+  async resetUsers(confirmReset: boolean = true) {
+    return await apiFetch('/auth/reset-users', {
+      method: 'POST',
+      body: JSON.stringify({ confirmReset })
+    });
+  },
+
+  async adminResetPassword(userId: string, newPassword: string) {
+    return await apiFetch<any>('/auth/admin/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, newPassword })
+    });
   },
 
   // Users & Audit Logs

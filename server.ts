@@ -25,6 +25,19 @@ import {
   createHybridRouter,
   generateSecureOpaqueToken
 } from './src/server/hybridCloudEngine';
+import {
+  createRequireAuth,
+  createRequireEnterpriseRole,
+  adminLoginLimiter,
+  createSession,
+  deleteSession,
+  sanitizeUserForClient,
+  validatePasswordStrength,
+  hashPassword,
+  verifyPassword,
+  invalidateUserSessions,
+  getSystemAuthState
+} from './src/server/authSecurity';
 
 const PORT = 3000;
 
@@ -183,57 +196,109 @@ async function startServer() {
   initHybridFleetMigration(getStore(), saveStore);
   apiRouter.use(hybridRouter);
 
-  // Enterprise Role-Based Access Control (RBAC) Guard
-  const requireEnterpriseRole = (allowedRoles: string[]) => {
-    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const role = (req.headers['x-user-role'] as string || '').toUpperCase().trim();
-      if (role === 'SUPER_ADMIN') {
-        return next();
-      }
-      if (role && !allowedRoles.includes(role)) {
-        return res.status(403).json({
-          error: `غير مصرح بتنفيذ هذا الإجراء لصاحب رتبة '${role}'. الصلاحية مقتصرة على: ${allowedRoles.join(', ')}.`,
-          code: 'PERMISSION_DENIED',
-          requiredRoles: allowedRoles
-        });
-      }
-      next();
-    };
-  };
+  // Server-authoritative authentication middleware and enterprise RBAC guard
+  const requireAuth = createRequireAuth(getStore);
+  const requireEnterpriseRole = createRequireEnterpriseRole;
+
+  // Enforce authoritative authentication on all administrative API routes
+  apiRouter.use((req, res, next) => {
+    const rawPath = req.path || '';
+    const p = (rawPath.replace(/^\/v1/, '') || '/').replace(/\/+$/, '') || '/';
+    // Whitelisted public endpoints
+    if (
+      p === '/health' ||
+      p === '/auth/status' ||
+      p === '/auth/login' ||
+      p === '/auth/setup-initial-admin' ||
+      p === '/auth/logout' ||
+      p.startsWith('/public') ||
+      p === '/technician/login'
+    ) {
+      return next();
+    }
+
+    // Technician portal endpoints with dedicated auth guard in hybridRouter
+    if (p.startsWith('/technician/')) {
+      return next();
+    }
+
+    // M2M Sync endpoints with dedicated HMAC / sync secret checks
+    if (p === '/sync/push' || p === '/sync/pending' || p === '/sync/acknowledge') {
+      return next();
+    }
+
+    // All administrative routes require valid user session
+    return requireAuth(req, res, next);
+  });
 
   // Health
   apiRouter.get('/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  // Auth Status & Super Admin check
+  // Auth Status: Expose authoritative system auth state machine metadata
   apiRouter.get('/auth/status', (req, res) => {
     const store = getStore();
     const users = store.users || [];
-    const superAdmin = users.find((u: any) => u.role === 'SUPER_ADMIN' || u.role === 'ADMIN');
+    const authStatus = getSystemAuthState(users);
     res.json({
-      hasUsers: users.length > 0,
-      userCount: users.length,
-      companyName: store.settings?.companyName || '',
-      superAdminName: superAdmin?.fullName || superAdmin?.name || null,
-      superAdminEmail: superAdmin?.email || null,
-      settings: store.settings
+      state: authStatus.state,
+      setupRequired: authStatus.setupRequired,
+      recoveryRequired: authStatus.recoveryRequired,
+      hasUsers: authStatus.hasUsers,
+      companyName: store.settings?.companyName || ''
     });
   });
 
-  // Register Initial Company System Administrator (Super Admin with full user management rights)
+  // Register Initial Company System Administrator (Super Admin)
+  // ABSOLUTE RULE: Permitted ONLY on a completely clean/empty user database (users.length === 0).
+  // If users exist, this is rejected (409). If no credentialed SUPER_ADMIN exists, state is ADMIN_RECOVERY_REQUIRED.
   apiRouter.post('/auth/setup-initial-admin', (req, res) => {
     const store = getStore();
+    const users = store.users || [];
+
+    if (users.length > 0) {
+      const authStatus = getSystemAuthState(users);
+      if (authStatus.state === 'ADMIN_RECOVERY_REQUIRED') {
+        return res.status(409).json({
+          error: 'تهيئة النظام مغلقة. توجد حسابات مسجلة مسبقاً تتطلب استعادة صلاحيات المشرف العام محلياً من الخادم.',
+          code: 'ADMIN_RECOVERY_REQUIRED',
+          state: 'ADMIN_RECOVERY_REQUIRED'
+        });
+      }
+      return res.status(409).json({
+        error: 'تهيئة النظام مكتملة بالفعل. لا يمكن تسجيل مدير النظام عند وجود مستخدمين مسجلين مسبقاً.',
+        code: 'SETUP_ALREADY_COMPLETED',
+        state: 'SYSTEM_READY'
+      });
+    }
+
     const { companyName, fullName, email, phone, password, city } = req.body || {};
 
     if (!fullName || !email) {
       return res.status(400).json({ error: 'الاسم الكامل والبريد الإلكتروني مطلوبان لتسجيل مدير النظام.' });
     }
 
+    const pwValidation = validatePasswordStrength(password);
+    if (!pwValidation.valid) {
+      return res.status(400).json({ error: pwValidation.error });
+    }
+
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanName = String(fullName).trim();
     const cleanPhone = (phone ? String(phone) : '').trim();
     const cleanCompany = (companyName ? String(companyName) : 'شركة أسطول البيع الذاتي').trim();
+
+    // Race-safe verification against latest store immediately prior to insertion
+    const latestStore = getStore();
+    if ((latestStore.users || []).length > 0) {
+      return res.status(409).json({
+        error: 'تهيئة النظام مغلقة. تم تسجيل مدير النظام بالفعل.',
+        code: 'SETUP_ALREADY_COMPLETED'
+      });
+    }
+
+    const passwordHash = hashPassword(String(password));
 
     // Create the primary Super Administrator user
     const adminUser = {
@@ -243,7 +308,7 @@ async function startServer() {
       name: cleanName,
       phone: cleanPhone,
       role: 'SUPER_ADMIN',
-      password: password ? String(password) : 'admin123',
+      passwordHash,
       isActive: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -251,20 +316,21 @@ async function startServer() {
       companyName: cleanCompany
     };
 
-    // Ensure users array is initialized and starts with this Super Admin
-    store.users = [adminUser];
+    // System was verified to have 0 users: set users array with adminUser
+    // NEVER filter, purge, or remove existing accounts
+    latestStore.users = [adminUser];
 
     // Update company settings
-    store.settings = {
-      ...(store.settings || DEFAULT_SETTINGS),
+    latestStore.settings = {
+      ...(latestStore.settings || DEFAULT_SETTINGS),
       companyName: cleanCompany,
       supportEmail: cleanEmail,
-      supportPhone: cleanPhone || store.settings?.supportPhone || '800-123-4567',
+      supportPhone: cleanPhone || latestStore.settings?.supportPhone || '800-123-4567',
       city: city || 'الرياض'
     };
 
-    if (!store.auditLogs) store.auditLogs = [];
-    store.auditLogs.unshift({
+    if (!latestStore.auditLogs) latestStore.auditLogs = [];
+    latestStore.auditLogs.unshift({
       id: `aud-${Date.now()}`,
       action: 'INITIAL_ADMIN_REGISTERED',
       entityName: 'User',
@@ -279,53 +345,207 @@ async function startServer() {
       createdAt: new Date().toISOString()
     });
 
-    saveStore(store);
+    saveStore(latestStore);
 
-    const token = `jwt-admin-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+    const session = createSession(adminUser);
     res.status(201).json({
       success: true,
-      user: adminUser,
-      token,
+      user: sanitizeUserForClient(adminUser),
+      token: session.token,
       companyName: cleanCompany
     });
   });
 
-  // Authenticate user with registered credentials
-  apiRouter.post('/auth/login', (req, res) => {
+  // Authenticate user with registered credentials (server-authoritative bcrypt verification)
+  apiRouter.post('/auth/login', adminLoginLimiter, (req, res) => {
     const store = getStore();
     const { email, password } = req.body || {};
 
-    if (!email) {
+    if (!email || typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ error: 'يرجى إدخال البريد الإلكتروني' });
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
+    if (!password || typeof password !== 'string' || !password.trim()) {
+      return res.status(400).json({ error: 'يرجى إدخال كلمة المرور' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Strict user lookup: find user by exact email match only.
+    // No hardcoded emails, no auto-provisioning, no alias bypass.
     const user = (store.users || []).find((u: any) => u.email?.trim().toLowerCase() === cleanEmail);
 
     if (!user) {
-      return res.status(401).json({ error: 'هذا البريد الإلكتروني غير مسجل في النظام. يرجى التحقق أو تسجيل مدير النظام أولاً.' });
+      return res.status(401).json({ error: 'بيانات الدخول غير صحيحة أو المستخدم غير مسجل' });
     }
 
-    if (!user.isActive) {
+    const isInactive = user.isActive === false || user.status === 'INACTIVE' || user.isDeleted === true;
+    if (isInactive) {
       return res.status(403).json({ error: 'حساب المستخدم معطل حالياً. يرجى مراجعة مدير النظام.' });
+    }
+
+    let passwordMatches = false;
+
+    if (user.passwordHash) {
+      // RULE A: passwordHash exists -> bcrypt verification required
+      passwordMatches = verifyPassword(password, user.passwordHash);
+    } else if (typeof user.password === 'string' && user.password.length > 0) {
+      // RULE B: legitimate legacy plaintext password exists -> exact password comparison required
+      // wrong password = 401, correct password = migrate to bcrypt, remove plaintext
+      if (user.password === password) {
+        passwordMatches = true;
+        user.passwordHash = hashPassword(password);
+        delete user.password;
+        saveStore(store);
+      } else {
+        passwordMatches = false;
+      }
+    } else {
+      // RULE C: no passwordHash AND no legitimate plaintext password
+      // ALWAYS 401. NEVER create passwordHash from supplied login password.
+      // Explicit administrator password reset required.
+      return res.status(401).json({
+        error: 'لم يتم تعيين كلمة مرور لهذا الحساب. يرجى مراجعة مسؤول النظام لإعادة تعيين كلمة المرور.',
+        code: 'PASSWORD_RESET_REQUIRED'
+      });
+    }
+
+    if (!passwordMatches) {
+      return res.status(401).json({ error: 'بيانات الدخول غير صحيحة أو المستخدم غير مسجل' });
     }
 
     user.lastLoginAt = new Date().toISOString();
     saveStore(store);
 
-    const token = `jwt-${user.id}-${Date.now()}`;
+    const session = createSession(user);
     res.json({
       success: true,
-      user,
-      token,
+      user: sanitizeUserForClient(user),
+      token: session.token,
       companyName: store.settings?.companyName || ''
     });
   });
 
-  // Reset Users (Allows resetting all users so a company can re-onboard if desired)
-  apiRouter.post('/auth/reset-users', (req, res) => {
+  // Dedicated Authenticated Admin Password Reset Handler
+  // Requires valid server session, authorized admin/SUPER_ADMIN, bcrypt hash, minimum 10 chars, revokes user sessions, audits action
+  const handleAdminPasswordReset = (req: any, res: any) => {
+    const store = getStore();
+    const targetUserId = (req.params?.id || req.body?.userId || '').trim();
+    const newPassword = req.body?.newPassword || req.body?.password;
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'معرف المستخدم المطلوب مطلوب (userId مطلوب).' });
+    }
+
+    const pwValidation = validatePasswordStrength(newPassword);
+    if (!pwValidation.valid) {
+      return res.status(400).json({ error: pwValidation.error });
+    }
+
+    const idx = (store.users || []).findIndex((u: any) => u.id === targetUserId);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'المستخدم المطلوب غير موجود' });
+    }
+
+    const targetUser = store.users[idx];
+    const callerRole = ((req.user?.role || '') as string).toUpperCase().trim();
+    const targetRole = ((targetUser.role || '') as string).toUpperCase().trim();
+    const callerId = req.user?.id;
+
+    // Privilege escalation protection:
+    // 1. Only SUPER_ADMIN may reset credentials for a SUPER_ADMIN account
+    if (targetRole === 'SUPER_ADMIN' && callerRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        error: 'غير مصرح لمسؤول النظام (ADMIN) بإعادة تعيين كلمة مرور المدير العام (SUPER_ADMIN). يقتصر ذلك على المدير العام فقط.',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
+    // 2. ADMIN cannot reset credentials for another ADMIN (only SUPER_ADMIN can manage other ADMIN accounts)
+    if (targetRole === 'ADMIN' && callerRole !== 'SUPER_ADMIN' && callerId !== targetUser.id) {
+      return res.status(403).json({
+        error: 'غير مصرح لمسؤول النظام (ADMIN) بإعادة تعيين كلمة مرور مسؤول نظام آخر. يقتصر ذلك على المدير العام (SUPER_ADMIN).',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
+    const passwordHash = hashPassword(String(newPassword));
+
+    targetUser.passwordHash = passwordHash;
+    delete targetUser.password;
+    targetUser.updatedAt = new Date().toISOString();
+
+    // Revoke all existing sessions for this user
+    invalidateUserSessions(targetUserId);
+
+    // Audit action
+    store.auditLogs = store.auditLogs || [];
+    store.auditLogs.unshift({
+      id: `aud-${Date.now()}`,
+      action: 'ADMIN_PASSWORD_RESET',
+      entityName: 'User',
+      entityId: targetUser.id,
+      userName: req.user?.fullName || req.user?.name || 'Admin',
+      newValues: {
+        message: 'تم إعادة تعيين كلمة مرور المستخدم وإلغاء جميع جلساته النشطة بواسطة مسؤول النظام',
+        targetUserId: targetUser.id,
+        targetEmail: targetUser.email,
+        adminUserId: req.user?.id
+      },
+      createdAt: new Date().toISOString()
+    });
+
+    saveStore(store);
+
+    return res.json({
+      success: true,
+      message: 'تم إعادة تعيين كلمة المرور بنجاح وإلغاء جميع جلسات المستخدم السابقة.',
+      user: sanitizeUserForClient(targetUser)
+    });
+  };
+
+  // Explicit Authenticated Admin Password Reset Endpoints
+  apiRouter.post('/auth/admin/reset-password', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), handleAdminPasswordReset);
+  apiRouter.post('/users/:id/reset-password', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), handleAdminPasswordReset);
+
+  // Return currently authenticated session profile
+  apiRouter.get('/auth/me', (req, res) => {
+    res.json({
+      success: true,
+      user: (req as any).user
+    });
+  });
+
+  // Logout and invalidate active session
+  apiRouter.post('/auth/logout', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      deleteSession(token);
+    }
+    res.json({ success: true, message: 'تم تسجيل الخروج بنجاح وإلغاء الجلسة.' });
+  });
+
+  // Reset Users: Authorized SUPER_ADMIN operation only
+  apiRouter.post('/auth/reset-users', requireEnterpriseRole(['SUPER_ADMIN']), (req, res) => {
+    if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEV_USER_RESET) {
+      return res.status(403).json({ error: 'عملية تفريغ المستخدمين غير مصرح بها في بيئة الإنتاج.' });
+    }
+    if (req.body?.confirmReset !== true) {
+      return res.status(400).json({ error: 'تأكيد تفريغ المستخدمين مطلوب: confirmReset must be true' });
+    }
     const store = getStore();
     store.users = [];
+    if (!store.auditLogs) store.auditLogs = [];
+    store.auditLogs.unshift({
+      id: `aud-${Date.now()}`,
+      action: 'USERS_RESET',
+      entityName: 'User',
+      entityId: 'ALL',
+      userName: (req as any).user?.name || (req as any).user?.fullName || 'SUPER_ADMIN',
+      newValues: { message: 'تم تفريغ مستخدمي النظام بالكامل بواسطة مدير النظام' },
+      createdAt: new Date().toISOString()
+    });
     saveStore(store);
     res.json({ success: true, message: 'تم تفريغ مستخدمي النظام بنجاح.' });
   });
@@ -2609,27 +2829,42 @@ async function startServer() {
   // Users
   apiRouter.get('/users', (req, res) => {
     const store = getStore();
-    res.json(store.users || []);
+    res.json((store.users || []).map(sanitizeUserForClient));
   });
 
   apiRouter.post('/users', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), (req, res) => {
     const store = getStore();
     const userData = req.body || {};
 
+    const pwValidation = validatePasswordStrength(userData.password);
+    if (!pwValidation.valid) {
+      return res.status(400).json({ error: pwValidation.error });
+    }
+
     const userId = userData.id || `usr-${Date.now()}`;
     const fullName = (userData.fullName || userData.name || 'New User').trim();
     const email = (userData.email || `${userId}@company.com`).trim().toLowerCase();
     const role = userData.role || 'TECHNICIAN';
-    const employeeCode = (userData.employeeCode || (role === 'TECHNICIAN' ? `TECH-${Math.floor(1000 + Math.random() * 9000)}` : '')).trim().toUpperCase();
 
-    const newUser = {
+    const callerRole = (((req as any).user?.role || '') as string).toUpperCase().trim();
+    if (role === 'SUPER_ADMIN' && callerRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        error: 'لا يمكن إنشاء حساب برتبة المدير العام (SUPER_ADMIN) إلا من قبل المدير العام.',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
+    const employeeCode = (userData.employeeCode || (role === 'TECHNICIAN' ? `TECH-${Math.floor(1000 + Math.random() * 9000)}` : '')).trim().toUpperCase();
+    const passwordHash = hashPassword(String(userData.password));
+
+    const newUser: any = {
       id: userId,
       fullName,
       name: fullName,
       email,
       phone: userData.phone || userData.phoneNumber || '',
       role,
-      password: userData.password || 'password123',
+      passwordHash,
       isActive: userData.isActive !== undefined ? userData.isActive : true,
       status: userData.status || (userData.isActive === false ? 'INACTIVE' : 'ACTIVE'),
       employeeCode,
@@ -2652,8 +2887,8 @@ async function startServer() {
           id: `tch-${Date.now()}`,
           userId: newUser.id,
           employeeCode: employeeCode || `TECH-${Math.floor(1000 + Math.random() * 9000)}`,
-          fullName: name,
-          fullNameAr: userData.fullNameAr || name,
+          fullName: fullName,
+          fullNameAr: userData.fullNameAr || fullName,
           email: email,
           phone: userData.phone || '',
           phoneNumber: userData.phone || '',
@@ -2695,7 +2930,7 @@ async function startServer() {
     });
 
     saveStore(store);
-    res.status(201).json(newUser);
+    res.status(201).json(sanitizeUserForClient(newUser));
   });
 
   apiRouter.put('/users/:id', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), (req, res) => {
@@ -2707,20 +2942,61 @@ async function startServer() {
     if (idx === -1) return res.status(404).json({ error: 'User not found' });
 
     const current = store.users[idx];
-    const updated = {
+    const callerRole = (((req as any).user?.role || '') as string).toUpperCase().trim();
+    const currentRole = ((current.role || '') as string).toUpperCase().trim();
+
+    if (currentRole === 'SUPER_ADMIN' && callerRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        error: 'غير مصرح بتعديل بيانات أو صلاحيات المدير العام (SUPER_ADMIN) إلا من قبل المدير العام.',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
+    if (updates.role === 'SUPER_ADMIN' && callerRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        error: 'لا يمكن ترقية الحساب إلى رتبة المدير العام (SUPER_ADMIN) إلا من قبل المدير العام.',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
+    let passwordHash = current.passwordHash;
+    if (updates.password !== undefined && updates.password !== null && String(updates.password).trim() !== '') {
+      if (currentRole === 'ADMIN' && callerRole !== 'SUPER_ADMIN' && (req as any).user?.id !== current.id) {
+        return res.status(403).json({
+          error: 'غير مصرح لمسؤول النظام (ADMIN) بتغيير كلمة مرور مسؤول نظام آخر. يقتصر ذلك على المدير العام.',
+          code: 'PERMISSION_DENIED'
+        });
+      }
+      const pwValidation = validatePasswordStrength(updates.password);
+      if (!pwValidation.valid) {
+        return res.status(400).json({ error: pwValidation.error });
+      }
+      passwordHash = hashPassword(String(updates.password));
+    }
+
+    const updated: any = {
       ...current,
       name: updates.name !== undefined ? updates.name.trim() : current.name,
+      fullName: updates.fullName !== undefined ? updates.fullName.trim() : (updates.name !== undefined ? updates.name.trim() : current.fullName),
       email: updates.email !== undefined ? updates.email.trim().toLowerCase() : current.email,
       phone: updates.phone !== undefined ? updates.phone.trim() : current.phone,
       role: updates.role !== undefined ? updates.role : current.role,
       status: updates.status !== undefined ? updates.status : current.status,
+      isActive: updates.isActive !== undefined ? updates.isActive : (updates.status !== undefined ? updates.status === 'ACTIVE' : current.isActive),
       employeeCode: updates.employeeCode !== undefined ? updates.employeeCode.trim().toUpperCase() : current.employeeCode,
       department: updates.department !== undefined ? updates.department : current.department,
       assignedRegion: updates.assignedRegion !== undefined ? updates.assignedRegion : current.assignedRegion,
+      passwordHash,
       updatedAt: new Date().toISOString()
     };
+    delete updated.password;
 
     store.users[idx] = updated;
+
+    // Invalidate sessions if user deactivated or role modified
+    if (!updated.isActive || updated.status === 'INACTIVE' || updated.role !== current.role) {
+      invalidateUserSessions(id);
+    }
 
     // Sync corresponding technician if role is TECHNICIAN
     if (updated.role === 'TECHNICIAN' || current.role === 'TECHNICIAN') {
@@ -2750,7 +3026,7 @@ async function startServer() {
     });
 
     saveStore(store);
-    res.json(updated);
+    res.json(sanitizeUserForClient(updated));
   });
 
   apiRouter.delete('/users/:id', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), (req, res) => {
@@ -2761,7 +3037,25 @@ async function startServer() {
     if (idx === -1) return res.status(404).json({ error: 'User not found' });
 
     const user = store.users[idx];
+    const callerRole = (((req as any).user?.role || '') as string).toUpperCase().trim();
+    const targetRole = ((user.role || '') as string).toUpperCase().trim();
+
+    if (targetRole === 'SUPER_ADMIN' && callerRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        error: 'لا يمكن حذف حساب المدير العام (SUPER_ADMIN) إلا من قبل المدير العام.',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
+    if (targetRole === 'ADMIN' && callerRole !== 'SUPER_ADMIN' && (req as any).user?.id !== user.id) {
+      return res.status(403).json({
+        error: 'غير مصرح لمسؤول النظام (ADMIN) بحذف حساب مسؤول نظام آخر. يقتصر ذلك على المدير العام.',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+
     store.users.splice(idx, 1);
+    invalidateUserSessions(id);
 
     store.auditLogs = store.auditLogs || [];
     store.auditLogs.unshift({
@@ -2803,7 +3097,7 @@ async function startServer() {
       suppliers: store.suppliers,
       partRequests: store.partRequests,
       transactions: store.transactions,
-      users: store.users,
+      users: (store.users || []).map(sanitizeUserForClient),
       settings: store.settings || DEFAULT_SETTINGS,
       auditLogs: store.auditLogs || []
     });
@@ -4895,8 +5189,8 @@ async function startServer() {
     res.json({ success: true, isPaused: false, message: 'Sync worker resumed and synced.', result });
   });
 
-  app.use('/api', apiRouter);
   app.use('/api/v1', apiRouter);
+  app.use('/api', apiRouter);
 
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {

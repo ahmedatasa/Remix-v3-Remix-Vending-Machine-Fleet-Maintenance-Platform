@@ -787,3 +787,4 @@ export const runtimeStoreManager = new Proxy({} as RuntimeStoreManager, {
 });
 export const getStore = () => RuntimeStoreManager.getInstance().getStore();
 export const saveStore = (data?: RuntimeStoreData) => RuntimeStoreManager.getInstance().saveStore(data);
+export const getRuntimeStoreManager = () => RuntimeStoreManager.getInstance();
