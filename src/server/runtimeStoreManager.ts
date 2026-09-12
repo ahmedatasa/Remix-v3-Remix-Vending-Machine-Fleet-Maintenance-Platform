@@ -380,6 +380,22 @@ export class RuntimeStoreManager {
     const runtimePath = resolveRuntimeDataPath();
     const now = new Date().toISOString();
 
+    // Explicit isolated staging mode:
+    // - never migrates tracked fleet_data.json
+    // - never seeds fleet_master_baseline.json
+    // - creates an empty runtime store only on the first staging start
+    // Existing staging runtime data is preserved across restarts.
+    const runtimeMode = (process.env.VENDING_RUNTIME_MODE || '').trim().toUpperCase();
+    const emptyStagingMode = runtimeMode === 'EMPTY_STAGING';
+
+    if (emptyStagingMode && !fs.existsSync(runtimePath)) {
+      console.log('[Persistence] EMPTY_STAGING mode: initializing isolated empty runtime store.');
+      this.inMemoryStore = createEmptyRuntimeStore(`staging-${crypto.randomBytes(6).toString('hex')}`);
+      this.atomicWriteJsonSync(runtimePath, this.inMemoryStore);
+      this.logStartupDiagnostics('SKIPPED_EMPTY_STAGING', 'EMPTY_STAGING_CREATED');
+      return this.inMemoryStore;
+    }
+
     // Fresh install / explicit baseline bypass support
     const forceBaseline = process.env.VENDING_FRESH_INSTALL === 'true' || process.env.VENDING_SEED_FROM_BASELINE === 'true';
     if (forceBaseline && !fs.existsSync(runtimePath)) {
@@ -389,8 +405,11 @@ export class RuntimeStoreManager {
       return this.inMemoryStore;
     }
 
-    // 1. Run legacy migration if needed
-    const migrationResult = this.migrateLegacyStore();
+    // 1. Run legacy migration if needed.
+    // EMPTY_STAGING must never inspect or migrate the tracked production fleet.
+    const migrationResult = emptyStagingMode
+      ? { migrated: false, status: 'SKIPPED_EMPTY_STAGING' }
+      : this.migrateLegacyStore();
 
     // 2. Load authoritative runtime file if exists
     if (fs.existsSync(runtimePath)) {
@@ -516,6 +535,14 @@ export class RuntimeStoreManager {
       } catch (err) {
         console.error('[Persistence] CRITICAL: Failed to parse runtime store:', err);
       }
+    }
+
+    // EMPTY_STAGING is fail-closed. If its runtime file exists but cannot be
+    // loaded safely, NEVER fall through to legacy migration or baseline seeding.
+    if (emptyStagingMode) {
+      throw new Error(
+        `EMPTY_STAGING_RUNTIME_INVALID: isolated staging runtime could not be loaded safely: ${runtimePath}`
+      );
     }
 
     // 3. First-run baseline initialization (if neither runtime nor legacy data exists)

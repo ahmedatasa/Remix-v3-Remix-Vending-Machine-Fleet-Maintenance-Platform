@@ -3,6 +3,7 @@ import https from 'https';
 import crypto from 'crypto';
 
 export interface SyncWorkerOptions {
+  enabled?: boolean;
   cloudApiUrl?: string;
   syncClientId?: string;
   syncClientSecret?: string;
@@ -26,6 +27,7 @@ class DesktopSyncWorker {
 
   public getOptions(): Required<SyncWorkerOptions> {
     return {
+      enabled: (process.env.DESKTOP_SYNC_ENABLED || 'true').trim().toLowerCase() !== 'false',
       cloudApiUrl: (process.env.CLOUD_API_URL || 'http://127.0.0.1:3001').trim().replace(/\/+$/, ''),
       syncClientId: (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim(),
       syncClientSecret: (process.env.SYNC_CLIENT_SECRET || '').trim(),
@@ -125,12 +127,21 @@ class DesktopSyncWorker {
    * NEVER overwrites or deletes local machines. Local fleet remains authoritative.
    */
   public async syncOnce(getStore: () => any, saveStore: (store: any) => void): Promise<SyncResult> {
+    const opts = this.getOptions();
+
+    if (!opts.enabled) {
+      return {
+        connected: false,
+        message: 'Desktop sync is disabled by DESKTOP_SYNC_ENABLED=false',
+        syncedEventsCount: 0
+      };
+    }
+
     if (this.isSyncing) {
       return { connected: false, message: 'Sync cycle already in progress', syncedEventsCount: 0 };
     }
 
     this.isSyncing = true;
-    const opts = this.getOptions();
 
     if (!opts.syncClientSecret) {
       this.isSyncing = false;
@@ -495,11 +506,17 @@ class DesktopSyncWorker {
    */
   public start(getStore: () => any, saveStore: (store: any) => void): void {
     if (this.isRunning) return;
+
+    const opts = this.getOptions();
+    if (!opts.enabled) {
+      console.log('[DesktopSync] Background worker disabled by DESKTOP_SYNC_ENABLED=false.');
+      return;
+    }
+
     this.isRunning = true;
     this.getStore = getStore;
     this.saveStore = saveStore;
 
-    const opts = this.getOptions();
     console.log(`[DesktopSync] Background worker started. Polling ${opts.cloudApiUrl} every ${opts.intervalSeconds}s.`);
 
     // Run initial sync cycle after 2 seconds
