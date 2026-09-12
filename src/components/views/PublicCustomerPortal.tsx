@@ -142,6 +142,16 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
     const code = (searchCode || trackingQuery).trim();
     if (!code) return;
 
+    if (!code.toUpperCase().startsWith('TRK-')) {
+      setTrackingData(null);
+      setTrackingError(
+        isArabic
+          ? 'استخدم رمز التتبع الآمن الذي يبدأ بـ TRK- والموجود في إيصال البلاغ.'
+          : 'Use the secure tracking token beginning with TRK- from your ticket receipt.'
+      );
+      return;
+    }
+
     setIsTrackingLoading(true);
     setTrackingError(null);
 
@@ -558,14 +568,14 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
             {/* Search Input */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg">
               <label className="block text-xs font-semibold text-slate-300 mb-2">
-                {isArabic ? 'أدخل رقم التذكرة أو رمز التتبع' : 'Enter Ticket Number or Tracking Token'}
+                {isArabic ? 'أدخل رمز التتبع الآمن' : 'Enter Secure Tracking Token'}
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={trackingQuery}
                   onChange={(e) => setTrackingQuery(e.target.value)}
-                  placeholder="TCK-2026-XXXX / TRK-XXXXXX"
+                  placeholder="TRK-XXXXXX"
                   className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-mono uppercase"
                 />
                 <button

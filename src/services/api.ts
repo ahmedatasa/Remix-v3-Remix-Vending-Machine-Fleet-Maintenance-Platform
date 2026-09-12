@@ -2053,29 +2053,42 @@ export const api = {
   // Dashboard Telemetry
   async getAllFleetData() {
     try {
-      const [machines, tickets, spareParts, technicians, transactions, partRequests, buildings, locations] = await Promise.all([
-        this.getMachines(),
-        this.getTickets(),
-        this.getSpareParts(),
-        this.getTechnicians(),
-        this.getTransactions(),
-        this.getPartRequests(),
-        this.getBuildings(),
-        this.getLocations()
-      ]);
-      const validTechs = (technicians || store.technicians || []).filter((t: any) => !t.isDeleted);
+      // Dashboard must consume one authoritative server-side runtime snapshot.
+      // Avoid Promise.all split-brain where one failed secondary endpoint causes
+      // the entire dashboard to fall back to stale browser-local state.
+      const data = await apiFetch<any>('/fleet/all');
+
+      const rawMachines: Machine[] = Array.isArray(data?.machines)
+        ? data.machines
+        : [];
+
+      const machines = rawMachines.map((m: Machine) => {
+        const { healthScore, healthStatus, isChronic, reason } =
+          this.calculateMachineHealth(m);
+
+        return {
+          ...m,
+          healthScore,
+          healthStatus,
+          isChronicFailure: isChronic || m.isChronicFailure,
+          chronicFailureReason: reason || m.chronicFailureReason
+        };
+      });
+
       return {
-        machines: machines || store.machines,
-        tickets: tickets || store.tickets,
-        spareParts: spareParts || store.spareParts,
-        technicians: validTechs,
-        transactions: transactions || store.transactions,
-        partRequests: partRequests || store.partRequests,
-        buildings: buildings || store.buildings,
-        locations: locations || store.locations
+        machines,
+        tickets: Array.isArray(data?.tickets) ? data.tickets : [],
+        spareParts: Array.isArray(data?.spareParts) ? data.spareParts : [],
+        technicians: (Array.isArray(data?.technicians) ? data.technicians : [])
+          .filter((t: any) => !t.isDeleted),
+        transactions: Array.isArray(data?.transactions) ? data.transactions : [],
+        partRequests: Array.isArray(data?.partRequests) ? data.partRequests : [],
+        buildings: Array.isArray(data?.buildings) ? data.buildings : [],
+        locations: Array.isArray(data?.locations) ? data.locations : []
       };
     } catch {
       store.sync();
+
       return {
         machines: store.machines,
         tickets: store.tickets,
@@ -8366,7 +8379,7 @@ export const api = {
   // Hybrid Cloud & Sync Queue APIs
   async getCloudSettings() {
     try {
-      return await apiFetch<any>('/cloud/settings');
+      return await apiFetch<any>('/admin/cloud-settings');
     } catch {
       return {
         publicQrBaseUrl: (import.meta as any).env?.VITE_PUBLIC_QR_BASE_URL || '',
@@ -8379,7 +8392,7 @@ export const api = {
   },
 
   async updateCloudSettings(settings: any) {
-    return await apiFetch<any>('/cloud/settings', {
+    return await apiFetch<any>('/admin/cloud-settings', {
       method: 'POST',
       body: JSON.stringify(settings)
     });
