@@ -39,7 +39,7 @@ import {
   getSystemAuthState
 } from './src/server/authSecurity';
 
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 import {
   runtimeStoreManager,
