@@ -1,3 +1,4 @@
+import { syncCloudTicketLifecycleFromMain } from './src/server/cloudTicketLifecycleClient';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -283,8 +284,14 @@ async function startServer() {
         ? req.url
         : '';
 
+    const managementTargetPrefix =
+      String(
+        (req as any).cloudManagementTargetPrefix ||
+        '/api/locations'
+      ).replace(/\/+$/, '');
+
     const targetPath =
-      `/api/locations${relativeUrl}`;
+      `${managementTargetPrefix}${relativeUrl}`;
 
     /*
      * Defense in depth:
@@ -520,6 +527,20 @@ async function startServer() {
       'MAINTENANCE_MANAGER'
     ]),
     cloudLocationManagementProxy
+  );
+
+  // Authenticated Main Server -> Cloud ticket lifecycle management.
+  apiRouter.use(
+    '/ticket-management',
+    requireEnterpriseRole([
+      'SUPER_ADMIN',
+      'ADMIN',
+      'MAINTENANCE_MANAGER'
+    ]),
+    (req, res) => {
+      (req as any).cloudManagementTargetPrefix = '/api/tickets';
+      return cloudLocationManagementProxy(req, res);
+    }
   );
 
   apiRouter.use(hybridRouter);
@@ -5126,7 +5147,7 @@ async function startServer() {
   });
 
   // Resolve Ticket
-  apiRouter.post('/tickets/:id/resolve', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN']), (req, res) => {
+  apiRouter.post('/tickets/:id/resolve', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN']), async (req, res) => {
     const store = getStore();
     const id = req.params.id;
     const tck = store.tickets.find((x: any) => x.id === id || x.ticketNumber === id);
@@ -5270,6 +5291,23 @@ async function startServer() {
     });
 
     saveStore(store);
+
+    const cloudLifecycleResult =
+      await syncCloudTicketLifecycleFromMain(
+        req,
+        tck,
+        'RESOLVED',
+        resolution.resolutionSummary
+      );
+
+    if (!cloudLifecycleResult.ok && !cloudLifecycleResult.skipped) {
+      console.error(
+        '[CloudTicketLifecycle] RESOLVED sync failed:',
+        tck.ticketNumber,
+        cloudLifecycleResult
+      );
+    }
+
     res.json(tck);
   });
 
@@ -5324,7 +5362,7 @@ async function startServer() {
   });
 
   // Close Ticket
-  apiRouter.post('/tickets/:id/close', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']), (req, res) => {
+  apiRouter.post('/tickets/:id/close', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']), async (req, res) => {
     const store = getStore();
     const id = req.params.id;
     const tck = store.tickets.find((x: any) => x.id === id || x.ticketNumber === id);
@@ -5370,6 +5408,23 @@ async function startServer() {
     });
 
     saveStore(store);
+
+    const cloudLifecycleResult =
+      await syncCloudTicketLifecycleFromMain(
+        req,
+        tck,
+        'CLOSED',
+        req.body.comment || tck.resolutionSummary
+      );
+
+    if (!cloudLifecycleResult.ok && !cloudLifecycleResult.skipped) {
+      console.error(
+        '[CloudTicketLifecycle] CLOSED sync failed:',
+        tck.ticketNumber,
+        cloudLifecycleResult
+      );
+    }
+
     res.json(tck);
   });
 

@@ -5,6 +5,7 @@ import { publicRoutes } from './routes/publicRoutes';
 import { technicianRoutes } from './routes/technicianRoutes';
 import { syncRoutes } from './routes/syncRoutes';
 import { locationRoutes } from './routes/locationRoutes';
+import { ticketManagementRoutes } from './routes/ticketManagementRoutes';
 import { cloudConfig } from './config/cloudConfig';
 
 export function createCloudApp(): express.Express {
@@ -71,6 +72,7 @@ export function createCloudApp(): express.Express {
   app.use(technicianRoutes);
   app.use(syncRoutes);
   app.use(locationRoutes);
+  app.use(ticketManagementRoutes);
 
   // Catch-all 404 handler
   app.use((req: Request, res: Response) => {
