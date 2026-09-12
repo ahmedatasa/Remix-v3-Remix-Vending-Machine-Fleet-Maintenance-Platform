@@ -1,4 +1,7 @@
-import { syncCloudTicketLifecycleFromMain } from './src/server/cloudTicketLifecycleClient';
+import {
+  syncCloudTicketLifecycleFromMain,
+  uploadCloudTicketEvidenceFromMain
+} from './src/server/cloudTicketLifecycleClient';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -4907,64 +4910,183 @@ async function startServer() {
   });
 
   // Attachments / Photos
-  apiRouter.post('/tickets/:id/attachments', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN']), (req, res) => {
-    const store = getStore();
-    const id = req.params.id;
-    const tck = store.tickets.find((x: any) => x.id === id || x.ticketNumber === id);
-    if (!tck) return res.status(404).json({ error: 'Ticket not found' });
+  apiRouter.post(
+    '/tickets/:id/attachments',
+    requireEnterpriseRole([
+      'SUPER_ADMIN',
+      'ADMIN',
+      'MAINTENANCE_MANAGER',
+      'TECHNICIAN'
+    ]),
+    async (req, res) => {
+      const store = getStore();
+      const id = req.params.id;
+      const tck = store.tickets.find(
+        (x: any) => x.id === id || x.ticketNumber === id
+      );
 
-    const photo = req.body;
-    const now = new Date().toISOString();
-    if (!tck.attachments) tck.attachments = [];
-    if (!tck.timeline) tck.timeline = [];
-
-    const newAtt = {
-      id: `att-${Date.now()}`,
-      ticketId: tck.id,
-      fileName: photo.fileName || `site-photo-${Date.now()}.jpg`,
-      fileType: photo.fileType || 'image/jpeg',
-      fileUrl: photo.fileUrl,
-      fileSize: photo.fileSize || 1024 * 340,
-      caption: photo.caption || 'صورة توثيق الفحص الميداني',
-      uploadedBy: photo.uploadedBy || tck.assignedTechnician?.fullName || 'Technician',
-      uploaderRole: photo.uploaderRole || 'TECHNICIAN',
-      createdAt: now
-    };
-
-    tck.attachments.unshift(newAtt);
-
-    tck.timeline.unshift({
-      id: `tl-${Date.now()}`,
-      ticketId: tck.id,
-      timestamp: now,
-      technicianName: newAtt.uploadedBy,
-      action: 'PHOTO_UPLOADED',
-      actionLabel: 'إرفاق صورة توثيقية',
-      description: photo.caption || `تم إرفاق صورة الفحص الميداني: ${newAtt.fileName}`,
-      attachment: {
-        id: newAtt.id,
-        fileName: newAtt.fileName,
-        fileUrl: newAtt.fileUrl,
-        fileType: newAtt.fileType,
-        caption: newAtt.caption
+      if (!tck) {
+        return res.status(404).json({
+          error: 'Ticket not found'
+        });
       }
-    });
 
-    tck.updatedAt = now;
+      const photo = req.body || {};
+      const now = new Date().toISOString();
 
-    if (!store.auditLogs) store.auditLogs = [];
-    store.auditLogs.unshift({
-      id: `aud-${Date.now()}`,
-      action: 'PHOTO_UPLOADED',
-      entityName: 'Ticket',
-      entityId: tck.ticketNumber,
-      newValues: { fileName: photo.fileName, uploadedBy: newAtt.uploadedBy },
-      createdAt: now
-    });
+      const fileUrl = String(photo.fileUrl || '').trim();
 
-    saveStore(store);
-    res.json(newAtt);
-  });
+      const dataUrlMime =
+        /^data:([^;,]+)[;,]/i.exec(fileUrl)?.[1]?.toLowerCase();
+
+      const mimeType = String(
+        photo.fileType ||
+        dataUrlMime ||
+        'image/jpeg'
+      ).trim().toLowerCase();
+
+      let cloudEvidence: any = null;
+
+      // Cloud-origin tickets must persist evidence in Cloud/S3.
+      if (String(tck.cloudTicketId || '').trim()) {
+        if (!fileUrl.startsWith('data:image/')) {
+          return res.status(400).json({
+            error: 'EVIDENCE_IMAGE_REQUIRED',
+            message:
+              'A real image file is required for Cloud evidence upload.'
+          });
+        }
+
+        const cloudResult =
+          await uploadCloudTicketEvidenceFromMain(
+            req,
+            tck,
+            {
+              imageBase64: fileUrl,
+              mimeType,
+              caption:
+                photo.caption ||
+                'صورة توثيق الفحص الميداني'
+            }
+          );
+
+        if (!cloudResult.ok) {
+          console.error(
+            '[CloudEvidence] Upload failed:',
+            cloudResult.error ||
+            cloudResult.reason
+          );
+
+          return res.status(
+            cloudResult.statusCode || 502
+          ).json({
+            error: 'CLOUD_EVIDENCE_UPLOAD_FAILED',
+            message:
+              cloudResult.error ||
+              cloudResult.reason ||
+              'Cloud evidence upload failed.'
+          });
+        }
+
+        cloudEvidence = cloudResult.evidence || null;
+      }
+
+      if (!tck.attachments) tck.attachments = [];
+      if (!tck.timeline) tck.timeline = [];
+
+      const persistedFileUrl =
+        cloudEvidence?.url || fileUrl;
+
+      const persistedMimeType =
+        cloudEvidence?.mimeType || mimeType;
+
+      const persistedFileSize =
+        cloudEvidence?.sizeBytes ||
+        photo.fileSize ||
+        0;
+
+      const newAtt = {
+        id:
+          cloudEvidence?.id ||
+          `att-${Date.now()}`,
+        ticketId: tck.id,
+        fileName:
+          photo.fileName ||
+          `site-photo-${Date.now()}.jpg`,
+        fileType: persistedMimeType,
+        fileUrl: persistedFileUrl,
+        fileSize: persistedFileSize,
+        caption:
+          photo.caption ||
+          'صورة توثيق الفحص الميداني',
+        uploadedBy:
+          cloudEvidence?.technicianName ||
+          photo.uploadedBy ||
+          tck.assignedTechnician?.fullName ||
+          'Technician',
+        uploaderRole:
+          photo.uploaderRole ||
+          'TECHNICIAN',
+        createdAt:
+          cloudEvidence?.timestamp ||
+          now,
+        ...(cloudEvidence
+          ? {
+              cloudEvidenceId: cloudEvidence.id,
+              objectKey: cloudEvidence.objectKey,
+              sha256: cloudEvidence.sha256
+            }
+          : {})
+      };
+
+      tck.attachments.unshift(newAtt);
+
+      tck.timeline.unshift({
+        id: `tl-${Date.now()}`,
+        ticketId: tck.id,
+        timestamp: now,
+        technicianName: newAtt.uploadedBy,
+        action: 'PHOTO_UPLOADED',
+        actionLabel: 'إرفاق صورة توثيقية',
+        description:
+          photo.caption ||
+          `تم إرفاق صورة الفحص الميداني: ${newAtt.fileName}`,
+        attachment: {
+          id: newAtt.id,
+          fileName: newAtt.fileName,
+          fileUrl: newAtt.fileUrl,
+          fileType: newAtt.fileType,
+          caption: newAtt.caption
+        }
+      });
+
+      tck.updatedAt = now;
+
+      if (!store.auditLogs) store.auditLogs = [];
+
+      store.auditLogs.unshift({
+        id: `aud-${Date.now()}`,
+        action: 'PHOTO_UPLOADED',
+        entityName: 'Ticket',
+        entityId: tck.ticketNumber,
+        newValues: {
+          fileName: newAtt.fileName,
+          uploadedBy: newAtt.uploadedBy,
+          cloudEvidenceId:
+            cloudEvidence?.id || null,
+          storage:
+            cloudEvidence
+              ? 'CLOUD_OBJECT_STORAGE'
+              : 'LOCAL'
+        },
+        createdAt: now
+      });
+
+      saveStore(store);
+
+      res.json(newAtt);
+    }
+  );
 
   // Notes
   apiRouter.post('/tickets/:id/notes', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'TECHNICIAN']), (req, res) => {

@@ -4498,75 +4498,30 @@ export const api = {
     uploadedBy?: string;
     uploaderRole?: string;
   }) {
-    try {
-      const newAtt = await apiFetch<TicketAttachment>(`/tickets/${ticketId}/attachments`, {
+    const newAtt = await apiFetch<TicketAttachment>(
+      `/tickets/${ticketId}/attachments`,
+      {
         method: 'POST',
         body: JSON.stringify(photo)
-      });
-      const tck = store.tickets.find(t => t.id === ticketId || t.ticketNumber === ticketId);
-      if (tck) {
-        if (!tck.attachments) tck.attachments = [];
-        if (!tck.attachments.some(a => a.id === newAtt.id)) {
-          tck.attachments.unshift(newAtt);
-        }
-        tck.updatedAt = new Date().toISOString();
-        store.save();
       }
-      return newAtt;
-    } catch {
-      const tck = store.tickets.find(t => t.id === ticketId || t.ticketNumber === ticketId);
-      if (!tck) throw new Error('Ticket not found');
+    );
 
-      const now = new Date().toISOString();
+    const tck = store.tickets.find(
+      t => t.id === ticketId || t.ticketNumber === ticketId
+    );
+
+    if (tck) {
       if (!tck.attachments) tck.attachments = [];
-      if (!tck.timeline) tck.timeline = [];
 
-      const newAtt: TicketAttachment = {
-        id: `att-${Date.now()}`,
-        ticketId: tck.id,
-        fileName: photo.fileName,
-        fileType: photo.fileType || 'image/jpeg',
-        fileUrl: photo.fileUrl,
-        fileSize: photo.fileSize || 1024 * 340,
-        caption: photo.caption || 'Site inspection photo',
-        uploadedBy: photo.uploadedBy || tck.assignedTechnician?.fullName || 'Technician',
-        uploaderRole: photo.uploaderRole || 'TECHNICIAN',
-        createdAt: now
-      };
+      if (!tck.attachments.some(a => a.id === newAtt.id)) {
+        tck.attachments.unshift(newAtt);
+      }
 
-      tck.attachments.unshift(newAtt);
-
-      tck.timeline.unshift({
-        id: `tl-${Date.now()}`,
-        ticketId: tck.id,
-        timestamp: now,
-        technicianName: newAtt.uploadedBy,
-        action: 'PHOTO_UPLOADED',
-        actionLabel: 'Photo Uploaded',
-        description: photo.caption || `Uploaded inspection evidence: ${photo.fileName}`,
-        attachment: {
-          id: newAtt.id,
-          fileName: newAtt.fileName,
-          fileUrl: newAtt.fileUrl,
-          fileType: newAtt.fileType,
-          caption: newAtt.caption
-        }
-      });
-
-      tck.updatedAt = now;
-
-      store.auditLogs.unshift({
-        id: `aud-${Date.now()}`,
-        action: 'PHOTO_UPLOADED',
-        entityName: 'Ticket',
-        entityId: tck.ticketNumber,
-        newValues: { fileName: photo.fileName, uploadedBy: newAtt.uploadedBy },
-        createdAt: now
-      });
-
+      tck.updatedAt = new Date().toISOString();
       store.save();
-      return newAtt;
     }
+
+    return newAtt;
   },
 
   async addTicketNote(ticketId: string, note: {

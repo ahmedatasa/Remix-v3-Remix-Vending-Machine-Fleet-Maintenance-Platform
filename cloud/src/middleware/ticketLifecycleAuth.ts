@@ -95,3 +95,8 @@ export function requireCloudTicketLifecycleAuth(
 
   next();
 }
+
+// Generic trusted Main -> Cloud ticket-management authentication.
+// Kept as an alias so existing lifecycle integrations remain compatible.
+export const requireCloudTicketManagementAuth =
+  requireCloudTicketLifecycleAuth;

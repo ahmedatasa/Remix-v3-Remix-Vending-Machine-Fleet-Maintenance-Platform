@@ -116,3 +116,134 @@ export async function syncCloudTicketLifecycleFromMain(
     };
   }
 }
+
+export async function uploadCloudTicketEvidenceFromMain(
+  req: any,
+  ticket: any,
+  evidence: {
+    imageBase64: string;
+    mimeType?: string;
+    caption?: string;
+  }
+) {
+  const cloudTicketId = String(ticket?.cloudTicketId || '').trim();
+
+  if (!cloudTicketId) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'NO_CLOUD_TICKET_ID'
+    };
+  }
+
+  const cloudApiUrl = String(
+    process.env.CLOUD_API_URL || ''
+  ).trim().replace(/\/+$/, '');
+
+  const clientId = String(
+    process.env.CLOUD_MANAGEMENT_CLIENT_ID || ''
+  ).trim();
+
+  const clientSecret = String(
+    process.env.CLOUD_MANAGEMENT_CLIENT_SECRET || ''
+  ).trim();
+
+  if (!cloudApiUrl || !clientId || !clientSecret) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'CLOUD_MANAGEMENT_NOT_CONFIGURED'
+    };
+  }
+
+  const user = req?.user || {};
+  const rawUser = req?.rawUser || {};
+
+  const actorId = String(
+    user.id ||
+    rawUser.id ||
+    ticket?.assignedTechnicianId ||
+    'main-server'
+  ).trim();
+
+  const actorName = String(
+    user.fullName ||
+    user.name ||
+    user.username ||
+    rawUser.fullName ||
+    rawUser.name ||
+    rawUser.username ||
+    ticket?.assignedTechnician?.fullName ||
+    actorId
+  ).trim();
+
+  const actorRole = String(
+    req?.userRole ||
+    user.role ||
+    rawUser.role ||
+    'MAINTENANCE_MANAGER'
+  ).trim().toUpperCase();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch(
+      `${cloudApiUrl}/api/tickets/${encodeURIComponent(cloudTicketId)}/evidence`,
+      {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+
+          'x-management-client-id': clientId,
+          'x-management-client-secret': clientSecret,
+
+          'x-management-actor-id': actorId,
+          'x-management-actor-name-b64':
+            Buffer.from(actorName, 'utf8').toString('base64url'),
+
+          'x-management-actor-role': actorRole
+        },
+        body: JSON.stringify({
+          imageBase64: evidence.imageBase64,
+          mimeType: evidence.mimeType || 'image/jpeg',
+          caption: String(evidence.caption || '').trim()
+        })
+      }
+    );
+
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        skipped: false,
+        statusCode: response.status,
+        error:
+          body?.error ||
+          body?.message ||
+          'CLOUD_EVIDENCE_UPLOAD_FAILED'
+      };
+    }
+
+    return {
+      ok: true,
+      skipped: false,
+      statusCode: response.status,
+      evidence: body?.evidence
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      skipped: false,
+      error:
+        err?.name === 'AbortError'
+          ? 'CLOUD_EVIDENCE_UPLOAD_TIMEOUT'
+          : err?.message || 'CLOUD_CONNECTION_FAILED'
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}

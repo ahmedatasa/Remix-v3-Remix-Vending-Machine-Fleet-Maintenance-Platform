@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { requireCloudTicketLifecycleAuth } from '../middleware/ticketLifecycleAuth';
+import { requireCloudTicketManagementAuth } from '../middleware/ticketLifecycleAuth';
 import { getCloudRepository } from '../repositories';
+import { cloudStorage } from '../storage/cloudStorage';
+import { TicketService } from '../services/ticketService';
 
 export const ticketManagementRoutes = Router();
 
@@ -20,7 +22,7 @@ const STATUS_RANK: Record<string, number> = {
  */
 ticketManagementRoutes.post(
   '/api/tickets/:ticketId/status',
-  requireCloudTicketLifecycleAuth,
+  requireCloudTicketManagementAuth,
   async (req: Request, res: Response) => {
     const repo = getCloudRepository();
     const ticketId = String(req.params.ticketId || '').trim();
@@ -106,6 +108,123 @@ ticketManagementRoutes.post(
       return res.status(500).json({
         error: 'TICKET_STATUS_UPDATE_FAILED',
         message: err.message || 'Failed to update Cloud ticket status.'
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/tickets/:ticketId/evidence
+ *
+ * Trusted Main Server -> Cloud evidence upload.
+ * The browser never receives S3 credentials.
+ *
+ * Flow:
+ * Main authenticated actor
+ *   -> M2M management authentication
+ *   -> Cloud object storage
+ *   -> PostgreSQL ticket_evidence
+ *   -> EVIDENCE_ADDED sync event
+ */
+ticketManagementRoutes.post(
+  '/api/tickets/:ticketId/evidence',
+  requireCloudTicketManagementAuth,
+  async (req: Request, res: Response) => {
+    const repo = getCloudRepository();
+
+    const ticketId = String(req.params.ticketId || '').trim();
+    const imageBase64 = String(req.body?.imageBase64 || '').trim();
+    const mimeType = String(
+      req.body?.mimeType || 'image/jpeg'
+    ).trim().toLowerCase();
+    const caption = String(req.body?.caption || '').trim();
+
+    if (!ticketId || !imageBase64) {
+      return res.status(400).json({
+        error: 'EVIDENCE_PARAMS_REQUIRED',
+        message: 'Cloud ticket ID and image data are required.'
+      });
+    }
+
+    try {
+      // Check ticket first so a bad ticket ID never creates an orphan S3 object.
+      const ticket = await repo.tickets.findById(ticketId);
+
+      if (!ticket) {
+        return res.status(404).json({
+          error: 'TICKET_NOT_FOUND',
+          message: 'Cloud ticket was not found.'
+        });
+      }
+
+      const actor = (req as any).managementActor;
+
+      // Accept a normal data URL or raw Base64.
+      const rawBase64 = imageBase64.replace(
+        /^data:[^;]+;base64,/i,
+        ''
+      );
+
+      const buffer = Buffer.from(rawBase64, 'base64');
+
+      if (!buffer.length) {
+        return res.status(400).json({
+          error: 'EMPTY_EVIDENCE_FILE',
+          message: 'Evidence image is empty.'
+        });
+      }
+
+      // Real PutObjectCommand path lives inside cloudStorage.
+      const uploadResult = await cloudStorage.upload({
+        buffer,
+        mimeType,
+        ticketId: ticket.id,
+        technicianId: actor.id
+      });
+
+      // Persist metadata to PostgreSQL and emit EVIDENCE_ADDED.
+      const result = await TicketService.attachEvidence({
+        ticketId: ticket.id,
+        technicianId: actor.id,
+        technicianName: actor.name,
+        uploadResult,
+        caption
+      });
+
+      await repo.audit.log({
+        actorType: 'SYSTEM',
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'MAIN_SERVER_EVIDENCE_UPLOAD',
+        entity: 'TICKET',
+        result: 'SUCCESS',
+        details: {
+          ticketId: ticket.id,
+          actorRole: actor.role,
+          objectKey: uploadResult.objectKey,
+          sizeBytes: uploadResult.sizeBytes,
+          mimeType: uploadResult.mimeType,
+          sha256: uploadResult.sha256
+        }
+      });
+
+      return res.json({
+        success: true,
+        evidence: result.evidence,
+        message: 'Evidence uploaded to Cloud storage successfully.'
+      });
+    } catch (err: any) {
+      const message =
+        err?.message || 'Failed to upload Cloud ticket evidence.';
+
+      const statusCode =
+        message.includes('STORAGE_SERVICE_UNAVAILABLE')
+          ? 503
+          : 400;
+
+      return res.status(statusCode).json({
+        error: 'EVIDENCE_UPLOAD_FAILED',
+        message
       });
     }
   }
