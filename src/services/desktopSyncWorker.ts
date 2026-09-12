@@ -2,12 +2,16 @@ import http from 'http';
 import https from 'https';
 import crypto from 'crypto';
 
+export type SyncMode = 'FULL' | 'PULL_ONLY';
+
 export interface SyncWorkerOptions {
   enabled?: boolean;
+  mode?: SyncMode;
   cloudApiUrl?: string;
   syncClientId?: string;
   syncClientSecret?: string;
   intervalSeconds?: number;
+  initialCursor?: number;
 }
 
 export interface SyncResult {
@@ -26,12 +30,17 @@ class DesktopSyncWorker {
   private saveStore: (store: any) => void = () => {};
 
   public getOptions(): Required<SyncWorkerOptions> {
+    const rawMode = (process.env.DESKTOP_SYNC_MODE || 'FULL').trim().toUpperCase();
+    const mode: SyncMode = rawMode === 'PULL_ONLY' ? 'PULL_ONLY' : 'FULL';
+
     return {
       enabled: (process.env.DESKTOP_SYNC_ENABLED || 'true').trim().toLowerCase() !== 'false',
+      mode,
       cloudApiUrl: (process.env.CLOUD_API_URL || 'http://127.0.0.1:3001').trim().replace(/\/+$/, ''),
       syncClientId: (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim(),
       syncClientSecret: (process.env.SYNC_CLIENT_SECRET || '').trim(),
-      intervalSeconds: parseInt(process.env.SYNC_INTERVAL || '60', 10)
+      intervalSeconds: parseInt(process.env.SYNC_INTERVAL || '60', 10),
+      initialCursor: Math.max(0, parseInt(process.env.DESKTOP_SYNC_INITIAL_CURSOR || '0', 10) || 0)
     };
   }
 
@@ -158,11 +167,21 @@ class DesktopSyncWorker {
         return { connected: false, message: 'Local store not initialized', syncedEventsCount: 0 };
       }
 
-      // 1. Safety check: ensure fleet has at least baseline 189 machines
+      // 1. Capture local fleet size. The >=189 production baseline guard
+      // applies only to FULL sync. PULL_ONLY never publishes the local fleet.
       const machineCountBefore = store.machines.length;
-      if (machineCountBefore < 189) {
+      if (opts.mode === 'FULL' && machineCountBefore < 189) {
         console.error(`[DesktopSync] CRITICAL SAFETY HALT: Machine count is ${machineCountBefore}, less than baseline 189.`);
         return { connected: false, message: `CRITICAL SAFETY HALT: Machine count ${machineCountBefore} < baseline 189`, syncedEventsCount: 0 };
+      }
+
+      if (opts.mode === 'PULL_ONLY' && machineCountBefore === 0) {
+        return {
+          connected: false,
+          message: 'PULL_ONLY waiting for at least one local machine before consuming Cloud events',
+          syncedEventsCount: 0,
+          bootstrappedMachinesCount: 0
+        };
       }
 
       // 2. Health check to Cloud API
@@ -189,59 +208,64 @@ class DesktopSyncWorker {
         'x-sync-client-secret': opts.syncClientSecret
       };
 
-      // 3. Bootstrap / synchronize sanitized machine registry to Cloud
-      // Prepares strictly sanitized public representations (NO serial numbers, NO costs, NO users)
-      const sanitizedMachines = store.machines.map((m: any) => ({
-        integrationMachineId: m.id || m.publicId || m.machineNumber,
-        publicQrToken: m.publicQrToken || m.publicQrId || m.publicId || m.machineNumber,
-        machineNumber: m.machineNumber,
-        model: m.model,
-        machineType: m.machineType || 'VENDING_MACHINE',
-        publicDisplayName: `${m.machineNumber} (${m.model || m.machineType || 'Vending'})`,
-        buildingPublicName: m.currentLocation?.building?.name || 'مبنى الماكينة',
-        locationPublicName: m.currentLocation?.fullDescription || 'موقع الماكينة',
-        latitude: typeof m.currentLocation?.latitude === 'number' ? m.currentLocation.latitude : (typeof m.latitude === 'number' ? m.latitude : null),
-        longitude: typeof m.currentLocation?.longitude === 'number' ? m.currentLocation.longitude : (typeof m.longitude === 'number' ? m.longitude : null),
-        active: m.status !== 'DECOMMISSIONED'
-      }));
-
-      // Synchronize technician credentials (bcrypt hash only)
-      const techniciansPayload = (store.technicians || []).map((t: any) => {
-        const user = (store.users || []).find((u: any) => u.id === t.userId || u.email?.toLowerCase() === t.email?.toLowerCase());
-        return {
-          id: t.id,
-          employeeCode: t.employeeCode,
-          fullName: t.fullName || t.name,
-          email: t.email,
-          phone: t.phone || t.phoneNumber,
-          passwordHash: user?.passwordHash || '',
-          status: t.status,
-          specialization: t.specialization
-        };
-      });
-
       let bootstrappedCount = 0;
-      try {
-        const bootstrapRes = await this.makeRequest('POST', `${opts.cloudApiUrl}/sync/bootstrap`, syncHeaders, {
-          machines: sanitizedMachines,
-          technicians: techniciansPayload
+      if (opts.mode === 'FULL') {
+        // 3. Bootstrap / synchronize sanitized machine registry to Cloud
+        // Prepares strictly sanitized public representations (NO serial numbers, NO costs, NO users)
+        const sanitizedMachines = store.machines.map((m: any) => ({
+          integrationMachineId: m.id || m.publicId || m.machineNumber,
+          publicQrToken: m.publicQrToken || m.publicQrId || m.publicId || m.machineNumber,
+          machineNumber: m.machineNumber,
+          model: m.model,
+          machineType: m.machineType || 'VENDING_MACHINE',
+          publicDisplayName: `${m.machineNumber} (${m.model || m.machineType || 'Vending'})`,
+          buildingPublicName: m.currentLocation?.building?.name || 'مبنى الماكينة',
+          locationPublicName: m.currentLocation?.fullDescription || 'موقع الماكينة',
+          latitude: typeof m.currentLocation?.latitude === 'number' ? m.currentLocation.latitude : (typeof m.latitude === 'number' ? m.latitude : null),
+          longitude: typeof m.currentLocation?.longitude === 'number' ? m.currentLocation.longitude : (typeof m.longitude === 'number' ? m.longitude : null),
+          active: m.status !== 'DECOMMISSIONED'
+        }));
+
+        // Synchronize technician credentials (bcrypt hash only)
+        const techniciansPayload = (store.technicians || []).map((t: any) => {
+          const user = (store.users || []).find((u: any) => u.id === t.userId || u.email?.toLowerCase() === t.email?.toLowerCase());
+          return {
+            id: t.id,
+            employeeCode: t.employeeCode,
+            fullName: t.fullName || t.name,
+            email: t.email,
+            phone: t.phone || t.phoneNumber,
+            passwordHash: user?.passwordHash || '',
+            status: t.status,
+            specialization: t.specialization
+          };
         });
-        if (bootstrapRes.statusCode === 200 && bootstrapRes.data?.synchronizedMachines) {
-          bootstrappedCount = bootstrapRes.data.synchronizedMachines;
-          // Mark pending local MACHINE_CREATED sync events as SYNCED
-          if (Array.isArray(store.syncQueue)) {
-            const now = new Date().toISOString();
-            store.syncQueue.forEach((e: any) => {
-              if (e.eventType === 'MACHINE_CREATED' && e.syncStatus === 'PENDING') {
-                e.syncStatus = 'SYNCED';
-                e.processedAt = now;
-              }
-            });
-            saveStore(store);
+
+        try {
+          const bootstrapRes = await this.makeRequest('POST', `${opts.cloudApiUrl}/sync/bootstrap`, syncHeaders, {
+            machines: sanitizedMachines,
+            technicians: techniciansPayload
+          });
+          if (bootstrapRes.statusCode === 200 && bootstrapRes.data?.synchronizedMachines) {
+            bootstrappedCount = bootstrapRes.data.synchronizedMachines;
+            // Mark pending local MACHINE_CREATED sync events as SYNCED
+            if (Array.isArray(store.syncQueue)) {
+              const now = new Date().toISOString();
+              store.syncQueue.forEach((e: any) => {
+                if (e.eventType === 'MACHINE_CREATED' && e.syncStatus === 'PENDING') {
+                  e.syncStatus = 'SYNCED';
+                  e.processedAt = now;
+                }
+              });
+              saveStore(store);
+            }
           }
+        } catch (err: any) {
+          console.warn('[DesktopSync] Bootstrap synchronization warning:', err.message);
         }
-      } catch (err: any) {
-        console.warn('[DesktopSync] Bootstrap synchronization warning:', err.message);
+
+      } else {
+        console.log('[DesktopSync] PULL_ONLY mode: skipping machine/technician bootstrap.');
       }
 
       // 4. Pull pending events from Cloud cursor
@@ -249,7 +273,19 @@ class DesktopSyncWorker {
         store.processedSyncEventIds = [];
       }
       const processedIds = new Set(store.processedSyncEventIds);
-      const cursor = typeof store.lastCloudSyncCursor === 'number' ? store.lastCloudSyncCursor : 0;
+      let cursor = typeof store.lastCloudSyncCursor === 'number' ? store.lastCloudSyncCursor : 0;
+
+      if (
+        opts.mode === 'PULL_ONLY' &&
+        cursor === 0 &&
+        processedIds.size === 0 &&
+        opts.initialCursor > 0
+      ) {
+        cursor = opts.initialCursor;
+        store.lastCloudSyncCursor = cursor;
+        saveStore(store);
+        console.log(`[DesktopSync] PULL_ONLY initialized Cloud cursor at ${cursor}.`);
+      }
 
       const eventsRes = await this.makeRequest('GET', `${opts.cloudApiUrl}/sync/events?after=${cursor}&limit=50`, syncHeaders);
       if (eventsRes.statusCode !== 200 || !eventsRes.data?.events) {
@@ -517,7 +553,7 @@ class DesktopSyncWorker {
     this.getStore = getStore;
     this.saveStore = saveStore;
 
-    console.log(`[DesktopSync] Background worker started. Polling ${opts.cloudApiUrl} every ${opts.intervalSeconds}s.`);
+    console.log(`[DesktopSync] Background worker started in ${opts.mode} mode. Polling ${opts.cloudApiUrl} every ${opts.intervalSeconds}s.`);
 
     // Run initial sync cycle after 2 seconds
     setTimeout(() => {
