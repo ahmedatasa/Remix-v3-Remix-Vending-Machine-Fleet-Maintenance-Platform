@@ -19,13 +19,23 @@ export interface QrUrlBuildResult {
 
 /**
  * Builds the canonical public QR URL for a vending machine.
- * Standardizes customer fault reporting: `${baseUrl}/public/m/${publicQrToken}`
- * Standardizes technician QR routing: `${baseUrl}/technician?machineToken=${publicQrToken}`
+ *
+ * ROUTING ARCHITECTURE SEPARATION:
+ * - Frontend / SPA UI Routes (Generated for QR Codes and browser navigation):
+ *     Customer Fault Report:    `${baseUrl}/report-fault?token=${encodeURIComponent(publicQrToken)}`
+ *     Technician Mobile Portal: `${baseUrl}/technician-portal?machineToken=${encodeURIComponent(publicQrToken)}`
+ *     Spare Part Request:       `${baseUrl}/technician-portal?machineToken=${encodeURIComponent(publicQrToken)}&tab=parts`
+ *
+ * - Cloud Backend API Routes (Reserved for JSON APIs, proxied to cloud, NOT used for SPA pages):
+ *     Public Lookup:            GET  /public/m/:token
+ *     Public Report Fault:      POST /public/m/:token/report
+ *     Public Ticket Tracking:   GET  /public/ticket/:trackingToken
+ *     Technician Auth & Ops:    POST /technician/login, POST /technician/checkin, etc.
  *
  * Enforces:
  * 1. Token must be the stable opaque publicQrToken (never machineNumber or raw database ID)
  * 2. Production URL must come from PUBLIC_QR_BASE_URL (never window.location.origin)
- * 3. Explicit error if PUBLIC_QR_BASE_URL is missing
+ * 3. Explicit error if PUBLIC_QR_BASE_URL is missing (fail-closed for production QR generation)
  */
 export function buildPublicMachineQrUrl(options: QrUrlBuildOptions): QrUrlBuildResult {
   const { machine, configuredBaseUrl, targetMode = 'customer', allowDevFallback = false } = options;
@@ -55,15 +65,25 @@ export function buildPublicMachineQrUrl(options: QrUrlBuildOptions): QrUrlBuildR
     baseUrl = String((import.meta as any).env.VITE_PUBLIC_QR_BASE_URL).trim().replace(/\/+$/, '');
   }
 
+  // Helper to build UI route based on targetMode
+  const buildUiUrl = (origin: string): string => {
+    const encodedToken = encodeURIComponent(token);
+    switch (targetMode) {
+      case 'part-request':
+        return `${origin}/technician-portal?machineToken=${encodedToken}&tab=parts`;
+      case 'technician':
+        return `${origin}/technician-portal?machineToken=${encodedToken}`;
+      case 'customer':
+      default:
+        return `${origin}/report-fault?token=${encodedToken}`;
+    }
+  };
+
   // 3. Handle missing base URL
   if (!baseUrl) {
     if (allowDevFallback && typeof window !== 'undefined') {
       const devBaseUrl = window.location.origin.replace(/\/+$/, '');
-      const url = targetMode === 'part-request'
-        ? `${devBaseUrl}/technician?machineToken=${encodeURIComponent(token)}&tab=parts`
-        : targetMode === 'technician'
-          ? `${devBaseUrl}/technician?machineToken=${encodeURIComponent(token)}`
-          : `${devBaseUrl}/public/m/${encodeURIComponent(token)}`;
+      const url = buildUiUrl(devBaseUrl);
 
       return {
         url,
@@ -88,11 +108,7 @@ export function buildPublicMachineQrUrl(options: QrUrlBuildOptions): QrUrlBuildR
   }
 
   // 4. Build production URL
-  const url = targetMode === 'part-request'
-    ? `${baseUrl}/technician?machineToken=${encodeURIComponent(token)}&tab=parts`
-    : targetMode === 'technician'
-      ? `${baseUrl}/technician?machineToken=${encodeURIComponent(token)}`
-      : `${baseUrl}/public/m/${encodeURIComponent(token)}`;
+  const url = buildUiUrl(baseUrl);
 
   return {
     url,

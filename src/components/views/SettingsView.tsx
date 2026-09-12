@@ -608,7 +608,7 @@ export const SettingsView: React.FC = () => {
                     dir="ltr"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    يُستخدم في توليد ملصقات الـ QR الموجهة للجوالات الخارجية بالصيغة: <code>{`{PUBLIC_QR_BASE_URL}/public/m/{token}`}</code>
+                    يُستخدم في توليد ملصقات الـ QR الموجهة للجوالات الخارجية بالصيغة: <code>{`{PUBLIC_QR_BASE_URL}/report-fault?token={token}`}</code>
                   </span>
                 </div>
 

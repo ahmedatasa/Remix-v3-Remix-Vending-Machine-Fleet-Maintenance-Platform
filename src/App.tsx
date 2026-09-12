@@ -48,27 +48,46 @@ const getInitialRoute = (): { tab: NavigationTab; id?: string } => {
         machineParam = hashParams.get('machineId') || hashParams.get('machine') || hashParams.get('qr') || hashParams.get('id') || hashParams.get('token');
       }
 
-      // Check for Technician Portal Route
-      if (pathname.includes('/technician') || hash.includes('/technician') || params.get('mode') === 'technician') {
+      // Check for Technician Portal Route (Explicit frontend route: /technician-portal)
+      // Note: Do NOT match '/technician' as that namespace is reserved for Cloud API proxy
+      const isTechnicianPortal =
+        pathname === '/technician-portal' ||
+        pathname.startsWith('/technician-portal/') ||
+        hash === '#technician-portal' ||
+        hash.startsWith('#technician-portal') ||
+        hash.includes('/technician-portal') ||
+        params.get('mode') === 'technician';
+
+      if (isTechnicianPortal) {
         return { tab: 'technician-portal', id: undefined };
       }
 
-      // Check for Public QR Portal Route: /public/m/:token
+      // Check for Public QR Portal Route: /public/m/:token (Preserved for backwards compatibility)
       if (pathname.includes('/public/m/')) {
         const token = pathname.split('/public/m/')[1]?.split('/')[0]?.split('?')[0];
         return { tab: 'public-portal', id: token ? decodeURIComponent(token).trim() : undefined };
       }
 
-      // Check for Public Ticket Tracking Route: /public/ticket/:trackingToken
+      // Check for Public Ticket Tracking Route: /public/ticket/:trackingToken (Preserved for backwards compatibility)
       if (pathname.includes('/public/ticket/')) {
         const trackingToken = pathname.split('/public/ticket/')[1]?.split('/')[0]?.split('?')[0];
         return { tab: 'public-portal', id: trackingToken ? decodeURIComponent(trackingToken).trim() : undefined };
       }
 
-      if (pathname.includes('report-fault') || pathname.includes('public-portal') || hash.includes('public-portal') || hash.includes('report-fault') || machineParam) {
+      // Check for Customer Fault Reporting Route: /report-fault or public-portal or query token
+      const isPublicReportRoute =
+        pathname === '/report-fault' ||
+        pathname.startsWith('/report-fault/') ||
+        pathname.includes('report-fault') ||
+        pathname.includes('public-portal') ||
+        hash.includes('public-portal') ||
+        hash.includes('report-fault') ||
+        Boolean(machineParam);
+
+      if (isPublicReportRoute) {
         return {
           tab: 'public-portal',
-          id: machineParam ? decodeURIComponent(machineParam).trim() : undefined
+          id: machineParam ? machineParam.trim() : undefined
         };
       }
     } catch {

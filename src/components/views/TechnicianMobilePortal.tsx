@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Wrench,
   CheckCircle2,
@@ -48,8 +48,45 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isLoadingTickets, setIsLoadingTickets] = useState<boolean>(false);
 
-  // Check-in & GPS state
-  const [machineTokenInput, setMachineTokenInput] = useState<string>('');
+  // Check-in & GPS state - initialize machineToken from URL query params (e.g. ?machineToken=...)
+  // Safe UI-only state initialization: does not authenticate, does not check-in, does not write data
+  const [machineTokenInput, setMachineTokenInput] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const search = window.location.search;
+        const params = new URLSearchParams(search);
+        const tokenParam = params.get('machineToken') || params.get('token');
+        if (tokenParam) return tokenParam.trim();
+        if (window.location.hash.includes('?')) {
+          const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+          const hashToken = hashParams.get('machineToken') || hashParams.get('token');
+          if (hashToken) return hashToken.trim();
+        }
+      } catch {}
+    }
+    return '';
+  });
+
+  // Preserve requested tab intent from URL (e.g. ?tab=parts from part-request QR)
+  // Safely preserved in UI state; no automatic write actions or bypass of authentication.
+  const [requestedTabIntent, setRequestedTabIntent] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const search = window.location.search;
+        const params = new URLSearchParams(search);
+        const tabParam = params.get('tab');
+        if (tabParam) return tabParam.trim();
+        if (window.location.hash.includes('?')) {
+          const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+          const hashTab = hashParams.get('tab');
+          if (hashTab) return hashTab.trim();
+        }
+      } catch {}
+    }
+    return null;
+  });
+
+  const partsSectionRef = useRef<HTMLDivElement>(null);
   const [isGettingGps, setIsGettingGps] = useState<boolean>(false);
   const [currentGps, setCurrentGps] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -119,6 +156,17 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         .catch(() => {});
     }
   }, [token]);
+
+  // Apply preserved requestedTabIntent safely when a ticket is selected
+  // Does not perform any write action or bypass authentication; safely highlights and scrolls to requested workflow
+  useEffect(() => {
+    if (selectedTicket && requestedTabIntent === 'parts') {
+      const timer = setTimeout(() => {
+        partsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedTicket, requestedTabIntent]);
 
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -541,38 +589,64 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                 <p>لا توجد تذاكر معلقة مسندة لك حالياً.</p>
               </div>
             ) : (
-              tickets.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setSelectedTicket(t)}
-                  className="bg-slate-900 border border-slate-800 hover:border-sky-500/60 rounded-2xl p-4 space-y-3 cursor-pointer transition shadow-md"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-xs font-mono text-sky-400 font-semibold">{t.ticketNumber}</span>
-                      <h4 className="text-sm font-bold text-white mt-0.5">
-                        ماكينة #{t.machine?.machineNumber} — {t.title || t.category}
-                      </h4>
-                    </div>
-                    <span
-                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
-                        t.status === 'IN_PROGRESS'
-                          ? 'bg-sky-950 text-sky-300 border-sky-800'
-                          : t.status === 'WAITING_FOR_PART'
-                          ? 'bg-amber-950 text-amber-300 border-amber-800'
-                          : 'bg-slate-800 text-slate-300 border-slate-700'
-                      }`}
-                    >
-                      {t.status}
-                    </span>
-                  </div>
+              tickets.map((t) => {
+                const isMatchedByToken = Boolean(
+                  machineTokenInput && (
+                    (t.machine?.publicQrToken && t.machine.publicQrToken.toLowerCase() === machineTokenInput.toLowerCase()) ||
+                    t.machine?.id === machineTokenInput ||
+                    t.machineId === machineTokenInput
+                  )
+                );
 
-                  <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                    <span>{t.machine?.currentLocation?.fullDescription || 'منطقة الحرم الجامعي'}</span>
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTicket(t)}
+                    className={`bg-slate-900 border ${
+                      isMatchedByToken
+                        ? 'border-sky-500 ring-1 ring-sky-500/50 shadow-sky-500/10'
+                        : 'border-slate-800 hover:border-sky-500/60'
+                    } rounded-2xl p-4 space-y-3 cursor-pointer transition shadow-md`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-sky-400 font-semibold">{t.ticketNumber}</span>
+                          {isMatchedByToken && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-sky-950 text-sky-300 border border-sky-700">
+                              الماكينة الممسوحة
+                            </span>
+                          )}
+                          {isMatchedByToken && requestedTabIntent === 'parts' && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-amber-950 text-amber-300 border border-amber-700">
+                              طلب قطع غيار (QR)
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-bold text-white mt-0.5">
+                          ماكينة #{t.machine?.machineNumber} — {t.title || t.category}
+                        </h4>
+                      </div>
+                      <span
+                        className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border ${
+                          t.status === 'IN_PROGRESS'
+                            ? 'bg-sky-950 text-sky-300 border-sky-800'
+                            : t.status === 'WAITING_FOR_PART'
+                            ? 'bg-amber-950 text-amber-300 border-amber-800'
+                            : 'bg-slate-800 text-slate-300 border-slate-700'
+                        }`}
+                      >
+                        {t.status}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>{t.machine?.currentLocation?.fullDescription || 'منطقة الحرم الجامعي'}</span>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -790,12 +864,24 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
             </div>
 
             {/* STEP D: Spare Part Request */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+            <div
+              ref={partsSectionRef}
+              className={`bg-slate-900 border ${
+                requestedTabIntent === 'parts'
+                  ? 'border-amber-500 ring-1 ring-amber-500/50 shadow-amber-500/10'
+                  : 'border-slate-800'
+              } rounded-2xl p-5 space-y-4 shadow-xl transition-all duration-300`}
+            >
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <Package className="w-5 h-5 text-amber-400" />
                   <h3 className="text-sm font-bold text-white">4. طلب قطع غيار من المستودع</h3>
                 </div>
+                {requestedTabIntent === 'parts' && (
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-amber-950/80 border border-amber-600 text-amber-300 rounded-lg">
+                    طلب موجه عبر رمز الـ QR (tab=parts)
+                  </span>
+                )}
               </div>
 
               <form onSubmit={handleRequestSparePart} className="space-y-3">
