@@ -61,6 +61,10 @@ import {
 import { mergeFleetSyncPayload } from './src/server/syncMergeEngine';
 import { SystemSettings, RuntimeStoreData } from './src/server/runtimeStoreTypes';
 import { normalizeExplicitLocationSource } from './src/utils/geoValidation';
+import {
+  restoreMainRuntimeSnapshotToFile,
+  closeMainRuntimeSnapshotStore
+} from './src/server/mainRuntimeSnapshotStore';
 
 export type { SystemSettings, RuntimeStoreData };
 
@@ -131,7 +135,13 @@ async function startServer() {
   }
   app.use('/uploads', express.static(uploadsDir));
 
-  // Initialize DB immediately
+  // Restore durable Main runtime snapshot before the first local store load.
+  // If MAIN_DATABASE_URL is not configured, this is a safe no-op.
+  await restoreMainRuntimeSnapshotToFile(
+    resolveRuntimeDataPath()
+  );
+
+  // Initialize authoritative runtime store after optional restore.
   getStore();
 
   // Create unified API router for both /api and /api/v1
@@ -5689,8 +5699,72 @@ async function startServer() {
   // Start background Desktop Sync Worker
   desktopSyncWorker.start(getStore, saveStore);
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const mainServer = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Unified Fleet Server running on http://0.0.0.0:${PORT}`);
+  });
+
+  let shutdownStarted = false;
+
+  const gracefulShutdown = async (signal: string): Promise<void> => {
+    if (shutdownStarted) {
+      return;
+    }
+
+    shutdownStarted = true;
+    console.log(`[Server] ${signal} received. Starting graceful shutdown...`);
+
+    // Stop background sync first so it cannot create new mutations.
+    desktopSyncWorker.stop();
+
+    // Safety timeout: do not let a broken connection hang deployment forever.
+    const forceShutdownTimer = setTimeout(() => {
+      console.error('[Server] Graceful shutdown timeout exceeded.');
+      process.exit(1);
+    }, 15000);
+
+    forceShutdownTimer.unref();
+
+    try {
+      // Stop accepting new requests and wait for active requests to finish.
+      await new Promise<void>((resolve, reject) => {
+        mainServer.close((err?: Error) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
+      });
+
+      console.log('[Server] HTTP server closed. Flushing durable runtime snapshot...');
+
+      // Flush the latest queued runtime state and close the PostgreSQL pool.
+      await closeMainRuntimeSnapshotStore();
+
+      clearTimeout(forceShutdownTimer);
+
+      console.log('[Server] Durable runtime snapshot flushed successfully.');
+      console.log('[Server] Graceful shutdown completed.');
+
+      process.exit(0);
+    } catch (err: any) {
+      clearTimeout(forceShutdownTimer);
+
+      console.error(
+        '[Server] Graceful shutdown failed:',
+        err?.message || err
+      );
+
+      process.exit(1);
+    }
+  };
+
+  process.once('SIGTERM', () => {
+    void gracefulShutdown('SIGTERM');
+  });
+
+  process.once('SIGINT', () => {
+    void gracefulShutdown('SIGINT');
   });
 }
 

@@ -18,6 +18,9 @@ import {
   sanitizeFleetMachines,
   normalizeEntityRevisions
 } from './syntheticGpsSanitizer';
+import {
+  queueMainRuntimeSnapshot
+} from './mainRuntimeSnapshotStore';
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   criticalSla: 2,
@@ -709,6 +712,11 @@ export class RuntimeStoreManager {
     this.inMemoryStore = store;
     const runtimePath = resolveRuntimeDataPath();
     this.atomicWriteJsonSync(runtimePath, store);
+
+    // Local atomic JSON remains the immediate authoritative runtime copy.
+    // When MAIN_DATABASE_URL is configured, queue the same validated state
+    // for durable PostgreSQL persistence without changing existing callers.
+    queueMainRuntimeSnapshot(store);
   }
 
   public getMetadata(): PersistenceMetadata {
