@@ -310,12 +310,18 @@ class DesktopSyncWorker {
 
       // Process events idempotently
       for (const evt of events) {
-        eventIdsToAck.push(evt.eventId);
 
         if (processedIds.has(evt.eventId)) {
-          // Already applied in a previous cycle
+          // Already applied in a previous cycle: ACK is safe and idempotent.
+          eventIdsToAck.push(evt.eventId);
+          if (typeof evt.cursor === 'number' && evt.cursor > cursor) {
+            cursor = evt.cursor;
+            store.lastCloudSyncCursor = evt.cursor;
+          }
           continue;
         }
+
+        let handled = false;
 
         switch (evt.eventType) {
           case 'CUSTOMER_TICKET_CREATED': {
@@ -375,6 +381,7 @@ class DesktopSyncWorker {
               store.tickets.unshift(newLocalTicket);
               appliedCount++;
             }
+            handled = true;
             break;
           }
 
@@ -394,6 +401,7 @@ class DesktopSyncWorker {
               }
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
+              handled = true;
             }
             break;
           }
@@ -411,6 +419,7 @@ class DesktopSyncWorker {
               ticket.actions.push(p.action);
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
+              handled = true;
             }
             break;
           }
@@ -428,6 +437,7 @@ class DesktopSyncWorker {
               ticket.evidence.push(p.evidence);
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
+              handled = true;
             }
             break;
           }
@@ -445,6 +455,7 @@ class DesktopSyncWorker {
               ticket.functionalTests.push(p.functionalTest);
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
+              handled = true;
             }
             break;
           }
@@ -461,6 +472,7 @@ class DesktopSyncWorker {
               });
               appliedCount++;
             }
+            handled = true;
             break;
           }
 
@@ -479,15 +491,27 @@ class DesktopSyncWorker {
               ticket.resolvedAt = p.resolvedAt;
               ticket.updatedAt = p.resolvedAt || evt.createdAt;
               appliedCount++;
+              handled = true;
             }
             break;
           }
         }
 
+        if (!handled) {
+          console.warn(
+            `[DesktopSync] Event ${evt.eventId} (${evt.eventType}) at cursor ${evt.cursor} was not safely handled. ` +
+            'Stopping this sync batch without ACK or cursor advancement.'
+          );
+          break;
+        }
+
+        eventIdsToAck.push(evt.eventId);
+
         // Mark as processed
         store.processedSyncEventIds.push(evt.eventId);
         processedIds.add(evt.eventId);
         if (typeof evt.cursor === 'number' && evt.cursor > cursor) {
+          cursor = evt.cursor;
           store.lastCloudSyncCursor = evt.cursor;
         }
       }
