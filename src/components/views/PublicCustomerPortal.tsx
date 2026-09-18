@@ -108,7 +108,7 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
     setIsLoadingMachine(true);
     setMachineError(null);
 
-    fetch(`/public/m/${encodeURIComponent(token)}`)
+    fetch(`/api/public/m/${encodeURIComponent(token)}`)
       .then(async (res) => {
         if (!res.ok) {
           const errJson = await res.json().catch(() => ({}));
@@ -155,7 +155,7 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
     setIsTrackingLoading(true);
     setTrackingError(null);
 
-    fetch(`/public/ticket/${encodeURIComponent(code)}`)
+    fetch(`/api/public/ticket/${encodeURIComponent(code)}`)
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -198,7 +198,7 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
     const cloudReportId = `CR-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
     try {
-      const res = await fetch(`/public/m/${encodeURIComponent(token)}/report`, {
+      const res = await fetch(`/api/public/m/${encodeURIComponent(token)}/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
