@@ -65,6 +65,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ onNavigate }) => {
   const [editIsActive, setEditIsActive] = useState<boolean>(true);
   const [editPassword, setEditPassword] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [editResult, setEditResult] = useState('');
 
   // Delete User Modal State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -136,39 +137,71 @@ export const UsersView: React.FC<UsersViewProps> = ({ onNavigate }) => {
     setEditRole(user.role);
     setEditIsActive(user.isActive !== false);
     setEditPassword('');
+    setEditResult('');
     setIsEditOpen(true);
   };
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser || !editFullName.trim() || !editEmail.trim()) return;
-
+    if (isUpdating || !editingUser || !editFullName.trim() || !editEmail.trim()) return;
+    if (editPassword && (editPassword.length < 10 || editPassword !== editPassword.trim())) {
+      setEditResult('كلمة المرور يجب أن تكون 10 أحرف على الأقل، دون مسافات في البداية أو النهاية.');
+      return;
+    }
     setIsUpdating(true);
+    setEditResult('');
+    let profileSaved = false;
+    let resetting = false;
     try {
       const updates: Partial<User> = {
-        fullName: editFullName.trim(),
-        name: editFullName.trim(),
-        email: editEmail.trim().toLowerCase(),
-        phone: editPhone.trim() || undefined,
-        role: editRole,
-        isActive: editIsActive
+        fullName: editFullName.trim(), name: editFullName.trim(),
+        email: editEmail.trim().toLowerCase(), phone: editPhone.trim() || undefined,
+        role: editRole, isActive: editIsActive,
+        status: editIsActive ? 'ACTIVE' : 'INACTIVE'
       };
-
-      if (editPassword.trim()) {
-        updates.password = editPassword.trim();
+      const updated = await api.updateUser(editingUser.id, updates);
+      profileSaved = true;
+      setEditingUser(updated);
+      let cloudSync = updated.cloudSync;
+      let passwordChanged = false;
+      if (editPassword) {
+        resetting = true;
+        const result = await api.resetUserPassword(editingUser.id, editPassword);
+        if (!result.success || !result.passwordChanged) throw new Error('لم يؤكد الخادم تغيير كلمة المرور.');
+        passwordChanged = true;
+        cloudSync = result.cloudSync;
       }
-
-      await api.updateUser(editingUser.id, updates);
-
-      showToast(t('success'), `User account for ${editFullName} updated successfully`, 'success');
-      setIsEditOpen(false);
-      setEditingUser(null);
+      setEditPassword('');
+      const message = passwordChanged ? 'تم تغيير كلمة المرور في Main.' : 'تم حفظ بيانات الحساب في Main.';
+      if (cloudSync?.status === 'FAILED') {
+        setEditResult(`${message} لم تتأكد مزامنة Cloud (${cloudSync.reason || 'UNKNOWN'}). استخدم زر إعادة المزامنة.`);
+        showToast(t('warning'), message + ' مزامنة Cloud تحتاج إعادة المحاولة.', 'warning');
+      } else {
+        setEditResult(message + (cloudSync?.status === 'SYNCED' ? ' تمت مزامنة حساب الفني إلى Cloud.' : ''));
+        showToast(t('success'), message, 'success');
+      }
       await loadUsers();
-    } catch {
-      showToast(t('error'), 'Failed to update user account', 'error');
-    } finally {
-      setIsUpdating(false);
-    }
+    } catch (err: any) {
+      if (resetting) setEditPassword('');
+      const prefix = profileSaved ? 'تم حفظ بيانات الحساب. ' : '';
+      const detail = resetting ? 'لم يتأكد تغيير كلمة المرور؛ تحقق من الدخول قبل إعادة المحاولة. ' : '';
+      setEditResult(prefix + detail + (err?.message || 'تعذر حفظ الحساب.'));
+      showToast(t('error'), prefix + detail + (err?.message || 'تعذر حفظ الحساب.'), 'error');
+    } finally { setIsUpdating(false); }
+  };
+
+  const handleRetryCredentialSync = async () => {
+    if (!editingUser || isUpdating) return;
+    setIsUpdating(true);
+    setEditResult('');
+    try {
+      const result = await api.syncTechnicianCredentials(editingUser.id);
+      setEditResult(result.success && result.cloudSync.status === 'SYNCED'
+        ? 'تمت مزامنة حساب الفني وكلمة مروره الحالية إلى Cloud.'
+        : `لم تتأكد مزامنة Cloud (${result.cloudSync.reason || 'UNKNOWN'}). لم يتم تغيير كلمة المرور.`);
+    } catch (err: any) {
+      setEditResult(err?.message || 'تعذر تأكيد المزامنة؛ يمكنك إعادة المحاولة.');
+    } finally { setIsUpdating(false); }
   };
 
   const handleOpenDelete = (user: User) => {
@@ -718,11 +751,17 @@ export const UsersView: React.FC<UsersViewProps> = ({ onNavigate }) => {
             />
           </div>
 
+          {editResult && <p role="status" className="text-sm text-amber-200">{editResult}</p>}
+          {editingUser?.role === 'TECHNICIAN' && (
+            <Button type="button" variant="outline" size="sm" disabled={isUpdating} onClick={handleRetryCredentialSync}>
+              إعادة مزامنة حساب الفني إلى Cloud
+            </Button>
+          )}
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsEditOpen(false)}>
+            <Button type="button" variant="outline" size="sm" disabled={isUpdating} onClick={() => setIsEditOpen(false)}>
               {t('cancel')}
             </Button>
-            <Button type="submit" variant="primary" size="sm" isLoading={isUpdating}>
+            <Button type="submit" variant="primary" size="sm" disabled={isUpdating} isLoading={isUpdating}>
               Save Changes
             </Button>
           </div>

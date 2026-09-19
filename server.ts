@@ -2,6 +2,7 @@ import {
   syncCloudTicketLifecycleFromMain,
   uploadCloudTicketEvidenceFromMain
 } from './src/server/cloudTicketLifecycleClient';
+import { createTechnicianCredentialSync } from './src/server/cloudTechnicianCredentials';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -146,6 +147,14 @@ async function startServer() {
 
   // Create unified API router for both /api and /api/v1
   const apiRouter = express.Router();
+  const syncTechnicianCredentials = createTechnicianCredentialSync({
+    getStore,
+    getConfig: () => ({
+      cloudApiUrl: (process.env.CLOUD_API_URL || '').trim(),
+      syncClientId: (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim(),
+      syncClientSecret: (process.env.SYNC_CLIENT_SECRET || '').trim()
+    })
+  });
 
   // Standalone Cloud Service Network Proxy
   // Forwards incoming public QR, technician mobile, evidence, and sync traffic to the standalone Cloud service (port 3001)
@@ -755,7 +764,7 @@ async function startServer() {
 
   // Dedicated Authenticated Admin Password Reset Handler
   // Requires valid server session, authorized admin/SUPER_ADMIN, bcrypt hash, minimum 10 chars, revokes user sessions, audits action
-  const handleAdminPasswordReset = (req: any, res: any) => {
+  const handleAdminPasswordReset = async (req: any, res: any) => {
     const store = getStore();
     const targetUserId = (req.params?.id || req.body?.userId || '').trim();
     const newPassword = req.body?.newPassword || req.body?.password;
@@ -764,6 +773,9 @@ async function startServer() {
       return res.status(400).json({ error: 'معرف المستخدم المطلوب مطلوب (userId مطلوب).' });
     }
 
+    if (typeof newPassword === 'string' && newPassword !== newPassword.trim()) {
+      return res.status(400).json({ error: 'كلمة المرور لا تقبل مسافات في البداية أو النهاية.' });
+    }
     const pwValidation = validatePasswordStrength(newPassword);
     if (!pwValidation.valid) {
       return res.status(400).json({ error: pwValidation.error });
@@ -823,10 +835,13 @@ async function startServer() {
     });
 
     saveStore(store);
+    const cloudSync = await syncTechnicianCredentials(targetUserId);
 
     return res.json({
       success: true,
-      message: 'تم إعادة تعيين كلمة المرور بنجاح وإلغاء جميع جلسات المستخدم السابقة.',
+      passwordChanged: true,
+      cloudSync,
+      message: 'تم إعادة تعيين كلمة المرور في Main وإلغاء جلسات Main السابقة.',
       user: sanitizeUserForClient(targetUser)
     });
   };
@@ -834,6 +849,25 @@ async function startServer() {
   // Explicit Authenticated Admin Password Reset Endpoints
   apiRouter.post('/auth/admin/reset-password', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), handleAdminPasswordReset);
   apiRouter.post('/users/:id/reset-password', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), handleAdminPasswordReset);
+
+  // Retry delivery of the CURRENT hash; never reset the password or sync machines.
+  apiRouter.post('/users/:id/sync-technician-credentials', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), async (req: any, res: any) => {
+    const target = (getStore().users || []).find((u: any) => u.id === req.params.id);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.role !== 'TECHNICIAN') return res.status(400).json({ error: 'TECHNICIAN_ROLE_REQUIRED' });
+    const cloudSync = await syncTechnicianCredentials(target.id);
+    const store = getStore();
+    store.auditLogs = store.auditLogs || [];
+    store.auditLogs.unshift({
+      id: `aud-${crypto.randomUUID()}`, action: 'TECHNICIAN_CREDENTIAL_SYNC',
+      entityName: 'User', entityId: target.id,
+      userName: req.user?.fullName || req.user?.name || 'Admin',
+      newValues: { status: cloudSync.status, reason: cloudSync.reason },
+      createdAt: new Date().toISOString()
+    });
+    saveStore(store);
+    return res.json({ success: cloudSync.status === 'SYNCED', cloudSync });
+  });
 
   // Return currently authenticated session profile
   apiRouter.get('/auth/me', (req, res) => {
@@ -3260,7 +3294,7 @@ async function startServer() {
     res.status(201).json(sanitizeUserForClient(newUser));
   });
 
-  apiRouter.put('/users/:id', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), (req, res) => {
+  apiRouter.put('/users/:id', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     const store = getStore();
     const id = req.params.id;
     const updates = req.body || {};
@@ -3294,6 +3328,9 @@ async function startServer() {
           code: 'PERMISSION_DENIED'
         });
       }
+      if (String(updates.password) !== String(updates.password).trim()) {
+        return res.status(400).json({ error: 'كلمة المرور لا تقبل مسافات في البداية أو النهاية.' });
+      }
       const pwValidation = validatePasswordStrength(updates.password);
       if (!pwValidation.valid) {
         return res.status(400).json({ error: pwValidation.error });
@@ -3321,7 +3358,7 @@ async function startServer() {
     store.users[idx] = updated;
 
     // Invalidate sessions if user deactivated or role modified
-    if (!updated.isActive || updated.status === 'INACTIVE' || updated.role !== current.role) {
+    if (passwordHash !== current.passwordHash || !updated.isActive || updated.status === 'INACTIVE' || updated.role !== current.role) {
       invalidateUserSessions(id);
     }
 
@@ -3353,7 +3390,9 @@ async function startServer() {
     });
 
     saveStore(store);
-    res.json(sanitizeUserForClient(updated));
+    const cloudSync = (updated.role === 'TECHNICIAN' || current.role === 'TECHNICIAN')
+      ? await syncTechnicianCredentials(id) : { status: 'NOT_REQUIRED' };
+    res.json({ ...sanitizeUserForClient(updated), cloudSync });
   });
 
   apiRouter.delete('/users/:id', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), (req, res) => {

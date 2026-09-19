@@ -7545,23 +7545,24 @@ export const api = {
   },
 
   async updateUser(id: string, updates: Partial<User>) {
-    try {
-      return await apiFetch<User>(`/users/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates)
-      });
-    } catch {
-      const idx = store.users.findIndex(u => u.id === id);
-      if (idx !== -1) {
-        store.users[idx] = {
-          ...store.users[idx],
-          ...updates,
-          updatedAt: new Date().toISOString()
-        };
-        return store.users[idx];
-      }
-      throw new Error('User not found');
-    }
+    return await apiFetch<User & { cloudSync?: { status: string; reason?: string } }>(`/users/${id}`, {
+      method: 'PUT', body: JSON.stringify(updates)
+    });
+  },
+
+  async resetUserPassword(id: string, newPassword: string) {
+    return await apiFetch<{
+      success: boolean; passwordChanged: boolean;
+      cloudSync: { status: string; reason?: string };
+    }>(`/users/${encodeURIComponent(id)}/reset-password`, {
+      method: 'POST', body: JSON.stringify({ newPassword })
+    });
+  },
+
+  async syncTechnicianCredentials(id: string) {
+    return await apiFetch<{
+      success: boolean; cloudSync: { status: string; reason?: string };
+    }>(`/users/${encodeURIComponent(id)}/sync-technician-credentials`, { method: 'POST' });
   },
 
   async deleteUser(id: string, reason?: string) {
