@@ -98,6 +98,18 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   const [isCheckingIn, setIsCheckingIn] = useState<boolean>(false);
   const [checkInError, setCheckInError] = useState<string | null>(null);
 
+  const selectedTicketIdRef = useRef<string | undefined>(selectedTicket?.id);
+  selectedTicketIdRef.current = selectedTicket?.id;
+  const hasVerifiedCheckin = checkInResult?.ticketId === selectedTicket?.id &&
+    ['GPS_VERIFIED', 'MANUAL_EXCEPTION'].includes(checkInResult?.status || '');
+  useEffect(() => {
+    setCheckInResult(null);
+    setCheckInError(null);
+    setCurrentGps(null);
+    setGpsError(null);
+    setManualReason('');
+  }, [selectedTicket?.id]);
+
   // Evidence state
   const [evidenceType, setEvidenceType] = useState<string>('BEFORE_PHOTO');
   const [evidenceCaption, setEvidenceCaption] = useState<string>('');
@@ -246,8 +258,8 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         console.warn('GPS lookup error:', err);
         setCurrentGps(null);
         const errMsg = err.code === 1
-          ? 'تم رفض إذن الوصول للموقع الجغرافي. يرجى تفعيل الموقع أو كتابة سبب استثناء يدوي.'
-          : 'تعذر الحصول على إحداثيات GPS دقيقة من جهازك. يرجى كتابة سبب استثناء يدوي أدناه.';
+          ? 'تم رفض إذن الوصول للموقع الجغرافي. يرجى تفعيل إذن الموقع في المتصفح.'
+          : 'تعذر الحصول على إحداثيات GPS دقيقة من جهازك. يرجى تفعيل الموقع والمحاولة في مكان تصل إليه إشارة GPS.';
         setGpsError(errMsg);
         setCheckInError(errMsg);
         setIsGettingGps(false);
@@ -274,9 +286,11 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         body: JSON.stringify({
           ticketId: selectedTicket.id,
           machineToken: machineTokenInput.trim() || selectedTicket.machine?.publicQrToken,
-          latitude: currentGps?.lat,
-          longitude: currentGps?.lng,
-          accuracyMeters: currentGps?.accuracy,
+          coordinates: currentGps ? {
+            latitude: currentGps.lat,
+            longitude: currentGps.lng,
+            accuracyMeters: currentGps.accuracy
+          } : undefined,
           manualExceptionReason: manualReason.trim() || undefined
         })
       });
@@ -286,7 +300,15 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         throw new Error(json.message || 'فشل التحقق الميداني');
       }
 
-      setCheckInResult(json.checkIn);
+      if (selectedTicketIdRef.current !== selectedTicket.id) return;
+      const record = json.checkin;
+      if (json.success !== true || record?.verified !== true ||
+          record.ticketId !== selectedTicket.id ||
+          !['VERIFIED', 'MANUAL_EXCEPTION'].includes(record.status)) {
+        throw new Error('لم تصل نتيجة حضور معتمدة لهذه التذكرة.');
+      }
+      setCheckInResult({ ...record, machineToken: machineTokenInput.trim() || selectedTicket.machine?.publicQrToken,
+        status: record.status === 'VERIFIED' ? 'GPS_VERIFIED' : 'MANUAL_EXCEPTION' });
       loadTickets();
     } catch (err: any) {
       setCheckInError(err.message || 'فشل التحقق');
@@ -683,7 +705,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                   <Navigation className="w-5 h-5 text-sky-400" />
                   <h3 className="text-sm font-bold text-white">1. التحقق الميداني والـ GPS</h3>
                 </div>
-                {checkInResult || selectedTicket.gpsVerificationStatus ? (
+                {hasVerifiedCheckin ? (
                   <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4" />
                     {checkInResult?.status || selectedTicket.gpsVerificationStatus}
@@ -693,7 +715,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                 )}
               </div>
 
-              {!(checkInResult || selectedTicket.gpsVerificationStatus) ? (
+              {!hasVerifiedCheckin ? (
                 <form onSubmit={handleCheckin} className="space-y-3">
                   <div>
                     <label className="block text-xs text-slate-300 mb-1">

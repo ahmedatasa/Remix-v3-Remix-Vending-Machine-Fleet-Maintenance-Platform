@@ -230,8 +230,9 @@ export class TicketService {
       throw new Error('TICKET_NOT_FOUND: البلاغ المطلوب غير موجود.');
     }
 
-    const machine = (await repo.machines.findByQrToken(machineToken)) || (await repo.machines.findByIntegrationId(ticket.integrationMachineId));
-    if (!machine) {
+    const cleanToken = typeof machineToken === 'string' ? machineToken.trim().toUpperCase() : '';
+    const machine = cleanToken ? await repo.machines.findByQrToken(cleanToken) : null;
+    if (!machine || machine.active !== true || machine.integrationMachineId !== ticket.integrationMachineId) {
       throw new Error('MACHINE_NOT_FOUND: رمز الماكينة غير صالح أو غير مرتبط بسجل معتمد.');
     }
 

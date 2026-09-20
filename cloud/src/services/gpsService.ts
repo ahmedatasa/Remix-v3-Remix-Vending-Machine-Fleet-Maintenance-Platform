@@ -61,7 +61,7 @@ export class GpsService {
       };
     }
 
-    if (!coords || typeof coords.latitude !== 'number' || typeof coords.longitude !== 'number') {
+    if (!coords || !Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
       return {
         verified: false,
         status: 'COORDINATES_MISSING',
@@ -89,7 +89,7 @@ export class GpsService {
     }
 
     // Validate GPS Accuracy
-    if (accuracyMeters > maxAccuracy) {
+    if (!Number.isFinite(accuracyMeters) || accuracyMeters < 0 || accuracyMeters > maxAccuracy) {
       return {
         verified: false,
         status: 'FAILED_ACCURACY',
@@ -102,7 +102,8 @@ export class GpsService {
     }
 
     // Machine must have configured coordinates
-    if (typeof machine.latitude !== 'number' || typeof machine.longitude !== 'number') {
+    if (!Number.isFinite(machine.latitude) || !Number.isFinite(machine.longitude) ||
+        Math.abs(machine.latitude as number) > 90 || Math.abs(machine.longitude as number) > 180) {
       // If machine location coordinates not set in fleet, require manual exception
       return {
         verified: false,
@@ -116,7 +117,7 @@ export class GpsService {
     }
 
     // Calculate actual distance
-    const distance = this.calculateDistanceMeters(latitude, longitude, machine.latitude, machine.longitude);
+    const distance = this.calculateDistanceMeters(latitude, longitude, machine.latitude as number, machine.longitude as number);
 
     if (distance > allowedRadius) {
       return {
