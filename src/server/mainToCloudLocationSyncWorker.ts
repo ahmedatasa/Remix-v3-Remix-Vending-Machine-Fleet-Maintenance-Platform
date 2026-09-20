@@ -48,7 +48,8 @@ function toSyncInput(event: any): CloudMachineLocationSyncInput | null {
 export const mainToCloudLocationSyncWorker = {
   async syncOnce(
     getStore: () => any,
-    saveStore: (store?: any) => void
+    saveStore: (store?: any) => void,
+    options: { force?: boolean } = {}
   ): Promise<WorkerResult> {
     if (running) {
       return { attempted: 0, synced: 0, pending: 0, superseded: 0 };
@@ -67,7 +68,7 @@ export const mainToCloudLocationSyncWorker = {
           event?.direction === 'MAIN_TO_CLOUD' &&
           event?.eventType === 'MACHINE_LOCATION_SYNC_REQUIRED' &&
           event?.syncStatus === 'PENDING' &&
-          isDue(event, nowMs)
+          (options.force === true || isDue(event, nowMs))
         )
         .slice(0, 10);
 

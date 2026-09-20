@@ -119,6 +119,7 @@ export interface IAuditRepository {
     details: any;
     ip?: string;
   }): Promise<void>;
+  listMachineSyncEvents(machineId: string, limit?: number): Promise<CloudAuditEvent[]>;
 }
 
 export interface IIdempotencyRepository {

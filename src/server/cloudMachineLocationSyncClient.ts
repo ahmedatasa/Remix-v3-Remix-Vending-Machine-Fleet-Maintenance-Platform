@@ -171,3 +171,89 @@ export async function syncCloudMachineLocationFromMain(
     clearTimeout(timeout);
   }
 }
+
+
+export interface CloudMachineLocationAuditResult {
+  success: boolean;
+  machine?: {
+    integrationMachineId: string;
+    publicQrToken?: string;
+    publicDisplayName?: string;
+    version?: number;
+  };
+  count?: number;
+  events?: any[];
+  error?: string;
+  httpStatus?: number;
+}
+
+/**
+ * Read Cloud location-sync audit through the same server-to-server M2M trust
+ * boundary used for synchronization. Sync credentials never reach the browser.
+ */
+export async function fetchCloudMachineLocationSyncAudit(
+  machineIdOrToken: string,
+  limit: number = 20
+): Promise<CloudMachineLocationAuditResult> {
+  const baseUrl = (process.env.CLOUD_API_URL || '').trim().replace(/\/+$/, '');
+  const syncClientId = (process.env.SYNC_CLIENT_ID || 'ksu-desktop-sync-client-2026').trim();
+  const syncClientSecret = (process.env.SYNC_CLIENT_SECRET || '').trim();
+
+  if (!baseUrl || !syncClientId || !syncClientSecret) {
+    return { success: false, error: 'CLOUD_SYNC_NOT_CONFIGURED' };
+  }
+
+  if (!isSafeCloudUrl(baseUrl)) {
+    return { success: false, error: 'UNSAFE_CLOUD_URL' };
+  }
+
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit || 20)));
+  const controller = new AbortController();
+  const timeoutMs = Math.max(2000, parseInt(process.env.MAIN_TO_CLOUD_SYNC_TIMEOUT_MS || '8000', 10));
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/sync/audit/machines/${encodeURIComponent(machineIdOrToken)}?limit=${safeLimit}`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'x-sync-client-id': syncClientId,
+          'x-sync-client-secret': syncClientSecret
+        },
+        signal: controller.signal
+      }
+    );
+
+    let body: any = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: body?.error || body?.message || `CLOUD_HTTP_${response.status}`,
+        httpStatus: response.status
+      };
+    }
+
+    return {
+      success: body?.success === true,
+      machine: body?.machine,
+      count: typeof body?.count === 'number' ? body.count : 0,
+      events: Array.isArray(body?.events) ? body.events : [],
+      httpStatus: response.status
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.name === 'AbortError' ? 'CLOUD_SYNC_TIMEOUT' : (err?.message || 'CLOUD_CONNECTION_FAILED')
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}

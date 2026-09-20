@@ -367,6 +367,20 @@ export class JsonAuditRepository implements IAuditRepository {
       event.ip
     );
   }
+
+  async listMachineSyncEvents(machineId: string, limit: number = 20): Promise<any[]> {
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit || 20)));
+    return this.db.getData().audit_events
+      .filter((event: any) =>
+        event?.entity === 'MACHINE' &&
+        String(event?.details?.machineId || '') === machineId &&
+        String(event?.action || '').startsWith('MAIN_MACHINE_LOCATION_SYNC_')
+      )
+      .sort((a: any, b: any) =>
+        new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+      )
+      .slice(0, safeLimit);
+  }
 }
 
 export class JsonIdempotencyRepository implements IIdempotencyRepository {

@@ -5,7 +5,10 @@ import {
   uploadCloudTicketEvidenceFromMain
 } from './src/server/cloudTicketLifecycleClient';
 import { createTechnicianCredentialSync } from './src/server/cloudTechnicianCredentials';
-import { syncCloudMachineLocationFromMain } from './src/server/cloudMachineLocationSyncClient';
+import {
+  syncCloudMachineLocationFromMain,
+  fetchCloudMachineLocationSyncAudit
+} from './src/server/cloudMachineLocationSyncClient';
 import { mainToCloudLocationSyncWorker } from './src/server/mainToCloudLocationSyncWorker';
 import express from 'express';
 import path from 'path';
@@ -5763,6 +5766,40 @@ async function startServer() {
       lastCloudSyncCursor: store.lastCloudSyncCursor || 0,
       processedEventsCount: (store.processedSyncEventIds || []).length,
       machinesAuthoritativeCount: (store.machines || []).length,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  apiRouter.get('/sync/audit/machines/:idOrToken', async (req, res) => {
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
+    const result = await fetchCloudMachineLocationSyncAudit(String(req.params.idOrToken || ''), limit);
+
+    if (!result.success) {
+      const status = result.httpStatus && result.httpStatus >= 400 && result.httpStatus < 600
+        ? result.httpStatus
+        : 503;
+      return res.status(status).json({
+        success: false,
+        error: result.error || 'CLOUD_AUDIT_UNAVAILABLE'
+      });
+    }
+
+    return res.json(result);
+  });
+
+  apiRouter.post('/sync/location-retry/trigger', async (req, res) => {
+    const result = await mainToCloudLocationSyncWorker.syncOnce(getStore, saveStore, { force: true });
+    const store = getStore();
+    const pendingLocationEvents = (store.syncQueue || []).filter((event: any) =>
+      event?.direction === 'MAIN_TO_CLOUD' &&
+      event?.eventType === 'MACHINE_LOCATION_SYNC_REQUIRED' &&
+      event?.syncStatus === 'PENDING'
+    );
+
+    return res.json({
+      success: true,
+      result,
+      pendingLocationSyncCount: pendingLocationEvents.length,
       timestamp: new Date().toISOString()
     });
   });

@@ -294,6 +294,48 @@ syncRoutes.put('/sync/machines/:idOrToken/location', async (req: Request, res: R
 });
 
 /**
+ * GET /sync/audit/machines/:idOrToken
+ *
+ * M2M-only audit viewer for Main -> Cloud machine-location synchronization.
+ * Returns only location-sync audit events for the resolved machine and never
+ * exposes sync credentials or unrelated customer/technician audit records.
+ */
+syncRoutes.get('/sync/audit/machines/:idOrToken', async (req: Request, res: Response) => {
+  const repo = getCloudRepository();
+  const idOrToken = String(req.params.idOrToken || '').trim();
+  const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
+
+  if (!idOrToken) {
+    return res.status(400).json({ error: 'MACHINE_IDENTIFIER_REQUIRED' });
+  }
+
+  const machine =
+    (await repo.machines.findByIntegrationId(idOrToken)) ||
+    (await repo.machines.findByQrToken(idOrToken));
+
+  if (!machine) {
+    return res.status(404).json({
+      error: 'MACHINE_NOT_FOUND',
+      message: `Machine ${idOrToken} is not present in the Cloud registry.`
+    });
+  }
+
+  const events = await repo.audit.listMachineSyncEvents(machine.integrationMachineId, limit);
+
+  return res.json({
+    success: true,
+    machine: {
+      integrationMachineId: machine.integrationMachineId,
+      publicQrToken: machine.publicQrToken,
+      publicDisplayName: machine.publicDisplayName,
+      version: machine.version
+    },
+    count: events.length,
+    events
+  });
+});
+
+/**
  * GET /sync/events
  * Cursor-based pull of pending cloud events for Desktop sync worker.
  */

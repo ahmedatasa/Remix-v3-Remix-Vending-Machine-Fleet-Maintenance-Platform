@@ -24,6 +24,7 @@ import type {
   CloudTechnicianSession,
   CloudSyncEvent,
   CloudSyncEventType,
+  CloudAuditEvent,
   MachineLocationProposal,
   FieldExceptionApproval,
   LocationSource
@@ -781,6 +782,32 @@ export class PostgresAuditRepository implements IAuditRepository {
       event.details ? JSON.stringify(event.details) : null,
       event.ip || null
     ]);
+  }
+
+  async listMachineSyncEvents(machineId: string, limit: number = 20): Promise<CloudAuditEvent[]> {
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit || 20)));
+    const query = `
+      SELECT id, actor_type, actor_id, actor_name, action, entity, result, details, ip, created_at
+      FROM audit_events
+      WHERE entity = 'MACHINE'
+        AND action LIKE 'MAIN_MACHINE_LOCATION_SYNC_%'
+        AND details->>'machineId' = $1
+      ORDER BY created_at DESC
+      LIMIT $2;
+    `;
+    const res = await this.pool.query(query, [machineId, safeLimit]);
+    return res.rows.map((row: any) => ({
+      id: row.id,
+      timestamp: toIsoDate(row.created_at),
+      actorType: row.actor_type,
+      actorId: row.actor_id,
+      actorName: row.actor_name,
+      action: row.action,
+      entity: row.entity,
+      result: row.result,
+      details: typeof row.details === 'string' ? JSON.parse(row.details) : (row.details || {}),
+      ip: row.ip || undefined
+    }));
   }
 }
 
