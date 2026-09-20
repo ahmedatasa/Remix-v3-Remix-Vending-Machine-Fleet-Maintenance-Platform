@@ -149,7 +149,14 @@ technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnic
  */
 technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
-  const { ticketId, imageBase64, mimeType = 'image/jpeg', caption } = req.body;
+  const ticketId = String(req.body?.ticketId || '').trim();
+  const caption = String(req.body?.caption || '').trim();
+
+  // Canonical contract is imageBase64. fileData remains accepted for
+  // backward compatibility with older technician portal deployments.
+  const imageBase64 = String(
+    req.body?.imageBase64 || req.body?.fileData || ''
+  ).trim();
 
   if (!ticketId || !imageBase64) {
     return res.status(400).json({
@@ -159,8 +166,20 @@ technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, requir
   }
 
   try {
-    // Strip data url prefix if present
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    // Prefer the MIME type encoded by FileReader's Data URL. This prevents
+    // PNG/WEBP payloads from being mislabeled as JPEG by a default value.
+    const dataUrlMatch = imageBase64.match(
+      /^data:(image\/(?:jpeg|png|webp));base64,/i
+    );
+    const declaredMimeType = String(req.body?.mimeType || '').trim().toLowerCase();
+    const mimeType = (dataUrlMatch?.[1] || declaredMimeType || 'image/jpeg').toLowerCase();
+
+    // Strip a supported Data URL prefix if present. Binary magic validation
+    // is performed again by the storage provider before persistence.
+    const base64Data = imageBase64.replace(
+      /^data:image\/(?:jpeg|png|webp);base64,/i,
+      ''
+    );
     const buffer = Buffer.from(base64Data, 'base64');
 
     const uploadResult = await cloudStorage.upload({

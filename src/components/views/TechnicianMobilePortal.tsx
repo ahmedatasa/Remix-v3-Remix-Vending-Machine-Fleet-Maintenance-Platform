@@ -114,6 +114,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   const [evidenceType, setEvidenceType] = useState<string>('BEFORE_PHOTO');
   const [evidenceCaption, setEvidenceCaption] = useState<string>('');
   const [evidenceFile, setEvidenceFile] = useState<string | null>(null);
+  const [evidenceMimeType, setEvidenceMimeType] = useState<string>('image/jpeg');
   const [isUploadingEvidence, setIsUploadingEvidence] = useState<boolean>(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
@@ -320,13 +321,23 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   // Evidence File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEvidenceFile(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setEvidenceFile(null);
+      setEvidenceMimeType('image/jpeg');
+      e.target.value = '';
+      alert('نوع الصورة غير مدعوم. الصيغ المسموحة: JPEG, PNG, WEBP.');
+      return;
     }
+
+    setEvidenceMimeType(file.type);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEvidenceFile(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Upload Evidence
@@ -348,7 +359,8 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
           ticketId: selectedTicket.id,
           evidenceType,
           caption: evidenceCaption,
-          fileData: evidenceFile
+          imageBase64: evidenceFile,
+          mimeType: evidenceMimeType
         })
       });
 
@@ -359,6 +371,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
 
       setUploadSuccess('تم حفظ ورفع الصورة التوثيقية بنجاح!');
       setEvidenceFile(null);
+      setEvidenceMimeType('image/jpeg');
       setEvidenceCaption('');
       loadTickets();
     } catch (err: any) {
@@ -375,7 +388,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
 
     setIsSavingTest(true);
     try {
-      const res = await fetch('/technician/functional-test', {
+      const res = await fetch('/technician/test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -384,7 +397,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         body: JSON.stringify({
           ticketId: selectedTicket.id,
           testType,
-          status: testStatus,
+          passed: testStatus === 'PASSED',
           notes: testNotes
         })
       });
@@ -412,7 +425,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
     setPartRequestMessage(null);
 
     try {
-      const res = await fetch('/technician/request-part', {
+      const res = await fetch('/technician/part-request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -421,7 +434,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         body: JSON.stringify({
           ticketId: selectedTicket.id,
           partId: selectedPartId,
-          quantity: partQty,
+          quantityRequested: partQty,
           reason: partReason
         })
       });
@@ -458,7 +471,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         },
         body: JSON.stringify({
           ticketId: selectedTicket.id,
-          resolutionSummary,
+          summary: resolutionSummary,
           rootCause
         })
       });

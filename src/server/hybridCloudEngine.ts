@@ -1012,9 +1012,17 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
     try {
       const store = getStore();
       const tech = (req as any).technician;
-      const { ticketId, evidenceType = 'BEFORE_PHOTO', caption, fileData, mimeType = 'image/jpeg' } = req.body;
+      const {
+        ticketId,
+        evidenceType = 'BEFORE_PHOTO',
+        caption,
+        fileData,
+        imageBase64,
+        mimeType = 'image/jpeg'
+      } = req.body;
+      const evidenceData = imageBase64 || fileData;
 
-      if (!ticketId || !fileData) {
+      if (!ticketId || !evidenceData) {
         return res.status(400).json({ error: 'MISSING_DATA', message: 'رقم التذكرة وبيانات الصورة مطلوبة.' });
       }
 
@@ -1023,7 +1031,7 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
         return res.status(404).json({ error: 'TICKET_NOT_FOUND', message: 'التذكرة غير موجودة.' });
       }
 
-      const uploadResult = await storageService.uploadEvidence(fileData, `${evidenceType}.jpg`, mimeType, ticket.id);
+      const uploadResult = await storageService.uploadEvidence(evidenceData, `${evidenceType}.jpg`, mimeType, ticket.id);
       const now = new Date().toISOString();
 
       const evidenceItem: MaintenanceEvidenceRecord = {
