@@ -2385,7 +2385,19 @@ export const api = {
         window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
       }
       return serverUpdated;
-    } catch {
+    } catch (err: any) {
+      // Production safety: never pretend a machine write succeeded only in the
+      // browser when the authoritative Main API rejected it or was unreachable.
+      // A local-write fallback is available only when explicitly enabled for a
+      // dedicated offline/local deployment.
+      const allowLocalWriteFallback = String(
+        (import.meta as any).env?.VITE_ALLOW_LOCAL_WRITE_FALLBACK || ''
+      ).trim().toLowerCase() === 'true';
+
+      if (!allowLocalWriteFallback) {
+        throw err;
+      }
+
       const idx = store.machines.findIndex(m => m.id === id || m.publicId === id || m.machineNumber === id);
       if (idx !== -1) {
         const oldMachine = { ...store.machines[idx] };

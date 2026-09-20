@@ -5,6 +5,37 @@ import { getCloudRepository } from '../repositories';
 
 export const syncRoutes = Router();
 
+
+const VALID_LOCATION_SOURCES = new Set([
+  'NONE',
+  'MANUAL_ENTRY',
+  'MAP_PICKER',
+  'DEVICE_GPS',
+  'TECHNICIAN_PROPOSAL_APPROVED',
+  'IMPORT',
+  'API',
+  'FUTURE_DEVICE'
+]);
+
+function normalizeCoordinate(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? Number(n.toFixed(6)) : NaN;
+}
+
+function sameCoordinatePair(
+  aLat: number | null,
+  aLng: number | null,
+  bLat: number | null,
+  bLng: number | null
+): boolean {
+  if (aLat === null || aLng === null || bLat === null || bLng === null) {
+    return aLat === bLat && aLng === bLng;
+  }
+  return Number(aLat.toFixed(6)) === Number(bLat.toFixed(6)) &&
+    Number(aLng.toFixed(6)) === Number(bLng.toFixed(6));
+}
+
 // Require M2M sync client authentication on all sync endpoints
 syncRoutes.use('/sync', requireSyncAuth);
 
@@ -84,6 +115,182 @@ syncRoutes.post('/sync/bootstrap', async (req: Request, res: Response) => {
     synchronizedTechnicians: finalTechCount,
     timestamp: new Date().toISOString()
   });
+});
+
+
+
+/**
+ * PUT /sync/machines/:idOrToken/location
+ *
+ * Explicit Main-authoritative machine-location push.
+ * This endpoint is M2M-only and intentionally does NOT emit a Cloud -> Main
+ * sync event. That prevents a sync echo while the normal background worker
+ * remains PULL_ONLY.
+ */
+syncRoutes.put('/sync/machines/:idOrToken/location', async (req: Request, res: Response) => {
+  const repo = getCloudRepository();
+  const idOrToken = String(req.params.idOrToken || '').trim();
+  const {
+    latitude,
+    longitude,
+    locationSource = 'MANUAL_ENTRY',
+    locationNote,
+    sourceRevision,
+    operationId,
+    actorId,
+    actorName,
+    publicQrToken
+  } = req.body || {};
+
+  if (!idOrToken || !operationId) {
+    return res.status(400).json({
+      error: 'SYNC_LOCATION_PARAMS_REQUIRED',
+      message: 'Machine identifier and operationId are required.'
+    });
+  }
+
+  if (!Number.isInteger(sourceRevision) || sourceRevision < 1) {
+    return res.status(400).json({
+      error: 'INVALID_SOURCE_REVISION',
+      message: 'sourceRevision must be a positive integer.'
+    });
+  }
+
+  const lat = normalizeCoordinate(latitude);
+  const lng = normalizeCoordinate(longitude);
+
+  const bothNull = lat === null && lng === null;
+  const bothNumbers = Number.isFinite(lat) && Number.isFinite(lng);
+  if (!bothNull && !bothNumbers) {
+    return res.status(400).json({
+      error: 'INVALID_COORDINATE_PAIR',
+      message: 'latitude and longitude must both be valid numbers or both null.'
+    });
+  }
+
+  if (typeof lat === 'number' && (lat < -90 || lat > 90)) {
+    return res.status(400).json({ error: 'INVALID_LATITUDE' });
+  }
+  if (typeof lng === 'number' && (lng < -180 || lng > 180)) {
+    return res.status(400).json({ error: 'INVALID_LONGITUDE' });
+  }
+
+  const source = String(locationSource || 'MANUAL_ENTRY').toUpperCase();
+  if (!VALID_LOCATION_SOURCES.has(source)) {
+    return res.status(400).json({ error: 'INVALID_LOCATION_SOURCE' });
+  }
+
+  const existing =
+    (await repo.machines.findByIntegrationId(idOrToken)) ||
+    (publicQrToken ? await repo.machines.findByQrToken(String(publicQrToken)) : null) ||
+    (await repo.machines.findByQrToken(idOrToken));
+
+  if (!existing) {
+    return res.status(404).json({
+      error: 'MACHINE_NOT_FOUND',
+      message: `Machine ${idOrToken} is not present in the Cloud registry.`
+    });
+  }
+
+  const normalizedExistingLat = typeof existing.latitude === 'number'
+    ? Number(existing.latitude.toFixed(6))
+    : null;
+  const normalizedExistingLng = typeof existing.longitude === 'number'
+    ? Number(existing.longitude.toFixed(6))
+    : null;
+
+  const requestedNote = locationNote === undefined ? existing.locationNote : String(locationNote || '');
+  const isIdempotent =
+    sameCoordinatePair(normalizedExistingLat, normalizedExistingLng, lat as number | null, lng as number | null) &&
+    String(existing.locationSource || 'NONE') === source &&
+    String(existing.locationNote || '') === String(requestedNote || '');
+
+  const resolvedActorId = String(actorId || req.headers['x-sync-client-id'] || 'MAIN_SYNC').trim();
+  const resolvedActorName = String(actorName || 'Main Authoritative Sync').trim();
+
+  if (isIdempotent) {
+    await repo.audit.log({
+      actorType: 'DESKTOP_SYNC',
+      actorId: resolvedActorId,
+      actorName: resolvedActorName,
+      action: 'MAIN_MACHINE_LOCATION_SYNC_IDEMPOTENT',
+      entity: 'MACHINE',
+      result: 'SUCCESS',
+      details: {
+        operationId,
+        machineId: existing.integrationMachineId,
+        sourceRevision,
+        idempotent: true
+      },
+      ip: req.ip
+    });
+
+    return res.json({
+      success: true,
+      idempotent: true,
+      operationId,
+      sourceRevision,
+      machine: existing
+    });
+  }
+
+  try {
+    const machine = await repo.machines.updateLocation(existing.integrationMachineId, {
+      latitude: lat as number | null,
+      longitude: lng as number | null,
+      locationSource: source as any,
+      locationNote: requestedNote,
+      actorId: resolvedActorId,
+      actorName: resolvedActorName
+    });
+
+    await repo.audit.log({
+      actorType: 'DESKTOP_SYNC',
+      actorId: resolvedActorId,
+      actorName: resolvedActorName,
+      action: 'MAIN_MACHINE_LOCATION_SYNC_APPLIED',
+      entity: 'MACHINE',
+      result: 'SUCCESS',
+      details: {
+        operationId,
+        machineId: machine.integrationMachineId,
+        sourceRevision,
+        latitude: machine.latitude,
+        longitude: machine.longitude,
+        locationSource: machine.locationSource
+      },
+      ip: req.ip
+    });
+
+    return res.json({
+      success: true,
+      idempotent: false,
+      operationId,
+      sourceRevision,
+      machine
+    });
+  } catch (err: any) {
+    await repo.audit.log({
+      actorType: 'DESKTOP_SYNC',
+      actorId: resolvedActorId,
+      actorName: resolvedActorName,
+      action: 'MAIN_MACHINE_LOCATION_SYNC_FAILED',
+      entity: 'MACHINE',
+      result: 'FAILURE',
+      details: {
+        operationId,
+        machineId: existing.integrationMachineId,
+        sourceRevision,
+        error: err?.message || 'UNKNOWN_ERROR'
+      },
+      ip: req.ip
+    });
+
+    return res.status(400).json({
+      error: 'MACHINE_LOCATION_SYNC_FAILED',
+      message: err?.message || 'Cloud machine location update failed.'
+    });
+  }
 });
 
 /**

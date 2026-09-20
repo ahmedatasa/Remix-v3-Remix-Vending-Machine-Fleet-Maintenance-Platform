@@ -5,6 +5,8 @@ import {
   uploadCloudTicketEvidenceFromMain
 } from './src/server/cloudTicketLifecycleClient';
 import { createTechnicianCredentialSync } from './src/server/cloudTechnicianCredentials';
+import { syncCloudMachineLocationFromMain } from './src/server/cloudMachineLocationSyncClient';
+import { mainToCloudLocationSyncWorker } from './src/server/mainToCloudLocationSyncWorker';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -3652,7 +3654,7 @@ async function startServer() {
     res.status(201).json(newMachine);
   });
 
-  apiRouter.put('/machines/:id', (req, res) => {
+  apiRouter.put('/machines/:id', async (req, res) => {
     const store = getStore();
     const id = req.params.id;
     const idx = (store.machines || []).findIndex((m: any) => m.id === id || m.machineNumber === id || m.publicQrToken === id);
@@ -3751,7 +3753,7 @@ async function startServer() {
       : 1;
     const nextRev = oldRev + 1;
 
-    const updated = {
+    const updated: any = {
       ...oldMachine,
       ...data,
       latitude: lat,
@@ -3804,8 +3806,131 @@ async function startServer() {
       });
     }
 
+    // Main is authoritative for admin GPS edits. Queue the exact revision before
+    // attempting Cloud delivery so a Cloud outage can never silently lose it.
+    let locationSyncEvent: any = null;
+    if (coordinatesActuallyChanged) {
+      const authenticatedUser = (req as any).user || {};
+      const rawUser = (req as any).rawUser || {};
+      const actorId = String(
+        authenticatedUser.id ||
+        authenticatedUser.username ||
+        rawUser.id ||
+        rawUser.username ||
+        'SYSTEM_ADMIN'
+      ).trim();
+      const actorName = String(
+        authenticatedUser.fullName ||
+        authenticatedUser.name ||
+        authenticatedUser.username ||
+        rawUser.fullName ||
+        rawUser.name ||
+        rawUser.username ||
+        actorId
+      ).trim();
+
+      const operationId = `main-location-${updated.id}-r${nextRev}`;
+      updated.cloudLocationSyncStatus = 'PENDING';
+      updated.cloudLocationSyncRevision = nextRev;
+      updated.cloudLocationSyncOperationId = operationId;
+      updated.cloudLocationSyncLastError = null;
+
+      locationSyncEvent = {
+        id: `evt-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+        operationId,
+        direction: 'MAIN_TO_CLOUD',
+        eventType: 'MACHINE_LOCATION_SYNC_REQUIRED',
+        aggregateType: 'MACHINE',
+        aggregateId: updated.id,
+        machinePublicToken: updated.publicQrToken || null,
+        payload: {
+          machineId: updated.id,
+          publicQrToken: updated.publicQrToken || null,
+          latitude: lat,
+          longitude: lng,
+          locationSource,
+          locationNote,
+          sourceRevision: nextRev,
+          actorId,
+          actorName
+        },
+        createdAt: now,
+        syncStatus: 'PENDING',
+        retryCount: 0,
+        nextRetryAt: now
+      };
+
+      if (!Array.isArray(store.syncQueue)) store.syncQueue = [];
+      const duplicate = store.syncQueue.some((e: any) => e.operationId === operationId);
+      if (!duplicate) store.syncQueue.push(locationSyncEvent);
+    }
+
+    // Persist Main + pending delivery atomically in the authoritative runtime
+    // snapshot before any network call.
     saveStore(store);
-    res.json(updated);
+
+    // Best-effort immediate delivery. On failure the dedicated retry worker
+    // keeps the event PENDING with exponential backoff.
+    if (locationSyncEvent) {
+      const syncResult = await syncCloudMachineLocationFromMain({
+        machineId: updated.id,
+        publicQrToken: updated.publicQrToken || null,
+        latitude: lat,
+        longitude: lng,
+        locationSource,
+        locationNote,
+        sourceRevision: nextRev,
+        operationId: locationSyncEvent.operationId,
+        actorId: locationSyncEvent.payload.actorId,
+        actorName: locationSyncEvent.payload.actorName
+      });
+
+      locationSyncEvent.lastAttemptAt = new Date().toISOString();
+
+      // A second admin request may have changed the same machine while the
+      // Cloud request was in flight. Never overwrite that newer machine object;
+      // update sync metadata only when the current GPS still matches this event.
+      const latestMachine = (store.machines || []).find((m: any) => m.id === updated.id);
+      const latestLocationMatchesEvent = latestMachine && (
+        (lat === null && lng === null &&
+          (latestMachine.latitude === null || latestMachine.latitude === undefined) &&
+          (latestMachine.longitude === null || latestMachine.longitude === undefined)) ||
+        (typeof lat === 'number' && typeof lng === 'number' &&
+          typeof latestMachine.latitude === 'number' && typeof latestMachine.longitude === 'number' &&
+          Number(latestMachine.latitude.toFixed(6)) === Number(lat.toFixed(6)) &&
+          Number(latestMachine.longitude.toFixed(6)) === Number(lng.toFixed(6)))
+      );
+
+      if (syncResult.status === 'SYNCED') {
+        locationSyncEvent.syncStatus = 'SYNCED';
+        locationSyncEvent.processedAt = new Date().toISOString();
+        locationSyncEvent.lastError = null;
+        locationSyncEvent.cloudVersion = syncResult.cloudVersion;
+        locationSyncEvent.idempotent = syncResult.idempotent === true;
+        if (latestLocationMatchesEvent) {
+          latestMachine.cloudLocationSyncStatus = 'SYNCED';
+          latestMachine.cloudLocationSyncedRevision = nextRev;
+          latestMachine.cloudLocationSyncedAt = locationSyncEvent.processedAt;
+          latestMachine.cloudLocationSyncLastError = null;
+        }
+        res.setHeader('x-cloud-location-sync-status', 'SYNCED');
+      } else {
+        locationSyncEvent.retryCount = 1;
+        locationSyncEvent.lastError = syncResult.error || 'CLOUD_SYNC_FAILED';
+        locationSyncEvent.nextRetryAt = new Date(Date.now() + 30000).toISOString();
+        if (latestLocationMatchesEvent) {
+          latestMachine.cloudLocationSyncStatus = 'PENDING';
+          latestMachine.cloudLocationSyncLastError = locationSyncEvent.lastError;
+        }
+        res.setHeader('x-cloud-location-sync-status', 'PENDING');
+      }
+
+      res.setHeader('x-cloud-location-sync-operation-id', locationSyncEvent.operationId);
+      saveStore(store);
+    }
+
+    const responseMachine = (store.machines || []).find((m: any) => m.id === updated.id) || updated;
+    res.json(responseMachine);
   });
 
   apiRouter.delete('/machines/:id', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']), (req, res) => {
@@ -5687,6 +5812,11 @@ async function startServer() {
   // Start background Desktop Sync Worker
   desktopSyncWorker.start(getStore, saveStore);
 
+  // Dedicated explicit Main -> Cloud retry worker for authoritative machine
+  // location edits. It only consumes MAIN_TO_CLOUD location events and does
+  // not change the PULL_ONLY behavior of desktopSyncWorker.
+  mainToCloudLocationSyncWorker.start(getStore, saveStore);
+
   const mainServer = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Unified Fleet Server running on http://0.0.0.0:${PORT}`);
   });
@@ -5703,6 +5833,7 @@ async function startServer() {
 
     // Stop background sync first so it cannot create new mutations.
     desktopSyncWorker.stop();
+    mainToCloudLocationSyncWorker.stop();
 
     // Safety timeout: do not let a broken connection hang deployment forever.
     const forceShutdownTimer = setTimeout(() => {
