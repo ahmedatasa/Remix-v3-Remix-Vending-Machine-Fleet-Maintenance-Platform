@@ -135,6 +135,27 @@ export class JsonCloudTicketRepository implements ICloudTicketRepository {
     return this.db.findTicketById(id);
   }
 
+  async findAssignedActive(technicianId: string): Promise<CloudTicket[]> {
+    return this.db.getData().cloud_tickets.filter(t => t.assignedTechnicianId === technicianId &&
+      ['OPEN', 'IN_PROGRESS'].includes(t.status))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+  }
+
+  async assignTechnician(ticketId: string, technicianId: string, revision: number, mainTicketNumber: string): Promise<boolean> {
+    const ticket = this.db.findTicketById(ticketId);
+    const tech = this.db.getData().technician_accounts.find(t => t.id === technicianId);
+    if (!ticket || !tech || tech.status !== 'ACTIVE' || !['OPEN', 'IN_PROGRESS'].includes(ticket.status)) return false;
+    const current = ticket.assignmentRevision || 0;
+    if (revision < current) return false;
+    if (revision === current) return ticket.assignedTechnicianId === technicianId && ticket.mainTicketNumber === mainTicketNumber;
+    ticket.assignedTechnicianId = technicianId;
+    ticket.assignmentRevision = revision;
+    ticket.mainTicketNumber = mainTicketNumber;
+    ticket.assignedAt = ticket.updatedAt = new Date().toISOString();
+    this.db.save();
+    return true;
+  }
+
   async findByReportId(reportId: string): Promise<CloudTicket | null> {
     return this.db.findTicketByReportId(reportId);
   }

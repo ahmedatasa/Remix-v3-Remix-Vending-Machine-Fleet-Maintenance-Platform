@@ -6,7 +6,24 @@ import { requireCloudTechnicianAuth } from '../middleware/technicianAuth';
 import { createCloudRateLimiter } from '../middleware/rateLimiter';
 import { cloudStorage } from '../storage/cloudStorage';
 
+import { getCloudRepository } from '../repositories';
+import { listTechnicianTickets, TicketAssignmentError } from '../services/ticketAssignmentService';
+import { requireAssignedCloudTicket } from '../middleware/assignedTicketAuth';
+
 export const technicianRoutes = Router();
+
+technicianRoutes.get('/technician/tickets', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    // Ignore all query/body technician selectors; identity comes only from the session.
+    return res.json(await listTechnicianTickets(getCloudRepository(), (req as any).technician.id));
+  } catch (err) {
+    const known = err instanceof TicketAssignmentError;
+    return res.status(known ? err.statusCode : 503).json({
+      error: known ? err.code : 'TICKETS_LOAD_FAILED', message: 'تعذر تحميل التذاكر المسندة. حاول مجدداً.'
+    });
+  }
+});
 
 // Rate limiters
 const loginLimiter = createCloudRateLimiter({
@@ -77,7 +94,7 @@ technicianRoutes.get('/technician/me', requireCloudTechnicianAuth, (req: Request
 /**
  * POST /technician/checkin
  */
-technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, machineToken, coordinates, manualExceptionReason } = req.body;
 
@@ -130,7 +147,7 @@ technicianRoutes.post('/technician/checkin', checkinLimiter, requireCloudTechnic
  * POST /technician/evidence
  * Upload maintenance evidence (image base64 or buffer)
  */
-technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, imageBase64, mimeType = 'image/jpeg', caption } = req.body;
 
@@ -177,7 +194,7 @@ technicianRoutes.post('/technician/evidence', requireCloudTechnicianAuth, async 
 /**
  * POST /technician/action
  */
-technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, actionType = 'MAINTENANCE_WORK', description } = req.body;
 
@@ -210,7 +227,7 @@ technicianRoutes.post('/technician/action', requireCloudTechnicianAuth, async (r
 /**
  * POST /technician/test
  */
-technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, testType = 'DISPENSE_TEST', passed, notes } = req.body;
 
@@ -244,7 +261,7 @@ technicianRoutes.post('/technician/test', requireCloudTechnicianAuth, async (req
 /**
  * POST /technician/part-request
  */
-technicianRoutes.post('/technician/part-request', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+technicianRoutes.post('/technician/part-request', requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, partName, quantityRequested = 1, reason, partId } = req.body;
 
@@ -272,7 +289,7 @@ technicianRoutes.post('/technician/part-request', requireCloudTechnicianAuth, as
 /**
  * POST /technician/resolve
  */
-technicianRoutes.post('/technician/resolve', requireCloudTechnicianAuth, async (req: Request, res: Response) => {
+technicianRoutes.post('/technician/resolve', requireCloudTechnicianAuth, requireAssignedCloudTicket, async (req: Request, res: Response) => {
   const tech = (req as any).technician;
   const { ticketId, summary = 'تمت معالجة العطل واختبار الماكينة بنجاح.' } = req.body;
 

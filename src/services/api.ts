@@ -4156,61 +4156,14 @@ export const api = {
   },
 
   async assignTicket(ticketId: string, technicianId: string, comment?: string) {
-    try {
-      return await apiFetch<Ticket>(`/tickets/${ticketId}/assign`, {
-        method: 'POST',
-        body: JSON.stringify({ technician_id: technicianId, comment })
+    const ticket = await apiFetch<Ticket & { cloudAssignmentSync?: { status: string; reason?: string } }>(
+      `/tickets/${encodeURIComponent(ticketId)}/assign`, {
+        method: 'POST', body: JSON.stringify({ technician_id: technicianId, comment })
       });
-    } catch {
-      const tck = store.tickets.find(t => t.id === ticketId);
-      const tech = store.technicians.find(t => t.id === technicianId);
-      if (tck && tech) {
-        const prevStatus = tck.status;
-        tck.assignedTechnicianId = tech.id;
-        tck.assignedTechnician = tech;
-        tck.status = 'ASSIGNED';
-        tck.updatedAt = new Date().toISOString();
-
-        if (!tck.timeline) tck.timeline = [];
-        if (!tck.statusHistory) tck.statusHistory = [];
-
-        const now = new Date().toISOString();
-        tck.statusHistory.push({
-          id: `sh-${Date.now()}`,
-          ticketId: tck.id,
-          previousStatus: prevStatus,
-          newStatus: 'ASSIGNED',
-          comment: comment || `Assigned to ${tech.fullName || tech.employeeCode}`,
-          createdAt: now
-        });
-
-        tck.timeline.unshift({
-          id: `tl-${Date.now()}`,
-          ticketId: tck.id,
-          timestamp: now,
-          technicianId: tech.id,
-          technicianName: tech.fullName || tech.employeeCode,
-          technicianCode: tech.employeeCode,
-          action: 'ASSIGNED',
-          actionLabel: 'Ticket Assigned',
-          description: comment || `Ticket assigned to ${tech.fullName || tech.employeeCode} (${tech.specialization || 'Technician'})`
-        });
-
-        store.auditLogs.unshift({
-          id: `aud-${Date.now()}`,
-          action: 'TICKET_ASSIGNED',
-          entityName: 'Ticket',
-          entityId: tck.ticketNumber,
-          oldValues: { status: prevStatus },
-          newValues: { status: 'ASSIGNED', technicianId: tech.id, technicianName: tech.fullName || tech.employeeCode },
-          createdAt: now
-        });
-
-        store.save();
-        return tck;
-      }
-      throw new Error('Ticket or Technician not found');
+    if (ticket.cloudAssignmentSync?.status === 'FAILED') {
+      throw new Error(`تم حفظ الإسناد في Main، لكن لم تتأكد مزامنته إلى Cloud (${ticket.cloudAssignmentSync.reason || 'UNKNOWN'}). أعد الإسناد لنفس الفني لإعادة المزامنة.`);
     }
+    return ticket;
   },
 
   async triageTicket(ticketId: string, payload: { priority?: TicketPriority; category?: FaultCategory; comment?: string }) {

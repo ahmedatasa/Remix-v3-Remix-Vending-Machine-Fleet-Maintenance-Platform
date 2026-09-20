@@ -111,10 +111,12 @@ export async function requireCloudTechnicianAuth(
         session.employeeCode
       ));
 
-    if (
-      tech &&
-      tech.status === 'DISABLED'
-    ) {
+    if (!tech) {
+      await repo.sessions.deleteSession(session.sessionId);
+      return res.status(403).json({ error: 'TECHNICIAN_NOT_ACTIVE', message: 'حساب الفني غير متاح.' });
+    }
+
+    if (tech.status !== 'ACTIVE') {
       await repo.sessions.deleteSession(
         session.sessionId
       );

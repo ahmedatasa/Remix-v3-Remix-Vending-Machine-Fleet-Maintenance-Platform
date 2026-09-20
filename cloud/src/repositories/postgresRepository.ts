@@ -279,6 +279,10 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
 
     return {
       id: ticketRow.id,
+      assignedTechnicianId: ticketRow.assigned_technician_id || null,
+      assignmentRevision: Number(ticketRow.assignment_revision || 0),
+      mainTicketNumber: ticketRow.main_ticket_number || null,
+      assignedAt: ticketRow.assigned_at ? toIsoDate(ticketRow.assigned_at) : null,
       cloudReportId: ticketRow.cloud_report_id,
       trackingToken: ticketRow.tracking_token,
       integrationMachineId: ticketRow.integration_machine_id,
@@ -359,6 +363,28 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
     const res = await this.pool.query('SELECT * FROM cloud_tickets WHERE id = $1 LIMIT 1;', [id]);
     if (res.rows.length === 0) return null;
     return this.populateTicketDetails(this.pool, res.rows[0]);
+  }
+
+  async findAssignedActive(technicianId: string): Promise<CloudTicket[]> {
+    const result = await this.pool.query(
+      `SELECT * FROM cloud_tickets WHERE assigned_technician_id = $1
+       AND status IN ('OPEN', 'IN_PROGRESS') ORDER BY created_at DESC, id;`, [technicianId]);
+    return Promise.all(result.rows.map(row => this.populateTicketDetails(this.pool, row)));
+  }
+
+  async assignTechnician(ticketId: string, technicianId: string, revision: number, mainTicketNumber: string): Promise<boolean> {
+    // Atomic monotonic update: an old/reordered retry cannot overwrite a newer assignment.
+    const result = await this.pool.query(
+      `UPDATE cloud_tickets SET assigned_technician_id = $2,
+         assigned_at = CASE WHEN assignment_revision < $3 THEN CURRENT_TIMESTAMP ELSE assigned_at END,
+         updated_at = CASE WHEN assignment_revision < $3 THEN CURRENT_TIMESTAMP ELSE updated_at END,
+         assignment_revision = $3, main_ticket_number = $4
+       WHERE id = $1 AND status IN ('OPEN', 'IN_PROGRESS')
+         AND EXISTS (SELECT 1 FROM technician_accounts WHERE id = $2 AND status = 'ACTIVE')
+         AND (assignment_revision < $3 OR
+           (assignment_revision = $3 AND assigned_technician_id = $2 AND main_ticket_number = $4))
+       RETURNING id;`, [ticketId, technicianId, revision, mainTicketNumber]);
+    return result.rows.length === 1;
   }
 
   async findByReportId(reportId: string): Promise<CloudTicket | null> {

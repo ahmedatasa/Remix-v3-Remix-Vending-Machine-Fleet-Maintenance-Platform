@@ -219,8 +219,8 @@ export const TicketDetailView: React.FC<TicketDetailViewProps> = ({ ticketId, on
       showToast(t('success'), 'Technician assigned successfully!', 'success');
       setIsAssignOpen(false);
       await loadTicketData();
-    } catch {
-      showToast(t('error'), 'Assignment failed', 'error');
+    } catch (err: any) {
+      showToast(t('error'), err?.message || 'تعذر تأكيد الإسناد؛ حدّث التذكرة قبل إعادة المحاولة.', 'error');
     } finally {
       setIsSubmitting(false);
     }

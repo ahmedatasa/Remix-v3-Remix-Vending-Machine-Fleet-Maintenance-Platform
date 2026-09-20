@@ -41,6 +41,8 @@ export interface ICloudMachineRepository {
 }
 
 export interface ICloudTicketRepository {
+  findAssignedActive(technicianId: string): Promise<CloudTicket[]>;
+  assignTechnician(ticketId: string, technicianId: string, revision: number, mainTicketNumber: string): Promise<boolean>;
   findById(id: string): Promise<CloudTicket | null>;
   findByReportId(reportId: string): Promise<CloudTicket | null>;
   findByTrackingToken(token: string): Promise<CloudTicket | null>;

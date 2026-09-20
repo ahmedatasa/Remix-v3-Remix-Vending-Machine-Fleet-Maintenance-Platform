@@ -4,7 +4,24 @@ import { getCloudRepository } from '../repositories';
 import { cloudStorage } from '../storage/cloudStorage';
 import { TicketService } from '../services/ticketService';
 
+import { assignCloudTicket, TicketAssignmentError } from '../services/ticketAssignmentService';
+
 export const ticketManagementRoutes = Router();
+
+// Existing authenticated Main actor context; assignment excludes the TECHNICIAN role.
+ticketManagementRoutes.post('/api/tickets/:ticketId/assignment', requireCloudTicketManagementAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const result = await assignCloudTicket(getCloudRepository(), String(req.params.ticketId), req.body, (req as any).managementActor);
+      return res.json(result);
+    } catch (err) {
+      const known = err instanceof TicketAssignmentError;
+      return res.status(known ? err.statusCode : 503).json({
+        error: known ? err.code : 'ASSIGNMENT_SYNC_FAILED',
+        message: 'تعذر تأكيد إسناد البلاغ في Cloud.'
+      });
+    }
+  });
 
 const STATUS_RANK: Record<string, number> = {
   OPEN: 0,

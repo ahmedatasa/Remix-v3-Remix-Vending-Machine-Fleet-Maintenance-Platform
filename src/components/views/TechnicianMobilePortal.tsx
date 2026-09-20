@@ -47,6 +47,9 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isLoadingTickets, setIsLoadingTickets] = useState<boolean>(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const ticketRequest = useRef(0);
 
   // Check-in & GPS state - initialize machineToken from URL query params (e.g. ?machineToken=...)
   // Safe UI-only state initialization: does not authenticate, does not check-in, does not write data
@@ -125,19 +128,24 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   // Load technician profile & tickets
   const loadTickets = async () => {
     if (!token) return;
+    const request = ++ticketRequest.current;
     setIsLoadingTickets(true);
+    setTicketsError(null);
     try {
       const res = await fetch('/technician/tickets', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store'
       });
-      if (res.ok) {
-        const data = await res.json();
-        setTickets(Array.isArray(data) ? data : []);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || `تعذر تحميل التذاكر (HTTP ${res.status}).`);
+      if (!Array.isArray(data)) throw new Error('استجابة قائمة التذاكر غير صالحة.');
+      if (request === ticketRequest.current) setTickets(data);
+    } catch (err: any) {
+      if (request === ticketRequest.current) {
+        setTickets([]);
+        setTicketsError(err?.message || 'تعذر الاتصال لتحميل التذاكر.');
       }
-    } catch (err) {
-      console.error('Failed to load technician tickets:', err);
     } finally {
-      setIsLoadingTickets(false);
+      if (request === ticketRequest.current) setIsLoadingTickets(false);
     }
   };
 
@@ -199,13 +207,18 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
     }
   };
 
-  const handleLogout = () => {
-    setToken('');
-    setTechnician(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('vending_tech_token');
-      localStorage.removeItem('vending_tech_profile');
-    }
+  const handleLogout = async () => {
+    setLogoutError(null);
+    try {
+      const res = await fetch('/technician/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok && res.status !== 401) throw new Error('تعذر تأكيد إنهاء الجلسة. حاول تسجيل الخروج مجدداً.');
+      ++ticketRequest.current;
+      setToken(''); setTechnician(null); setTickets([]); setSelectedTicket(null); setTicketsError(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('vending_tech_token');
+        localStorage.removeItem('vending_tech_profile');
+      }
+    } catch (err: any) { setLogoutError(err?.message || 'تعذر تأكيد إنهاء الجلسة.'); }
   };
 
   // Request GPS from browser (FIX 5: No hardcoded fallback)
@@ -554,12 +567,13 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
 
       {/* Main Container */}
       <main className="flex-1 max-w-xl w-full mx-auto p-4 space-y-5">
+        {logoutError && <p role="alert" className="rounded-xl border border-rose-700 p-4 text-rose-200">{logoutError}</p>}
         {/* View Mode Switcher */}
         {selectedTicket && (
           <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-3">
             <div>
               <span className="text-xs text-slate-400 block font-mono">{selectedTicket.ticketNumber}</span>
-              <h3 className="text-sm font-bold text-white">الماكينة #{selectedTicket.machine?.machineNumber}</h3>
+              <h3 className="text-sm font-bold text-white">{(selectedTicket.machine as any)?.publicDisplayName || `ماكينة #${selectedTicket.machine?.machineNumber || '—'}`}</h3>
             </div>
             <button
               onClick={() => setSelectedTicket(null)}
@@ -574,7 +588,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         {!selectedTicket && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-200">التذاكر المسندة إليك ({tickets.length})</h2>
+              <h2 className="text-sm font-bold text-slate-200">التذاكر المسندة إليك ({isLoadingTickets ? '…' : ticketsError ? '—' : tickets.length})</h2>
               <button
                 onClick={loadTickets}
                 className="text-xs p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
@@ -583,7 +597,14 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
               </button>
             </div>
 
-            {tickets.length === 0 ? (
+            {isLoadingTickets ? (
+              <p role="status" className="p-6 text-slate-300">جارٍ تحميل التذاكر…</p>
+            ) : ticketsError ? (
+              <div role="alert" className="rounded-xl border border-rose-700 bg-rose-950/30 p-4 text-rose-200">
+                <p>{ticketsError}</p>
+                <button type="button" onClick={loadTickets} className="mt-3 underline">إعادة المحاولة</button>
+              </div>
+            ) : tickets.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-2 text-slate-400 text-sm">
                 <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500/80 mb-2" />
                 <p>لا توجد تذاكر معلقة مسندة لك حالياً.</p>
@@ -624,7 +645,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                           )}
                         </div>
                         <h4 className="text-sm font-bold text-white mt-0.5">
-                          ماكينة #{t.machine?.machineNumber} — {t.title || t.category}
+                          {(t.machine as any)?.publicDisplayName || `ماكينة #${t.machine?.machineNumber || '—'}`} — {t.title || t.category}
                         </h4>
                       </div>
                       <span
@@ -640,9 +661,10 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                       </span>
                     </div>
 
+                    <p className="text-xs text-slate-300">{t.description}</p>
                     <div className="text-xs text-slate-400 flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                      <span>{t.machine?.currentLocation?.fullDescription || 'منطقة الحرم الجامعي'}</span>
+                      <span>{t.machine?.currentLocation?.fullDescription || 'الموقع غير محدد'}</span>
                     </div>
                   </div>
                 );

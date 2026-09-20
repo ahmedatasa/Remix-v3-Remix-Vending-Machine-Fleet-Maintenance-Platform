@@ -1,3 +1,5 @@
+import { createMainTicketAssignmentHandler } from './src/server/mainTicketAssignment';
+import { syncCloudTicketAssignment } from './src/server/cloudTicketAssignmentClient';
 import {
   syncCloudTicketLifecycleFromMain,
   uploadCloudTicketEvidenceFromMain
@@ -4670,62 +4672,9 @@ async function startServer() {
     res.json(newTicket);
   });
 
-  // Assign Ticket
-  apiRouter.post('/tickets/:id/assign', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']), (req, res) => {
-    const store = getStore();
-    const id = req.params.id;
-    const tck = store.tickets.find((x: any) => x.id === id || x.ticketNumber === id);
-    if (!tck) return res.status(404).json({ error: 'Ticket not found' });
-
-    const techId = req.body.technician_id || req.body.technicianId;
-    const comment = req.body.comment;
-    const tech = (store.technicians || []).find((t: any) => t.id === techId) || store.technicians?.[0];
-
-    const prevStatus = tck.status;
-    tck.status = 'ASSIGNED';
-    tck.assignedTechnicianId = tech?.id || techId;
-    tck.assignedTechnician = tech;
-    const now = new Date().toISOString();
-    tck.updatedAt = now;
-
-    if (!tck.timeline) tck.timeline = [];
-    if (!tck.statusHistory) tck.statusHistory = [];
-
-    tck.statusHistory.push({
-      id: `sh-${Date.now()}`,
-      ticketId: tck.id,
-      previousStatus: prevStatus,
-      newStatus: 'ASSIGNED',
-      comment: comment || `Assigned to ${tech?.fullName || tech?.employeeCode || 'Technician'}`,
-      createdAt: now
-    });
-
-    tck.timeline.unshift({
-      id: `tl-${Date.now()}`,
-      ticketId: tck.id,
-      timestamp: now,
-      technicianId: tech?.id,
-      technicianName: tech?.fullName || tech?.employeeCode,
-      technicianCode: tech?.employeeCode,
-      action: 'ASSIGNED',
-      actionLabel: 'تم إسناد التذكرة للفني',
-      description: comment || `تم إسناد التذكرة إلى الفني ${tech?.fullName || tech?.employeeCode} (${tech?.specialization || 'صيانة'})`
-    });
-
-    if (!store.auditLogs) store.auditLogs = [];
-    store.auditLogs.unshift({
-      id: `aud-${Date.now()}`,
-      action: 'TICKET_ASSIGNED',
-      entityName: 'Ticket',
-      entityId: tck.ticketNumber,
-      oldValues: { status: prevStatus },
-      newValues: { status: 'ASSIGNED', technicianId: tech?.id, technicianName: tech?.fullName },
-      createdAt: now
-    });
-
-    saveStore(store);
-    res.json(tck);
-  });
+  // Explicit management command, independent of the PULL_ONLY background worker.
+  apiRouter.post('/tickets/:id/assign', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']),
+    createMainTicketAssignmentHandler({ getStore, saveStore, sync: syncCloudTicketAssignment }));
 
   // Triage Ticket
   apiRouter.post('/tickets/:id/triage', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']), (req, res) => {

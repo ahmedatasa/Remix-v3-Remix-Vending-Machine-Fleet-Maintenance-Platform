@@ -159,6 +159,10 @@ export interface CloudPartRequestRecord {
 
 export interface CloudTicket {
   id: string;
+  assignedTechnicianId?: string | null;
+  assignmentRevision?: number;
+  mainTicketNumber?: string | null;
+  assignedAt?: string | null;
   cloudReportId: string;
   trackingToken: string;
   integrationMachineId: string;
