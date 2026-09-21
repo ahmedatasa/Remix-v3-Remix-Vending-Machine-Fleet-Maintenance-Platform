@@ -58,6 +58,12 @@ syncRoutes.post('/sync/bootstrap', async (req: Request, res: Response) => {
       sanitizedList.push({
         integrationMachineId: String(m.integrationMachineId),
         publicQrToken: String(m.publicQrToken).toUpperCase().trim(),
+        machineNumber: m.machineNumber !== undefined && m.machineNumber !== null
+          ? String(m.machineNumber).trim()
+          : undefined,
+        model: m.model !== undefined && m.model !== null
+          ? String(m.model).trim()
+          : undefined,
         machineType: String(m.machineType || 'VENDING_MACHINE'),
         publicDisplayName: String(m.publicDisplayName || `ماكينة ${m.publicQrToken}`),
         buildingPublicName: String(m.buildingPublicName || 'موقع الماكينة'),
