@@ -475,7 +475,6 @@ async function startServer() {
       p === '/auth/login' ||
       p === '/auth/setup-initial-admin' ||
       p === '/auth/recover-admin' ||
-      p === '/auth/recovery-diagnostics' ||
       p === '/auth/logout' ||
       p.startsWith('/public') ||
       p === '/technician/login'
@@ -606,24 +605,6 @@ async function startServer() {
    * - Does not touch machines, tickets, inventory, QR tokens, or any fleet data.
    * - Revokes prior sessions for the recovered account and writes an audit event.
    */
-  apiRouter.get('/auth/recovery-diagnostics', (req, res) => {
-    const configuredSecret = String(process.env.ADMIN_RECOVERY_SECRET || '');
-    const store = getStore();
-    const authStatus = getSystemAuthState(store.users || []);
-
-    return res.json({
-      state: authStatus.state,
-      recoveryRequired: authStatus.recoveryRequired,
-      recoveryEndpointEnabled: configuredSecret.length >= 32,
-      configuredSecretLength: configuredSecret.length,
-      configuredSecretSha256: configuredSecret
-        ? crypto.createHash('sha256').update(configuredSecret, 'utf8').digest('hex')
-        : null,
-      renderGitCommit: process.env.RENDER_GIT_COMMIT || null,
-      renderServiceName: process.env.RENDER_SERVICE_NAME || null
-    });
-  });
-
   apiRouter.post('/auth/recover-admin', (req, res) => {
     const configuredSecret = String(process.env.ADMIN_RECOVERY_SECRET || '');
 
