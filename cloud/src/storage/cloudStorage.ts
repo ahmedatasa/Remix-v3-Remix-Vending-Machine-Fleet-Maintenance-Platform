@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { cloudConfig } from '../config/cloudConfig';
 
 export interface StorageUploadInput {
@@ -21,9 +21,16 @@ export interface StorageUploadResult {
   provider: string;
 }
 
+export interface StorageReadResult {
+  buffer: Buffer;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface ICloudStorageProvider {
   upload(input: StorageUploadInput): Promise<StorageUploadResult>;
   delete(objectKey: string): Promise<boolean>;
+  getObject(objectKey: string): Promise<StorageReadResult>;
   getUrl(objectKey: string): string;
 }
 
@@ -34,6 +41,42 @@ const ALLOWED_MIME_TYPES: Record<string, string> = {
 };
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+function sanitizeEvidenceObjectKey(objectKey: string): string {
+  let decoded = String(objectKey || '').trim();
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    throw new Error('INVALID_STORAGE_KEY: مسار ملف الدليل غير صالح.');
+  }
+
+  const cleanKey = decoded.replace(/^\/+/, '');
+  const segments = cleanKey.split('/');
+  if (
+    !cleanKey ||
+    !cleanKey.startsWith('evidence/') ||
+    segments.includes('..') ||
+    cleanKey.includes('\0') ||
+    cleanKey.includes('\\')
+  ) {
+    throw new Error('INVALID_STORAGE_KEY: مسار ملف الدليل غير صالح.');
+  }
+  return cleanKey;
+}
+
+function encodeEvidenceObjectKey(objectKey: string): string {
+  return sanitizeEvidenceObjectKey(objectKey)
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+function mimeTypeFromObjectKey(objectKey: string): string {
+  const lower = objectKey.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
 
 export class LocalStorageProvider implements ICloudStorageProvider {
   private baseDir: string;
@@ -109,9 +152,31 @@ export class LocalStorageProvider implements ICloudStorageProvider {
     return false;
   }
 
+  public async getObject(objectKey: string): Promise<StorageReadResult> {
+    const cleanKey = sanitizeEvidenceObjectKey(objectKey);
+    const fullPath = path.resolve(this.baseDir, cleanKey);
+    const basePath = path.resolve(this.baseDir);
+
+    if (!fullPath.startsWith(basePath + path.sep)) {
+      throw new Error('INVALID_STORAGE_KEY: مسار ملف الدليل غير صالح.');
+    }
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) {
+      throw new Error('STORAGE_OBJECT_NOT_FOUND: ملف الدليل المطلوب غير موجود.');
+    }
+
+    const buffer = fs.readFileSync(fullPath);
+    return {
+      buffer,
+      mimeType: mimeTypeFromObjectKey(cleanKey),
+      sizeBytes: buffer.length
+    };
+  }
+
   public getUrl(objectKey: string): string {
-    const cleanKey = objectKey.replace(/\.\./g, '');
-    return `${this.publicBaseUrl}/cloud-storage/${cleanKey}`;
+    const cleanKey = encodeEvidenceObjectKey(objectKey);
+    const base = String(this.publicBaseUrl || '').replace(/\/+$/, '');
+    const resource = `/cloud-storage/${cleanKey}`;
+    return base ? `${base}${resource}` : resource;
   }
 }
 
@@ -213,9 +278,8 @@ export class S3CompatibleStorageProvider implements ICloudStorageProvider {
 
       await this.s3Client.send(putCommand);
 
-      const publicUrl = this.endpoint
-        ? `${this.endpoint.replace(/\/+$/, '')}/${this.bucket}/${objectKey}`
-        : `https://${this.bucket}.s3.${this.region}.amazonaws.com/${objectKey}`;
+      // Keep the object bucket private. Browser reads are served by Cloud.
+      const publicUrl = this.getUrl(objectKey);
 
       const providerName = cloudConfig.storageProvider === 'supabase'
         ? 'supabase_s3'
@@ -255,12 +319,51 @@ export class S3CompatibleStorageProvider implements ICloudStorageProvider {
     }
   }
 
-  public getUrl(objectKey: string): string {
-    const cleanKey = objectKey.replace(/\.\./g, '');
-    if (this.endpoint) {
-      return `${this.endpoint.replace(/\/+$/, '')}/${this.bucket}/${cleanKey}`;
+  public async getObject(objectKey: string): Promise<StorageReadResult> {
+    if (!this.s3Client) {
+      return this.fallbackLocal.getObject(objectKey);
     }
-    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${cleanKey}`;
+
+    const cleanKey = sanitizeEvidenceObjectKey(objectKey);
+    try {
+      const response = await this.s3Client.send(new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: cleanKey
+      }));
+
+      if (!response.Body) {
+        throw new Error('STORAGE_OBJECT_NOT_FOUND: ملف الدليل المطلوب غير موجود.');
+      }
+
+      const bytes = await (response.Body as any).transformToByteArray();
+      const buffer = Buffer.from(bytes);
+      return {
+        buffer,
+        mimeType: response.ContentType || mimeTypeFromObjectKey(cleanKey),
+        sizeBytes: Number(response.ContentLength || buffer.length)
+      };
+    } catch (err: any) {
+      const code = String(err?.name || err?.Code || '');
+      if (
+        code === 'NoSuchKey' ||
+        code === 'NotFound' ||
+        err?.$metadata?.httpStatusCode === 404
+      ) {
+        throw new Error('STORAGE_OBJECT_NOT_FOUND: ملف الدليل المطلوب غير موجود.');
+      }
+      if (String(err?.message || '').startsWith('STORAGE_OBJECT_NOT_FOUND:')) {
+        throw err;
+      }
+      console.error('[CloudStorage] Read error:', err?.message || err);
+      throw new Error('STORAGE_SERVICE_UNAVAILABLE: تعذر قراءة المرفق من خادم التخزين السحابي.');
+    }
+  }
+
+  public getUrl(objectKey: string): string {
+    const cleanKey = encodeEvidenceObjectKey(objectKey);
+    const base = String(cloudConfig.cloudApiUrl || '').replace(/\/+$/, '');
+    const resource = `/cloud-storage/${cleanKey}`;
+    return base ? `${base}${resource}` : resource;
   }
 }
 

@@ -29,6 +29,7 @@ import type {
   FieldExceptionApproval,
   LocationSource
 } from '../db/cloudDb';
+import { cloudStorage } from '../storage/cloudStorage';
 
 function toIsoDate(d: any): string {
   if (!d) return new Date().toISOString();
@@ -328,7 +329,7 @@ export class PostgresCloudTicketRepository implements ICloudTicketRepository {
         technicianId: r.technician_id,
         technicianName: r.technician_name,
         objectKey: r.object_key,
-        url: r.url,
+        url: cloudStorage.getUrl(r.object_key),
         mimeType: r.mime_type,
         sizeBytes: Number(r.size_bytes),
         sha256: r.sha256,

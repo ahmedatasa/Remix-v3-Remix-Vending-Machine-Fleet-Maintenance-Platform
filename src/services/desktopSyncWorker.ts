@@ -166,6 +166,30 @@ class DesktopSyncWorker {
       if (!store || !Array.isArray(store.machines)) {
         return { connected: false, message: 'Local store not initialized', syncedEventsCount: 0 };
       }
+      // Repair browser URLs for evidence already synchronized before the private
+      // storage read-through was introduced. objectKey remains authoritative.
+      let repairedEvidenceUrls = 0;
+      const toEvidenceBrowserUrl = (objectKey: string): string =>
+        `/cloud-storage/${String(objectKey)
+          .replace(/^\/+/, '')
+          .split('/')
+          .map((segment) => encodeURIComponent(segment))
+          .join('/')}`;
+
+      if (Array.isArray(store.tickets)) {
+        for (const ticket of store.tickets) {
+          if (!Array.isArray(ticket.evidence)) continue;
+          for (const evidence of ticket.evidence) {
+            if (!evidence?.objectKey) continue;
+            const browserUrl = toEvidenceBrowserUrl(evidence.objectKey);
+            if (evidence.url !== browserUrl || evidence.fileUrl !== browserUrl) {
+              evidence.url = browserUrl;
+              evidence.fileUrl = browserUrl;
+              repairedEvidenceUrls++;
+            }
+          }
+        }
+      }
 
       // 1. Capture local fleet size. The >=189 production baseline guard
       // applies only to FULL sync. PULL_ONLY never publishes the local fleet.
@@ -434,7 +458,17 @@ class DesktopSyncWorker {
             );
             if (ticket) {
               if (!Array.isArray(ticket.evidence)) ticket.evidence = [];
-              ticket.evidence.push(p.evidence);
+              const evidence = { ...p.evidence };
+              if (evidence.objectKey) {
+                const browserUrl = toEvidenceBrowserUrl(evidence.objectKey);
+                evidence.url = browserUrl;
+                evidence.fileUrl = browserUrl;
+              }
+              const exists = ticket.evidence.some((e: any) =>
+                (evidence.id && e.id === evidence.id) ||
+                (evidence.objectKey && e.objectKey === evidence.objectKey)
+              );
+              if (!exists) ticket.evidence.push(evidence);
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
               handled = true;
@@ -463,13 +497,74 @@ class DesktopSyncWorker {
           case 'PART_REQUEST_CREATED': {
             const p = evt.payload;
             const reqRecord = p.partRequest;
-            // Record in global store.partRequests with status REQUESTED
+            const ticket = store.tickets.find((t: any) =>
+              t.id === p.ticketId ||
+              t.cloudTicketId === p.ticketId ||
+              t.cloudReportId === p.ticketId ||
+              t.publicTrackingToken === p.ticketId ||
+              t.id === reqRecord.ticketId ||
+              t.cloudTicketId === reqRecord.ticketId
+            );
+
+            const normalizedName = String(reqRecord.partName || '').trim().toLowerCase();
+            const matchedPart = (store.spareParts || []).find((part: any) =>
+              (reqRecord.partId && (part.id === reqRecord.partId || part.sparePartId === reqRecord.partId)) ||
+              (
+                normalizedName &&
+                String(part.name || part.nameAr || '').trim().toLowerCase() === normalizedName
+              )
+            );
+
             const exists = store.partRequests.find((r: any) => r.id === reqRecord.id);
             if (!exists) {
+              const quantityRequested = Math.max(1, Number(reqRecord.quantityRequested || 1));
+              const createdAt = reqRecord.timestamp || evt.createdAt || new Date().toISOString();
+              const requestNumber = reqRecord.requestNumber ||
+                `PR-${String(reqRecord.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`;
+
               store.partRequests.unshift({
                 ...reqRecord,
-                status: 'REQUESTED' // Never directly alters inventory stock from field!
+                requestNumber,
+                ticketId: ticket?.id || reqRecord.ticketId,
+                ticketNumber: ticket?.ticketNumber,
+                machineId: ticket?.machineId,
+                machineNumber: ticket?.machineNumber,
+                partId: matchedPart?.id || reqRecord.partId || undefined,
+                sparePartId: matchedPart?.id || reqRecord.partId || undefined,
+                sparePart: matchedPart || undefined,
+                part: matchedPart || undefined,
+                partNumber: matchedPart?.partNumber || matchedPart?.code || undefined,
+                partName: reqRecord.partName,
+                isCustomNonCatalog: !matchedPart,
+                quantity: quantityRequested,
+                quantityRequested,
+                reason: reqRecord.reason || '',
+                notes: reqRecord.reason || '',
+                status: 'REQUESTED',
+                createdAt,
+                requestedAt: createdAt,
+                timeline: [{
+                  status: 'REQUESTED',
+                  timestamp: createdAt,
+                  actor: reqRecord.technicianName || 'TECHNICIAN',
+                  comment: reqRecord.reason || `طلب قطعة غيار: ${reqRecord.partName}`
+                }]
               });
+
+              if (ticket && !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(ticket.status)) {
+                ticket.status = 'WAITING_FOR_PART';
+                ticket.updatedAt = createdAt;
+                if (!Array.isArray(ticket.timeline)) ticket.timeline = [];
+                ticket.timeline.push({
+                  id: `tml-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+                  ticketId: ticket.id,
+                  timestamp: createdAt,
+                  action: 'PART_REQUESTED',
+                  actionLabel: 'بانتظار قطعة غيار',
+                  description: `طلب الفني قطعة الغيار (${reqRecord.partName}) وأصبحت التذكرة بانتظار معالجة المستودع.`
+                });
+              }
+
               appliedCount++;
             }
             handled = true;
@@ -522,7 +617,7 @@ class DesktopSyncWorker {
       }
 
       // Authoritative persistence via injected store manager abstraction
-      if (appliedCount > 0 || events.length > 0) {
+      if (appliedCount > 0 || events.length > 0 || repairedEvidenceUrls > 0) {
         saveStore(store);
       }
 

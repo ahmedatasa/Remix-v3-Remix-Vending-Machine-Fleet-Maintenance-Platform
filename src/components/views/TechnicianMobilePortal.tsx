@@ -127,6 +127,7 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   // Spare Part Request state
   const [sparePartsCatalog, setSparePartsCatalog] = useState<SparePart[]>([]);
   const [selectedPartId, setSelectedPartId] = useState<string>('');
+  const [partNameInput, setPartNameInput] = useState<string>('');
   const [partQty, setPartQty] = useState<number>(1);
   const [partReason, setPartReason] = useState<string>('');
   const [isRequestingPart, setIsRequestingPart] = useState<boolean>(false);
@@ -171,7 +172,6 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         .then((parts) => {
           if (Array.isArray(parts)) {
             setSparePartsCatalog(parts);
-            if (parts.length > 0) setSelectedPartId(parts[0].id);
           }
         })
         .catch(() => {});
@@ -419,7 +419,20 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   // Request Spare Part
   const handleRequestSparePart = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTicket || !selectedPartId || !token) return;
+    if (!selectedTicket || !token) return;
+
+    const selectedCatalogPart = sparePartsCatalog.find((p) => p.id === selectedPartId);
+    const requestedPartName = (
+      partNameInput.trim() ||
+      selectedCatalogPart?.name ||
+      (selectedCatalogPart as any)?.nameAr ||
+      ''
+    ).trim();
+
+    if (!requestedPartName) {
+      alert('اكتب اسم قطعة الغيار المطلوبة، أو اختر قطعة من المخزون.');
+      return;
+    }
 
     setIsRequestingPart(true);
     setPartRequestMessage(null);
@@ -433,18 +446,24 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
         },
         body: JSON.stringify({
           ticketId: selectedTicket.id,
-          partId: selectedPartId,
-          quantityRequested: partQty,
-          reason: partReason
+          partId: selectedCatalogPart?.id || undefined,
+          partName: requestedPartName,
+          quantityRequested: Math.max(1, Number(partQty) || 1),
+          reason: partReason.trim()
         })
       });
-
       const json = await res.json();
       if (!res.ok) {
         throw new Error(json.message || 'فشل طلب قطعة الغيار');
       }
 
-      setPartRequestMessage(`تم إنشاء طلب الصرف برقم ${json.partRequest.requestNumber} بنجاح!`);
+      const requestRef = json.partRequest?.requestNumber || json.partRequest?.id || '';
+      setPartRequestMessage(
+        `تم إرسال طلب القطعة للمستودع${requestRef ? ` (${requestRef})` : ''} بنجاح.`
+      );
+      setSelectedPartId('');
+      setPartNameInput('');
+      setPartQty(1);
       setPartReason('');
       loadTickets();
     } catch (err: any) {
@@ -453,7 +472,6 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
       setIsRequestingPart(false);
     }
   };
-
   // Resolve Ticket
   const handleResolveTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -942,13 +960,37 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
               </div>
 
               <form onSubmit={handleRequestSparePart} className="space-y-3">
+                <div>
+                  <label className="block text-xs text-slate-300 mb-1">
+                    اسم قطعة الغيار المطلوبة *
+                  </label>
+                  <input
+                    type="text"
+                    value={partNameInput}
+                    onChange={(e) => setPartNameInput(e.target.value)}
+                    placeholder="مثال: Compressor Relay 24V أو حساس حرارة PT100"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    يمكنك طلب أي قطعة حتى لو لم تكن مسجلة أو متوفرة حاليًا في المخزن.
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-2">
                     <select
                       value={selectedPartId}
-                      onChange={(e) => setSelectedPartId(e.target.value)}
+                      onChange={(e) => {
+                        const nextId = e.target.value;
+                        setSelectedPartId(nextId);
+                        if (nextId) {
+                          const part = sparePartsCatalog.find((p) => p.id === nextId);
+                          if (part) setPartNameInput(part.name || (part as any).nameAr || '');
+                        }
+                      }}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200"
                     >
+                      <option value="">اختيار من المخزون (اختياري)</option>
                       {sparePartsCatalog.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name} ({p.currentQuantity ?? 0} متوفر)
@@ -960,32 +1002,38 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                     <input
                       type="number"
                       min={1}
-                      max={10}
+                      max={999}
                       value={partQty}
                       onChange={(e) => setPartQty(Number(e.target.value))}
+                      aria-label="الكمية المطلوبة"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 text-center"
                     />
                   </div>
                 </div>
 
+                {sparePartsCatalog.length === 0 && (
+                  <div className="p-2.5 bg-amber-950/30 border border-amber-900 rounded-xl text-[11px] text-amber-300">
+                    المخزن لا يحتوي حاليًا على قطع مسجلة. اكتب اسم القطعة المطلوبة وسيصل الطلب إلى مسؤول المخزن لاتخاذ قرار الصرف أو الشراء.
+                  </div>
+                )}
+
                 <input
                   type="text"
                   value={partReason}
                   onChange={(e) => setPartReason(e.target.value)}
-                  placeholder="سبب طلب القطعة..."
+                  placeholder="سبب الطلب / المواصفات المطلوبة..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100"
                 />
 
                 {partRequestMessage && (
                   <p className="text-xs text-emerald-400 font-medium">{partRequestMessage}</p>
                 )}
-
                 <button
                   type="submit"
-                  disabled={isRequestingPart}
-                  className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition"
+                  disabled={isRequestingPart || !partNameInput.trim()}
+                  className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"
                 >
-                  {isRequestingPart ? 'جارٍ الإرسال...' : 'إرسال طلب الصرف للمستودع'}
+                  {isRequestingPart ? 'جارٍ الإرسال...' : 'إرسال طلب القطعة للمستودع'}
                 </button>
               </form>
             </div>

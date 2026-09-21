@@ -7,6 +7,7 @@ import { syncRoutes } from './routes/syncRoutes';
 import { locationRoutes } from './routes/locationRoutes';
 import { ticketManagementRoutes } from './routes/ticketManagementRoutes';
 import { cloudConfig } from './config/cloudConfig';
+import { cloudStorage } from './storage/cloudStorage';
 
 export function createCloudApp(): express.Express {
   const app = express();
@@ -22,8 +23,60 @@ export function createCloudApp(): express.Express {
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-  // Static storage endpoint for locally stored evidence
-  app.use('/cloud-storage', express.static(cloudConfig.storageLocalDir));
+  // Evidence read-through. Object storage remains private; Cloud reads the
+  // object with server credentials and streams it to the browser.
+  app.get('/cloud-storage/*', async (req: Request, res: Response) => {
+    const rawKey = String(req.params[0] || '');
+    let objectKey = rawKey;
+    try {
+      objectKey = decodeURIComponent(rawKey).replace(/^\/+/, '');
+    } catch {
+      return res.status(400).json({
+        error: 'INVALID_STORAGE_KEY',
+        message: 'مسار ملف الدليل غير صالح.'
+      });
+    }
+
+    if (
+      !objectKey.startsWith('evidence/') ||
+      objectKey.includes('..') ||
+      objectKey.includes('\\')
+    ) {
+      return res.status(400).json({
+        error: 'INVALID_STORAGE_KEY',
+        message: 'مسار ملف الدليل غير صالح.'
+      });
+    }
+
+    try {
+      const stored = await cloudStorage.getObject(objectKey);
+      res.setHeader('Content-Type', stored.mimeType);
+      res.setHeader('Content-Length', String(stored.sizeBytes));
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.status(200).send(stored.buffer);
+    } catch (err: any) {
+      const message = String(err?.message || '');
+      if (message.startsWith('STORAGE_OBJECT_NOT_FOUND:')) {
+        return res.status(404).json({
+          error: 'STORAGE_OBJECT_NOT_FOUND',
+          message: 'ملف الدليل المطلوب غير موجود.'
+        });
+      }
+      if (message.startsWith('INVALID_STORAGE_KEY:')) {
+        return res.status(400).json({
+          error: 'INVALID_STORAGE_KEY',
+          message: 'مسار ملف الدليل غير صالح.'
+        });
+      }
+      console.error('[CloudStorage ReadThrough] Error:', message || err);
+      return res.status(503).json({
+        error: 'STORAGE_SERVICE_UNAVAILABLE',
+        message: 'تعذر قراءة المرفق من خادم التخزين السحابي.'
+      });
+    }
+  });
 
   // Health check endpoint (Liveness)
   app.get('/health', (req: Request, res: Response) => {

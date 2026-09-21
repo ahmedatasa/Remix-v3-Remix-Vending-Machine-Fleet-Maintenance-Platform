@@ -1540,13 +1540,34 @@ export function createHybridRouter(getStore: () => any, saveStore: (store: any) 
       return res.status(404).json({ error: 'REQUEST_NOT_FOUND', message: 'طلب قطعة الغيار غير موجود.' });
     }
 
-    const sparePart = store.spareParts.find((p: any) => p.id === partReq.partId || p.partNumber === partReq.partNumber);
+    const requestedName = String(partReq.partName || '').trim().toLowerCase();
+    const sparePart = store.spareParts.find((p: any) =>
+      p.id === partReq.partId ||
+      p.id === partReq.sparePartId ||
+      (partReq.partNumber && p.partNumber === partReq.partNumber) ||
+      (
+        requestedName &&
+        String(p.name || p.nameAr || '').trim().toLowerCase() === requestedName
+      )
+    );
     if (!sparePart) {
-      return res.status(404).json({ error: 'SPARE_PART_NOT_FOUND', message: 'قطعة الغيار غير موجودة في المخزن.' });
+      return res.status(409).json({
+        error: 'PROCUREMENT_REQUIRED',
+        message: `القطعة المطلوبة (${partReq.partName || 'غير محددة'}) غير متوفرة في كتالوج المخزن. أنشئ أمر شراء واستلم القطعة أولاً ثم أعد تنفيذ أمر الصرف.`
+      });
     }
 
+    // Bind a free-text field request to the inventory item once procurement/
+    // receiving has created it in the warehouse catalog.
+    partReq.partId = sparePart.id;
+    partReq.sparePartId = sparePart.id;
+    partReq.partNumber = sparePart.partNumber || partReq.partNumber;
+    partReq.sparePart = sparePart;
+    partReq.part = sparePart;
+    partReq.isCustomNonCatalog = false;
+
     const currentQty = sparePart.currentQuantity ?? sparePart.currentStock ?? 0;
-    const reqQty = partReq.quantity || 1;
+    const reqQty = Math.max(1, Number(partReq.quantityRequested ?? partReq.quantity ?? 1));
 
     // Strict Negative Stock Prevention
     if (currentQty < reqQty) {
