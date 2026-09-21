@@ -1288,6 +1288,143 @@ async function startServer() {
     });
   });
 
+  // Temporary SUPER_ADMIN recovery utilities for durable local runtime backups.
+  // Listing is read-only. Restore requires an explicit confirmation phrase and
+  // creates a safety backup of the current state before replacing the store.
+  apiRouter.get(
+    '/system/local-backups',
+    requireEnterpriseRole(['SUPER_ADMIN']),
+    (req, res) => {
+      const backupsDir = resolveBackupsDir();
+
+      try {
+        if (!fs.existsSync(backupsDir)) {
+          return res.json({ success: true, backupsDir, backups: [] });
+        }
+
+        const backups = fs.readdirSync(backupsDir)
+          .filter((name) => name.endsWith('.json'))
+          .map((name) => {
+            const fullPath = path.join(backupsDir, name);
+            const stat = fs.statSync(fullPath);
+
+            let summary: any = {
+              valid: false,
+              machines: null,
+              buildings: null,
+              tickets: null,
+              technicians: null,
+              spareParts: null,
+              users: null,
+              baselineCommittedAt: null
+            };
+
+            try {
+              const parsed = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+              summary = {
+                valid: !!parsed && typeof parsed === 'object' && Array.isArray(parsed.machines),
+                machines: Array.isArray(parsed.machines) ? parsed.machines.length : null,
+                buildings: Array.isArray(parsed.buildings) ? parsed.buildings.length : null,
+                tickets: Array.isArray(parsed.tickets) ? parsed.tickets.length : null,
+                technicians: Array.isArray(parsed.technicians) ? parsed.technicians.length : null,
+                spareParts: Array.isArray(parsed.spareParts) ? parsed.spareParts.length : null,
+                users: Array.isArray(parsed.users) ? parsed.users.length : null,
+                baselineCommittedAt: parsed.baselineCommittedAt || null
+              };
+            } catch {}
+
+            return {
+              fileName: name,
+              modifiedAt: stat.mtime.toISOString(),
+              sizeBytes: stat.size,
+              ...summary
+            };
+          })
+          .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+
+        return res.json({
+          success: true,
+          backupsDir,
+          count: backups.length,
+          backups
+        });
+      } catch (err: any) {
+        return res.status(500).json({
+          error: 'LOCAL_BACKUP_LIST_FAILED',
+          message: err?.message || String(err)
+        });
+      }
+    }
+  );
+
+  apiRouter.post(
+    '/system/restore-local-backup',
+    requireEnterpriseRole(['SUPER_ADMIN']),
+    (req, res) => {
+      const fileName = String(req.body?.fileName || '').trim();
+      const confirmation = String(req.body?.confirmation || '');
+
+      if (confirmation !== 'RESTORE_PRE_BACKUP_STATE') {
+        return res.status(400).json({
+          error: 'RESTORE_CONFIRMATION_REQUIRED'
+        });
+      }
+
+      if (!fileName || path.basename(fileName) !== fileName || !fileName.endsWith('.json')) {
+        return res.status(400).json({
+          error: 'INVALID_BACKUP_FILENAME'
+        });
+      }
+
+      const backupsDir = resolveBackupsDir();
+      const fullPath = path.resolve(backupsDir, fileName);
+      const resolvedDir = path.resolve(backupsDir);
+
+      if (!fullPath.startsWith(resolvedDir + path.sep)) {
+        return res.status(400).json({ error: 'INVALID_BACKUP_PATH' });
+      }
+
+      if (!fs.existsSync(fullPath)) {
+        return res.status(404).json({ error: 'BACKUP_NOT_FOUND' });
+      }
+
+      try {
+        const candidate = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+
+        if (!candidate || typeof candidate !== 'object' || !Array.isArray(candidate.machines)) {
+          return res.status(400).json({
+            error: 'INVALID_BACKUP_CONTENT'
+          });
+        }
+
+        const safetyBackupPath = runtimeStoreManager.createBackup('pre-rollback-safety');
+
+        saveStore(candidate);
+
+        return res.json({
+          success: true,
+          restoredFrom: fileName,
+          safetyBackupFile: path.basename(safetyBackupPath),
+          stats: {
+            machines: candidate.machines?.length || 0,
+            buildings: candidate.buildings?.length || 0,
+            floors: candidate.floors?.length || 0,
+            locations: candidate.locations?.length || 0,
+            tickets: candidate.tickets?.length || 0,
+            technicians: candidate.technicians?.length || 0,
+            spareParts: candidate.spareParts?.length || 0,
+            users: candidate.users?.length || 0
+          }
+        });
+      } catch (err: any) {
+        return res.status(500).json({
+          error: 'LOCAL_BACKUP_RESTORE_FAILED',
+          message: err?.message || String(err)
+        });
+      }
+    }
+  );
+
   // Clear / Purge All Virtual & Demo Data (Start 100% Clean)
   apiRouter.post('/system/purge-all', requireEnterpriseRole(['SUPER_ADMIN']), (req, res) => {
     const deleteCommittedBaseline = req.body?.deleteCommittedBaseline === true;
