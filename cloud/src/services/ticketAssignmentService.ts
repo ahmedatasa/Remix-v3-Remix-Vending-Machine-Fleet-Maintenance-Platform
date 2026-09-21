@@ -45,6 +45,39 @@ export async function listTechnicianTickets(repo: ICloudRepositoryManager, techn
       status: ticket.status === 'OPEN' ? 'ASSIGNED' : ticket.status,
       category: ticket.category, title: ticket.category, description: ticket.description,
       createdAt: ticket.createdAt, updatedAt: ticket.updatedAt,
+      evidence: (ticket.evidence || []).map((item: any) => ({
+        ...item,
+        fileUrl: item.url,
+        fileType: item.mimeType,
+        evidenceType: item.evidenceType || 'OTHER',
+        uploadStatus: 'SYNCED',
+        createdAt: item.timestamp
+      })),
+      functionalTests: ticket.functionalTests || [],
+      functionalTest: (() => {
+        const tests = ticket.functionalTests || [];
+        const latest = tests.length > 0 ? tests[tests.length - 1] : null;
+        if (!latest) return undefined;
+        const rawType = String(latest.testType || 'OPERATIONAL').toUpperCase();
+        const typeMap: Record<string, string> = {
+          DISPENSE_TEST: 'DISPENSING',
+          DISPENSING: 'DISPENSING',
+          PAYMENT: 'PAYMENT',
+          COOLING: 'COOLING',
+          DISPLAY: 'DISPLAY',
+          NETWORK: 'NETWORK',
+          OPERATIONAL: 'OPERATIONAL',
+          ALL: 'ALL'
+        };
+        return {
+          status: latest.passed ? 'PASSED' : 'FAILED',
+          testType: typeMap[rawType] || 'OPERATIONAL',
+          notes: latest.notes || '',
+          performedBy: latest.technicianName || tech.fullName,
+          performedAt: latest.timestamp
+        };
+      })(),
+      partRequests: ticket.partRequests || [],
       machine: {
         id: ticket.integrationMachineId,
         publicQrToken: ticket.publicQrToken,

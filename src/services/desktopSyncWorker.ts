@@ -166,8 +166,9 @@ class DesktopSyncWorker {
       if (!store || !Array.isArray(store.machines)) {
         return { connected: false, message: 'Local store not initialized', syncedEventsCount: 0 };
       }
-      // Repair browser URLs for evidence already synchronized before the private
-      // storage read-through was introduced. objectKey remains authoritative.
+      // Normalize Cloud field-work data into the shapes expected by Main UI.
+      // This also backfills already-synchronized evidence/tests without asking
+      // the technician to upload or test again.
       let repairedEvidenceUrls = 0;
       const toEvidenceBrowserUrl = (objectKey: string): string =>
         `/cloud-storage/${String(objectKey)
@@ -176,15 +177,160 @@ class DesktopSyncWorker {
           .map((segment) => encodeURIComponent(segment))
           .join('/')}`;
 
+      const normalizeFunctionalTest = (rawTest: any) => {
+        const rawType = String(rawTest?.testType || 'OPERATIONAL').toUpperCase();
+        const typeMap: Record<string, string> = {
+          DISPENSE_TEST: 'DISPENSING',
+          DISPENSING: 'DISPENSING',
+          PAYMENT: 'PAYMENT',
+          COOLING: 'COOLING',
+          DISPLAY: 'DISPLAY',
+          NETWORK: 'NETWORK',
+          OPERATIONAL: 'OPERATIONAL',
+          ALL: 'ALL'
+        };
+        return {
+          status: rawTest?.passed === true ? 'PASSED' : rawTest?.passed === false ? 'FAILED' : 'NOT_REQUIRED',
+          testType: typeMap[rawType] || 'OPERATIONAL',
+          notes: String(rawTest?.notes || ''),
+          performedBy: rawTest?.technicianName || rawTest?.performedBy || 'TECHNICIAN',
+          performedAt: rawTest?.timestamp || rawTest?.performedAt || new Date().toISOString()
+        };
+      };
+
+      const ensureFunctionalTestPresentation = (ticket: any, rawTest: any): boolean => {
+        if (!rawTest) return false;
+        let changed = false;
+        const normalized = normalizeFunctionalTest(rawTest);
+
+        const current = ticket.functionalTest;
+        if (
+          !current ||
+          current.status !== normalized.status ||
+          current.testType !== normalized.testType ||
+          current.notes !== normalized.notes ||
+          current.performedAt !== normalized.performedAt
+        ) {
+          ticket.functionalTest = normalized;
+          changed = true;
+        }
+
+        if (!Array.isArray(ticket.timeline)) ticket.timeline = [];
+        const testId = rawTest.id || `${rawTest.ticketId || ticket.id}-${normalized.performedAt}`;
+        const timelineId = `tml-functional-${testId}`;
+        if (!ticket.timeline.some((item: any) => item.id === timelineId)) {
+          ticket.timeline.push({
+            id: timelineId,
+            ticketId: ticket.id,
+            timestamp: normalized.performedAt,
+            technicianName: rawTest.technicianName || rawTest.performedBy,
+            technicianId: rawTest.technicianId,
+            action: 'ACTION_ADDED',
+            actionLabel: 'الفحص التشغيلي',
+            description: `نتيجة الفحص التشغيلي: ${normalized.status === 'PASSED' ? 'ناجح' : normalized.status === 'FAILED' ? 'راسب' : 'غير مطلوب'}${normalized.notes ? ` — ${normalized.notes}` : ''}`,
+            metadata: {
+              source: 'CLOUD_FUNCTIONAL_TEST',
+              cloudTestId: rawTest.id,
+              testType: rawTest.testType,
+              passed: rawTest.passed
+            }
+          });
+          changed = true;
+        }
+        return changed;
+      };
+
+      const ensureEvidencePresentation = (ticket: any, evidence: any): boolean => {
+        if (!evidence) return false;
+        let changed = false;
+
+        const browserUrl = evidence.objectKey
+          ? toEvidenceBrowserUrl(evidence.objectKey)
+          : String(evidence.fileUrl || evidence.url || '');
+
+        if (browserUrl && (evidence.url !== browserUrl || evidence.fileUrl !== browserUrl)) {
+          evidence.url = browserUrl;
+          evidence.fileUrl = browserUrl;
+          changed = true;
+        }
+
+        evidence.fileType = evidence.fileType || evidence.mimeType || 'image/jpeg';
+        evidence.createdAt = evidence.createdAt || evidence.timestamp || ticket.updatedAt || new Date().toISOString();
+        evidence.uploadStatus = evidence.uploadStatus || 'SYNCED';
+        evidence.evidenceType = evidence.evidenceType || 'OTHER';
+
+        if (!Array.isArray(ticket.attachments)) ticket.attachments = [];
+        const attachmentId = evidence.id || `att-${String(evidence.objectKey || '').replace(/[^a-zA-Z0-9]/g, '').slice(-20)}`;
+        const fileName = String(evidence.objectKey || '').split('/').pop() || `${attachmentId}.jpg`;
+        const attachment = {
+          id: attachmentId,
+          ticketId: ticket.id,
+          fileName,
+          fileType: evidence.fileType,
+          fileUrl: browserUrl,
+          fileSize: evidence.sizeBytes,
+          uploadedBy: evidence.technicianName || 'TECHNICIAN',
+          uploaderRole: 'TECHNICIAN',
+          caption: evidence.caption || 'صورة توثيقية من الفني',
+          createdAt: evidence.createdAt
+        };
+
+        const existingAttachment = ticket.attachments.find((a: any) =>
+          a.id === attachmentId ||
+          (browserUrl && a.fileUrl === browserUrl)
+        );
+        if (!existingAttachment && browserUrl) {
+          ticket.attachments.push(attachment);
+          changed = true;
+        } else if (existingAttachment && browserUrl && existingAttachment.fileUrl !== browserUrl) {
+          existingAttachment.fileUrl = browserUrl;
+          changed = true;
+        }
+
+        if (!Array.isArray(ticket.timeline)) ticket.timeline = [];
+        const timelineId = `tml-evidence-${attachmentId}`;
+        if (!ticket.timeline.some((item: any) => item.id === timelineId) && browserUrl) {
+          ticket.timeline.push({
+            id: timelineId,
+            ticketId: ticket.id,
+            timestamp: evidence.createdAt,
+            technicianName: evidence.technicianName,
+            technicianId: evidence.technicianId,
+            action: 'PHOTO_UPLOADED',
+            actionLabel: 'صورة توثيقية',
+            description: evidence.caption || 'تم رفع صورة توثيقية من الفني إلى ملف البلاغ.',
+            attachment: {
+              id: attachment.id,
+              fileName: attachment.fileName,
+              fileUrl: attachment.fileUrl,
+              fileType: attachment.fileType,
+              caption: attachment.caption
+            },
+            metadata: {
+              source: 'CLOUD_EVIDENCE',
+              objectKey: evidence.objectKey,
+              sha256: evidence.sha256
+            }
+          });
+          changed = true;
+        }
+
+        return changed;
+      };
+
       if (Array.isArray(store.tickets)) {
         for (const ticket of store.tickets) {
-          if (!Array.isArray(ticket.evidence)) continue;
-          for (const evidence of ticket.evidence) {
-            if (!evidence?.objectKey) continue;
-            const browserUrl = toEvidenceBrowserUrl(evidence.objectKey);
-            if (evidence.url !== browserUrl || evidence.fileUrl !== browserUrl) {
-              evidence.url = browserUrl;
-              evidence.fileUrl = browserUrl;
+          if (Array.isArray(ticket.evidence)) {
+            for (const evidence of ticket.evidence) {
+              if (ensureEvidencePresentation(ticket, evidence)) {
+                repairedEvidenceUrls++;
+              }
+            }
+          }
+
+          if (Array.isArray(ticket.functionalTests) && ticket.functionalTests.length > 0) {
+            const latestTest = ticket.functionalTests[ticket.functionalTests.length - 1];
+            if (ensureFunctionalTestPresentation(ticket, latestTest)) {
               repairedEvidenceUrls++;
             }
           }
@@ -459,16 +605,19 @@ class DesktopSyncWorker {
             if (ticket) {
               if (!Array.isArray(ticket.evidence)) ticket.evidence = [];
               const evidence = { ...p.evidence };
-              if (evidence.objectKey) {
-                const browserUrl = toEvidenceBrowserUrl(evidence.objectKey);
-                evidence.url = browserUrl;
-                evidence.fileUrl = browserUrl;
-              }
               const exists = ticket.evidence.some((e: any) =>
                 (evidence.id && e.id === evidence.id) ||
                 (evidence.objectKey && e.objectKey === evidence.objectKey)
               );
-              if (!exists) ticket.evidence.push(evidence);
+              const storedEvidence = exists
+                ? ticket.evidence.find((e: any) =>
+                    (evidence.id && e.id === evidence.id) ||
+                    (evidence.objectKey && e.objectKey === evidence.objectKey)
+                  )
+                : evidence;
+
+              if (!exists) ticket.evidence.push(storedEvidence);
+              ensureEvidencePresentation(ticket, storedEvidence);
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
               handled = true;
@@ -486,7 +635,12 @@ class DesktopSyncWorker {
             );
             if (ticket) {
               if (!Array.isArray(ticket.functionalTests)) ticket.functionalTests = [];
-              ticket.functionalTests.push(p.functionalTest);
+              const rawTest = p.functionalTest;
+              const exists = ticket.functionalTests.some((t: any) =>
+                rawTest?.id && t.id === rawTest.id
+              );
+              if (!exists && rawTest) ticket.functionalTests.push(rawTest);
+              ensureFunctionalTestPresentation(ticket, rawTest);
               ticket.updatedAt = p.updatedAt || evt.createdAt;
               appliedCount++;
               handled = true;
