@@ -474,6 +474,7 @@ async function startServer() {
       p === '/auth/status' ||
       p === '/auth/login' ||
       p === '/auth/setup-initial-admin' ||
+      p === '/auth/recover-admin' ||
       p === '/auth/logout' ||
       p.startsWith('/public') ||
       p === '/technician/login'
@@ -590,6 +591,147 @@ async function startServer() {
       recoveryRequired: authStatus.recoveryRequired,
       hasUsers: authStatus.hasUsers,
       companyName: store.settings?.companyName || ''
+    });
+  });
+
+  /**
+   * Break-glass administrator recovery.
+   *
+   * Security invariants:
+   * - Disabled unless ADMIN_RECOVERY_SECRET is configured and >= 32 chars.
+   * - Works ONLY while auth state is ADMIN_RECOVERY_REQUIRED.
+   * - Requires constant-time comparison of x-admin-recovery-secret.
+   * - Recovers an EXISTING ADMIN/SUPER_ADMIN; never creates a new account.
+   * - Does not touch machines, tickets, inventory, QR tokens, or any fleet data.
+   * - Revokes prior sessions for the recovered account and writes an audit event.
+   */
+  apiRouter.post('/auth/recover-admin', (req, res) => {
+    const configuredSecret = String(process.env.ADMIN_RECOVERY_SECRET || '');
+
+    if (configuredSecret.length < 32) {
+      return res.status(404).json({
+        error: 'ADMIN_RECOVERY_ENDPOINT_DISABLED',
+        message: 'Administrator recovery is not enabled on this server.'
+      });
+    }
+
+    const suppliedSecret = String(req.headers['x-admin-recovery-secret'] || '');
+    const suppliedBuffer = Buffer.from(suppliedSecret, 'utf8');
+    const configuredBuffer = Buffer.from(configuredSecret, 'utf8');
+
+    if (
+      suppliedBuffer.length !== configuredBuffer.length ||
+      !crypto.timingSafeEqual(suppliedBuffer, configuredBuffer)
+    ) {
+      return res.status(403).json({
+        error: 'INVALID_ADMIN_RECOVERY_SECRET',
+        message: 'Administrator recovery authorization failed.'
+      });
+    }
+
+    const store = getStore();
+    const authStatus = getSystemAuthState(store.users || []);
+
+    if (authStatus.state !== 'ADMIN_RECOVERY_REQUIRED') {
+      return res.status(409).json({
+        error: 'ADMIN_RECOVERY_NOT_REQUIRED',
+        state: authStatus.state,
+        message: 'Administrator recovery is allowed only while the system is in ADMIN_RECOVERY_REQUIRED state.'
+      });
+    }
+
+    const { newPassword, email, fullName } = req.body || {};
+
+    if (typeof newPassword === 'string' && newPassword !== newPassword.trim()) {
+      return res.status(400).json({
+        error: 'كلمة المرور لا تقبل مسافات في البداية أو النهاية.'
+      });
+    }
+
+    const pwValidation = validatePasswordStrength(newPassword);
+    if (!pwValidation.valid) {
+      return res.status(400).json({ error: pwValidation.error });
+    }
+
+    const users = store.users || [];
+    const targetIndex = users.findIndex((u: any) =>
+      (u.role === 'SUPER_ADMIN' || u.role === 'ADMIN') &&
+      u.isActive !== false &&
+      u.isDeleted !== true
+    );
+
+    if (targetIndex < 0) {
+      return res.status(409).json({
+        error: 'RECOVERABLE_ADMIN_NOT_FOUND',
+        message: 'No existing active ADMIN or SUPER_ADMIN account is available for recovery.'
+      });
+    }
+
+    const target = users[targetIndex];
+    const previousEmail = String(target.email || '');
+
+    target.role = 'SUPER_ADMIN';
+    target.isActive = true;
+    target.status = 'ACTIVE';
+    target.isDeleted = false;
+    target.passwordHash = hashPassword(String(newPassword));
+    delete target.password;
+
+    if (typeof email === 'string' && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      const duplicate = users.some((u: any, idx: number) =>
+        idx !== targetIndex &&
+        String(u.email || '').trim().toLowerCase() === cleanEmail
+      );
+      if (duplicate) {
+        return res.status(409).json({
+          error: 'EMAIL_ALREADY_IN_USE',
+          message: 'The requested recovery email is already assigned to another user.'
+        });
+      }
+      target.email = cleanEmail;
+    }
+
+    if (typeof fullName === 'string' && fullName.trim()) {
+      target.fullName = fullName.trim();
+      target.name = fullName.trim();
+    }
+
+    target.updatedAt = new Date().toISOString();
+
+    invalidateUserSessions(target.id);
+
+    store.auditLogs = store.auditLogs || [];
+    store.auditLogs.unshift({
+      id: `aud-${crypto.randomUUID()}`,
+      action: 'EMERGENCY_ADMIN_RECOVERY',
+      entityName: 'User',
+      entityId: target.id,
+      userName: 'Server Recovery',
+      newValues: {
+        message: 'تم استرجاع حساب المدير العام عبر مسار الاستعادة الطارئة المحمي.',
+        targetUserId: target.id,
+        previousEmail,
+        recoveredEmail: target.email
+      },
+      createdAt: new Date().toISOString()
+    });
+
+    saveStore(store);
+
+    const postRecoveryStatus = getSystemAuthState(store.users || []);
+    if (postRecoveryStatus.state !== 'SYSTEM_READY') {
+      return res.status(500).json({
+        error: 'ADMIN_RECOVERY_STATE_VERIFICATION_FAILED',
+        state: postRecoveryStatus.state
+      });
+    }
+
+    return res.json({
+      success: true,
+      state: postRecoveryStatus.state,
+      user: sanitizeUserForClient(target),
+      message: 'Administrator credentials recovered successfully. Sign in normally.'
     });
   });
 
