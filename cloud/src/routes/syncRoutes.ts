@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { requireSyncAuth } from '../middleware/syncAuth';
-import type { SanitizedCloudMachine, CloudTechnicianAccount } from '../db/cloudDb';
+import type { SanitizedCloudMachine, CloudTechnicianAccount, CloudTicket } from '../db/cloudDb';
 import { getCloudRepository } from '../repositories';
 
 export const syncRoutes = Router();
@@ -124,6 +125,203 @@ syncRoutes.post('/sync/bootstrap', async (req: Request, res: Response) => {
 });
 
 
+
+/**
+ * POST /sync/manual-ticket
+ *
+ * Trusted Main -> Cloud creation for tickets entered manually in Main.
+ * Protected by the existing /sync M2M middleware.
+ *
+ * Idempotency is based on a deterministic cloudReportId derived from
+ * the Main ticket ID. No CUSTOMER_TICKET_CREATED event is emitted
+ * because Main already owns the ticket.
+ */
+syncRoutes.post('/sync/manual-ticket', async (req: Request, res: Response) => {
+  const repo = getCloudRepository();
+  const body = req.body || {};
+
+  const mainTicketId = String(body.mainTicketId || '').trim();
+  const mainTicketNumber = String(body.mainTicketNumber || '').trim();
+  const integrationMachineId =
+    String(body.integrationMachineId || '').trim();
+  const description = String(body.description || '').trim();
+
+  const actorId = String(
+    body.actorId ||
+    req.headers['x-sync-client-id'] ||
+    ''
+  ).trim();
+
+  const actorName = String(
+    body.actorName || 'Main Manual Ticket Sync'
+  ).trim();
+
+  const actorRole = String(body.actorRole || '')
+    .trim()
+    .toUpperCase();
+
+  const allowedRoles = new Set([
+    'SUPER_ADMIN',
+    'ADMIN',
+    'MAINTENANCE_MANAGER',
+    'FACILITY_MANAGER',
+    'MANAGEMENT',
+    'TECHNICIAN'
+  ]);
+
+  if (
+    !mainTicketId ||
+    !mainTicketNumber ||
+    !integrationMachineId ||
+    !description ||
+    !actorId ||
+    !actorRole
+  ) {
+    return res.status(400).json({
+      error: 'MANUAL_TICKET_PARAMS_REQUIRED'
+    });
+  }
+
+  if (!allowedRoles.has(actorRole)) {
+    return res.status(403).json({
+      error: 'MANUAL_TICKET_ROLE_FORBIDDEN'
+    });
+  }
+
+  const machine =
+    await repo.machines.findByIntegrationId(integrationMachineId);
+
+  if (!machine || machine.active !== true) {
+    return res.status(404).json({
+      error: 'MACHINE_NOT_FOUND'
+    });
+  }
+
+  const requestedQr =
+    String(body.publicQrToken || '').trim().toUpperCase();
+  const registryQr =
+    String(machine.publicQrToken || '').trim().toUpperCase();
+
+  if (requestedQr && requestedQr !== registryQr) {
+    return res.status(409).json({
+      error: 'MACHINE_QR_MISMATCH'
+    });
+  }
+
+  const cloudReportId = `MAIN-${mainTicketId}`;
+
+  const existing =
+    await repo.tickets.findByReportId(cloudReportId);
+
+  if (existing) {
+    if (
+      existing.integrationMachineId !==
+      machine.integrationMachineId
+    ) {
+      return res.status(409).json({
+        error: 'MANUAL_TICKET_CONFLICT'
+      });
+    }
+
+    await repo.audit.log({
+      actorType: 'DESKTOP_SYNC',
+      actorId,
+      actorName,
+      action: 'MAIN_MANUAL_TICKET_CREATE_IDEMPOTENT',
+      entity: 'TICKET',
+      result: 'SUCCESS',
+      details: {
+        mainTicketId,
+        mainTicketNumber,
+        ticketId: existing.id,
+        actorRole
+      },
+      ip: req.ip
+    });
+
+    return res.json({
+      success: true,
+      idempotent: true,
+      ticketId: existing.id,
+      cloudReportId: existing.cloudReportId,
+      trackingToken: existing.trackingToken,
+      status: existing.status
+    });
+  }
+
+  const now = new Date().toISOString();
+
+  const ticketId =
+    `cld-tck-${Date.now()}-${crypto
+      .randomBytes(4)
+      .toString('hex')}`;
+
+  const trackingToken =
+    `TRK-${Date.now().toString(36).toUpperCase()}-${crypto
+      .randomBytes(4)
+      .toString('hex')
+      .toUpperCase()}`;
+
+  const newTicket: CloudTicket = {
+    id: ticketId,
+    mainTicketNumber,
+    cloudReportId,
+    trackingToken,
+    integrationMachineId: machine.integrationMachineId,
+    publicQrToken: machine.publicQrToken,
+    category:
+      String(body.category || 'OTHER').trim() || 'OTHER',
+    description,
+    reporterName:
+      String(
+        body.reporterName ||
+        actorName ||
+        'Operations Team'
+      ).trim(),
+    reporterPhone:
+      String(body.reporterPhone || '').trim(),
+    reporterEmail:
+      String(body.reporterEmail || '').trim(),
+    status: 'OPEN',
+    syncStatus: 'ACKNOWLEDGED',
+    createdAt: now,
+    updatedAt: now,
+    checkins: [],
+    actions: [],
+    evidence: [],
+    functionalTests: [],
+    partRequests: []
+  };
+
+  const created =
+    await repo.tickets.createTicket(newTicket);
+
+  await repo.audit.log({
+    actorType: 'DESKTOP_SYNC',
+    actorId,
+    actorName,
+    action: 'MAIN_MANUAL_TICKET_CREATED',
+    entity: 'TICKET',
+    result: 'SUCCESS',
+    details: {
+      mainTicketId,
+      mainTicketNumber,
+      ticketId: created.id,
+      machineId: machine.integrationMachineId,
+      actorRole
+    },
+    ip: req.ip
+  });
+
+  return res.status(201).json({
+    success: true,
+    idempotent: false,
+    ticketId: created.id,
+    cloudReportId: created.cloudReportId,
+    trackingToken: created.trackingToken,
+    status: created.status
+  });
+});
 
 /**
  * PUT /sync/machines/:idOrToken/location

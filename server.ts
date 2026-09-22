@@ -1,5 +1,6 @@
 import { createMainTicketAssignmentHandler } from './src/server/mainTicketAssignment';
 import { syncCloudTicketAssignment } from './src/server/cloudTicketAssignmentClient';
+import { syncManualTicketToCloud } from './src/server/cloudManualTicketClient';
 import {
   syncCloudTicketLifecycleFromMain,
   uploadCloudTicketEvidenceFromMain
@@ -4999,7 +5000,7 @@ async function startServer() {
     res.json(t);
   });
 
-  apiRouter.post('/tickets', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'FACILITY_MANAGER', 'MANAGEMENT', 'TECHNICIAN']), (req, res) => {
+  apiRouter.post('/tickets', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'FACILITY_MANAGER', 'MANAGEMENT', 'TECHNICIAN']), async (req, res) => {
     const store = getStore();
     const data = req.body;
     const count = store.tickets.length + 1;
@@ -5075,13 +5076,58 @@ async function startServer() {
     }
 
     store.tickets.unshift(newTicket);
+
+    // Local persistence first: the operator's ticket is never lost
+    // if Cloud is temporarily unavailable.
+    (newTicket as any).cloudCreationSync = {
+      status: 'PENDING',
+      reason: 'AWAITING_CLOUD_CONFIRMATION'
+    };
     saveStore(store);
-    res.json(newTicket);
+
+    let cloudCreateResult;
+
+    try {
+      cloudCreateResult =
+        await syncManualTicketToCloud(
+          req,
+          { ...newTicket },
+          { ...machine }
+        );
+    } catch {
+      cloudCreateResult = {
+        status: 'FAILED',
+        reason: 'CLOUD_OUTCOME_UNCONFIRMED'
+      };
+    }
+
+    (newTicket as any).cloudCreationSync =
+      cloudCreateResult;
+
+    if (
+      cloudCreateResult.status === 'SYNCED' &&
+      cloudCreateResult.cloudTicketId
+    ) {
+      (newTicket as any).cloudTicketId =
+        cloudCreateResult.cloudTicketId;
+      (newTicket as any).cloudReportId =
+        cloudCreateResult.cloudReportId;
+      (newTicket as any).publicTrackingToken =
+        cloudCreateResult.publicTrackingToken;
+    }
+
+    saveStore(store);
+    res.status(201).json(newTicket);
   });
 
   // Explicit management command, independent of the PULL_ONLY background worker.
   apiRouter.post('/tickets/:id/assign', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']),
-    createMainTicketAssignmentHandler({ getStore, saveStore, sync: syncCloudTicketAssignment }));
+    createMainTicketAssignmentHandler({
+      getStore,
+      saveStore,
+      sync: syncCloudTicketAssignment,
+      ensureCloud: syncManualTicketToCloud
+    }));
 
   // Triage Ticket
   apiRouter.post('/tickets/:id/triage', requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER']), (req, res) => {
