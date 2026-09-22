@@ -625,7 +625,10 @@ async function startServer() {
 
       const results: any[] = new Array(pending.length);
       let nextIndex = 0;
-      const workerCount = Math.min(12, pending.length);
+      // Reconciliation intentionally runs sequentially.
+      // Cloud may apply upstream/service-level burst protection even though
+      // the M2M sync route itself has no application rate limiter.
+      const workerCount = Math.min(1, pending.length);
 
       const worker = async () => {
         while (true) {
@@ -648,10 +651,28 @@ async function startServer() {
           }
 
           const localQr = String(machine.publicQrToken || '').trim();
-          const audit = await fetchCloudMachineLocationSyncAudit(
-            String(machine.id),
-            1
-          );
+          // Retry only transient Cloud rate limiting. Identity/QR mismatches
+          // remain hard verification failures and are never retried away.
+          let audit: any = null;
+
+          for (let attempt = 0; attempt < 4; attempt++) {
+            audit = await fetchCloudMachineLocationSyncAudit(
+              String(machine.id),
+              1
+            );
+
+            if (audit?.httpStatus !== 429 || attempt === 3) {
+              break;
+            }
+
+            const backoffMs =
+              (1000 * Math.pow(2, attempt)) +
+              Math.floor(Math.random() * 250);
+
+            await new Promise((resolve) =>
+              setTimeout(resolve, backoffMs)
+            );
+          }
 
           const cloudMachine = audit.machine;
           const cloudId = String(
