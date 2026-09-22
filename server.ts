@@ -581,6 +581,204 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  /**
+   * Reconcile local MACHINE_CREATED queue records against the Cloud registry.
+   *
+   * Safety:
+   * - Admin-only.
+   * - No Cloud writes.
+   * - No machine/ticket/user/inventory mutations.
+   * - Never deletes queue records.
+   * - Marks only PENDING MACHINE_CREATED records whose Main ID + QR token are
+   *   independently confirmed by the Cloud M2M audit endpoint.
+   * - dryRun=true performs verification only.
+   *
+   * This is intentionally separate from FULL desktop sync so production can
+   * remain DESKTOP_SYNC_MODE=PULL_ONLY.
+   */
+  apiRouter.post(
+    '/admin/reconcile-machine-created-events',
+    requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']),
+    async (req, res) => {
+      const store = getStore();
+      const dryRun = req.body?.dryRun !== false;
+      const queue = Array.isArray(store.syncQueue) ? store.syncQueue : [];
+
+      const pending = queue.filter(
+        (e: any) =>
+          e?.eventType === 'MACHINE_CREATED' &&
+          e?.syncStatus === 'PENDING'
+      );
+
+      if (pending.length === 0) {
+        return res.json({
+          success: true,
+          dryRun,
+          pendingBefore: 0,
+          verified: 0,
+          reconciled: 0,
+          failed: 0,
+          pendingAfter: 0,
+          message: 'No pending MACHINE_CREATED events require reconciliation.'
+        });
+      }
+
+      const results: any[] = new Array(pending.length);
+      let nextIndex = 0;
+      const workerCount = Math.min(12, pending.length);
+
+      const worker = async () => {
+        while (true) {
+          const index = nextIndex++;
+          if (index >= pending.length) return;
+
+          const event = pending[index];
+          const machine = (store.machines || []).find(
+            (m: any) => m?.id === event?.aggregateId
+          );
+
+          if (!machine) {
+            results[index] = {
+              eventId: event?.id,
+              machineId: event?.aggregateId,
+              verified: false,
+              reason: 'LOCAL_MACHINE_NOT_FOUND'
+            };
+            continue;
+          }
+
+          const localQr = String(machine.publicQrToken || '').trim();
+          const audit = await fetchCloudMachineLocationSyncAudit(
+            String(machine.id),
+            1
+          );
+
+          const cloudMachine = audit.machine;
+          const cloudId = String(
+            cloudMachine?.integrationMachineId || ''
+          ).trim();
+          const cloudQr = String(
+            cloudMachine?.publicQrToken || ''
+          ).trim();
+
+          const verified =
+            audit.success === true &&
+            cloudId === String(machine.id) &&
+            Boolean(localQr) &&
+            cloudQr.toUpperCase() === localQr.toUpperCase();
+
+          results[index] = {
+            eventId: event?.id,
+            machineId: machine.id,
+            machineNumber: machine.machineNumber,
+            verified,
+            cloudHttpStatus: audit.httpStatus,
+            reason: verified
+              ? undefined
+              : (
+                  audit.error ||
+                  (cloudId !== String(machine.id)
+                    ? 'CLOUD_MACHINE_ID_MISMATCH'
+                    : 'CLOUD_QR_TOKEN_MISMATCH')
+                )
+          };
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: workerCount }, () => worker())
+      );
+
+      const failed = results.filter((r: any) => !r?.verified);
+      const verified = results.filter((r: any) => r?.verified);
+
+      // Fail closed: execute mode changes nothing unless every pending event
+      // has been verified against Cloud.
+      if (!dryRun && failed.length > 0) {
+        return res.status(409).json({
+          success: false,
+          dryRun: false,
+          pendingBefore: pending.length,
+          verified: verified.length,
+          reconciled: 0,
+          failed: failed.length,
+          pendingAfter: pending.length,
+          failures: failed.slice(0, 25),
+          message:
+            'Reconciliation aborted. No queue status was changed because one or more Cloud registry checks failed.'
+        });
+      }
+
+      let reconciled = 0;
+
+      if (!dryRun) {
+        const now = new Date().toISOString();
+        const verifiedEventIds = new Set(
+          verified.map((r: any) => r.eventId)
+        );
+
+        for (const event of pending) {
+          if (!verifiedEventIds.has(event.id)) continue;
+          event.syncStatus = 'SYNCED';
+          event.processedAt = now;
+          event.lastError = null;
+          event.reconciledAt = now;
+          event.reconciliationMethod =
+            'CLOUD_REGISTRY_ID_AND_QR_CONFIRMED';
+          reconciled++;
+        }
+
+        store.auditLogs = Array.isArray(store.auditLogs)
+          ? store.auditLogs
+          : [];
+
+        store.auditLogs.unshift({
+          id: `aud-${Date.now()}`,
+          action: 'MACHINE_CREATED_QUEUE_RECONCILED',
+          entityName: 'SyncQueue',
+          entityId: 'MACHINE_CREATED',
+          userName:
+            (req as any).user?.fullName ||
+            (req as any).user?.name ||
+            (req as any).user?.username ||
+            'Administrator',
+          newValues: {
+            reconciled,
+            verificationMethod:
+              'CLOUD_REGISTRY_ID_AND_QR_CONFIRMED',
+            desktopSyncMode:
+              (process.env.DESKTOP_SYNC_MODE || 'FULL')
+                .trim()
+                .toUpperCase()
+          },
+          createdAt: now
+        });
+
+        saveStore(store);
+      }
+
+      const pendingAfter = queue.filter(
+        (e: any) =>
+          e?.eventType === 'MACHINE_CREATED' &&
+          e?.syncStatus === 'PENDING'
+      ).length;
+
+      return res.json({
+        success: failed.length === 0,
+        dryRun,
+        pendingBefore: pending.length,
+        verified: verified.length,
+        reconciled,
+        failed: failed.length,
+        pendingAfter,
+        failures: failed.slice(0, 25),
+        message: dryRun
+          ? 'Dry-run verification completed. No local queue records were changed.'
+          : 'Verified MACHINE_CREATED queue records were reconciled locally without changing Cloud or switching out of PULL_ONLY.'
+      });
+    }
+  );
+
   // Auth Status: Expose authoritative system auth state machine metadata
   apiRouter.get('/auth/status', (req, res) => {
     const store = getStore();
