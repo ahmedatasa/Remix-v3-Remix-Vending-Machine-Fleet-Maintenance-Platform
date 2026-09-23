@@ -133,6 +133,25 @@ function saveStore(data?: any): void {
 async function startServer() {
   const app = express();
 
+  // Production security hardening.
+  // Keep camera and geolocation available to the same-origin technician UI.
+  app.disable('x-powered-by');
+
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(self), geolocation=(self), microphone=()'
+    );
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains'
+    );
+    next();
+  });
+
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true }));
 
@@ -1465,21 +1484,49 @@ async function startServer() {
   });
 
   // System Full Backup Export (JSON snapshot)
-  apiRouter.get('/system/backup', (req, res) => {
+  apiRouter.get(
+    '/system/backup',
+    requireEnterpriseRole(['SUPER_ADMIN', 'ADMIN']),
+    (req, res) => {
     const store = getStore();
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename="vending_fleet_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json"`);
     res.json(store);
-  });
+    }
+  );
 
   // System Full Backup Restore (Upload JSON snapshot)
-  apiRouter.post('/system/restore-backup', (req, res) => {
-    const backupData = req.body;
+  apiRouter.post(
+    '/system/restore-backup',
+    requireEnterpriseRole(['SUPER_ADMIN']),
+    (req, res) => {
+    const confirmation = String(req.body?.confirmation || '');
+
+    if (confirmation !== 'RESTORE_FULL_BACKUP') {
+      return res.status(400).json({
+        error: 'RESTORE_CONFIRMATION_REQUIRED',
+        message: 'Explicit restore confirmation is required.'
+      });
+    }
+
+    const backupData = req.body?.backupData;
     if (!backupData || typeof backupData !== 'object') {
       return res.status(400).json({ error: 'Invalid backup payload. Expected valid JSON object.' });
     }
     if (!Array.isArray(backupData.machines)) {
       return res.status(400).json({ error: 'Invalid backup format: missing machines array.' });
+    }
+
+    let safetyBackupPath: string;
+
+    try {
+      safetyBackupPath =
+        runtimeStoreManager.createBackup('pre-full-restore-safety');
+    } catch (err: any) {
+      return res.status(500).json({
+        error: 'SAFETY_BACKUP_FAILED',
+        message: err?.message || String(err)
+      });
     }
 
     const merged = {
@@ -1492,9 +1539,11 @@ async function startServer() {
       message: 'Backup restored successfully.',
       machinesCount: merged.machines.length,
       ticketsCount: merged.tickets?.length || 0,
-      partsCount: merged.spareParts?.length || 0
+      partsCount: merged.spareParts?.length || 0,
+      safetyBackupFile: path.basename(safetyBackupPath)
     });
-  });
+    }
+  );
 
   // Authoritative Persistence Diagnostics (Phase 5.4.4)
   apiRouter.get('/system/persistence-status', (req, res) => {
@@ -1647,6 +1696,27 @@ async function startServer() {
 
   // Clear / Purge All Virtual & Demo Data (Start 100% Clean)
   apiRouter.post('/system/purge-all', requireEnterpriseRole(['SUPER_ADMIN']), (req, res) => {
+    const confirmation = String(req.body?.confirmation || '');
+
+    if (confirmation !== 'PURGE_ALL_DATA') {
+      return res.status(400).json({
+        error: 'PURGE_CONFIRMATION_REQUIRED',
+        message: 'Explicit purge confirmation is required.'
+      });
+    }
+
+    let safetyBackupPath: string;
+
+    try {
+      safetyBackupPath =
+        runtimeStoreManager.createBackup('pre-purge-safety');
+    } catch (err: any) {
+      return res.status(500).json({
+        error: 'SAFETY_BACKUP_FAILED',
+        message: err?.message || String(err)
+      });
+    }
+
     const deleteCommittedBaseline = req.body?.deleteCommittedBaseline === true;
     if (deleteCommittedBaseline && fs.existsSync(MASTER_BASELINE_FILE)) {
       try {
@@ -1662,20 +1732,47 @@ async function startServer() {
       success: true,
       status: 'ok',
       message: 'تم تفريغ كافة البيانات وحذف السجلات الافتراضية بنجاح. النظام الآن نظيف تماماً وجاهز لإدخال أو استيراد البيانات الحقيقية.',
-      stats: { machines: 0, tickets: 0, locations: 0, technicians: 0, spareParts: 0 }
+      stats: { machines: 0, tickets: 0, locations: 0, technicians: 0, spareParts: 0 },
+      safetyBackupFile: path.basename(safetyBackupPath)
     });
   });
 
-  apiRouter.post('/clear-database', (req, res) => {
+  apiRouter.post(
+    '/clear-database',
+    requireEnterpriseRole(['SUPER_ADMIN']),
+    (req, res) => {
+    const confirmation = String(req.body?.confirmation || '');
+
+    if (confirmation !== 'CLEAR_DATABASE') {
+      return res.status(400).json({
+        error: 'CLEAR_DATABASE_CONFIRMATION_REQUIRED',
+        message: 'Explicit database-clear confirmation is required.'
+      });
+    }
+
+    let safetyBackupPath: string;
+
+    try {
+      safetyBackupPath =
+        runtimeStoreManager.createBackup('pre-clear-database-safety');
+    } catch (err: any) {
+      return res.status(500).json({
+        error: 'SAFETY_BACKUP_FAILED',
+        message: err?.message || String(err)
+      });
+    }
+
     const clean = createCleanDatabase();
     saveStore(clean);
     res.json({
       status: 'ok',
       message: 'تم تفريغ وحذف جميع البيانات الافتراضية بنجاح. قاعدة البيانات الآن نظيفة وجاهزة.',
       machinesCount: 0,
-      ticketsCount: 0
+      ticketsCount: 0,
+      safetyBackupFile: path.basename(safetyBackupPath)
     });
-  });
+    }
+  );
 
   // Get Complete Authoritative Fleet Database State
   apiRouter.get('/fleet/all', (req, res) => {

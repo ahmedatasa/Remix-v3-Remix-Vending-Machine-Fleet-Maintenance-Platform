@@ -8004,69 +8004,53 @@ export const api = {
     }
   },
 
-  async purgeDatabase(options?: { deleteCommittedBaseline?: boolean }) {
-    try {
-      const res = await apiFetch<any>('/system/purge-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteCommittedBaseline: options?.deleteCommittedBaseline === true })
-      });
-      await store.fetchServerState();
+  async purgeDatabase(options?: {
+    deleteCommittedBaseline?: boolean;
+    confirmation?: string;
+  }) {
+    const res = await apiFetch<any>('/system/purge-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deleteCommittedBaseline:
+          options?.deleteCommittedBaseline === true,
+        confirmation: options?.confirmation || ''
+      })
+    });
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
-      }
+    await store.fetchServerState();
 
-      return res;
-    } catch {
-      // Fallback local purge
-      store.machines = [];
-      store.buildings = [];
-      store.floors = [];
-      store.locations = [];
-      store.tickets = [];
-      store.technicians = [];
-      store.categories = [];
-      store.spareParts = [];
-      store.suppliers = [];
-      store.partRequests = [];
-      store.transactions = [];
-      store.importBatches = [];
-      store.importRows = [];
-      store.auditLogs.unshift({
-        id: `aud-${Date.now()}`,
-        action: 'DATABASE_PURGED',
-        entityName: 'System',
-        entityId: 'ROOT',
-        userName: 'مدير النظام',
-        newValues: { message: 'تم تفريغ كافة البيانات الافتراضية بنجاح.' },
-        createdAt: new Date().toISOString()
-      });
-      store.save();
-
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
-      }
-
-      return {
-        success: true,
-        message: 'تم تفريغ كافة البيانات بنجاح.'
-      };
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('vending-fleet-data-updated')
+      );
     }
+
+    return res;
   },
 
-  async resetDatabase() {
-    try {
-      const res = await apiFetch<any>('/reset-database', { method: 'POST' });
-      await store.fetchServerState();
+  async resetDatabase(
+    keepTechniciansAndParts = false,
+    confirmation = ''
+  ) {
+    const res = await apiFetch<any>('/clear-database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keepTechniciansAndParts,
+        confirmation
+      })
+    });
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
-      }
-      return res;
-    } catch {
-      return this.purgeDatabase();
+    await store.fetchServerState();
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('vending-fleet-data-updated')
+      );
     }
+
+    return res;
   },
 
   async restoreMasterBaseline() {
@@ -8107,52 +8091,28 @@ export const api = {
     return fullSnapshot;
   },
 
-  async restoreFullBackup(backupData: any) {
-    if (!backupData || typeof backupData !== 'object' || !Array.isArray(backupData.machines)) {
-      throw new Error('الملف غير صالح أو لا يحتوي على بنية بيانات الماكينات المطلوبة.');
-    }
-
-    if (Array.isArray(backupData.machines)) store.machines = backupData.machines;
-    if (Array.isArray(backupData.buildings)) store.buildings = backupData.buildings;
-    if (Array.isArray(backupData.floors)) store.floors = backupData.floors;
-    if (Array.isArray(backupData.locations)) store.locations = backupData.locations;
-    if (Array.isArray(backupData.tickets)) store.tickets = backupData.tickets;
-    if (Array.isArray(backupData.technicians)) store.technicians = backupData.technicians;
-    if (Array.isArray(backupData.categories)) store.categories = backupData.categories;
-    if (Array.isArray(backupData.spareParts)) store.spareParts = backupData.spareParts;
-    if (Array.isArray(backupData.suppliers)) store.suppliers = backupData.suppliers;
-    if (Array.isArray(backupData.partRequests)) store.partRequests = backupData.partRequests;
-    if (Array.isArray(backupData.transactions)) store.transactions = backupData.transactions;
-    if (Array.isArray(backupData.importBatches)) store.importBatches = backupData.importBatches;
-    if (Array.isArray(backupData.importRows)) store.importRows = backupData.importRows;
-
-    store.auditLogs.unshift({
-      id: `aud-${Date.now()}`,
-      action: 'BACKUP_RESTORED',
-      entityName: 'System',
-      entityId: 'ROOT',
-      newValues: { message: `Backup restored successfully with ${store.machines.length} machines.` },
-      createdAt: new Date().toISOString()
+  async restoreFullBackup(
+    backupData: any,
+    confirmation = ''
+  ) {
+    const res = await apiFetch<any>('/system/restore-backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        confirmation,
+        backupData
+      })
     });
-    store.save();
 
-    try {
-      await apiFetch<any>('/system/restore-backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(backupData)
-      });
-    } catch {}
+    await store.fetchServerState();
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('vending-fleet-data-updated'));
+      window.dispatchEvent(
+        new CustomEvent('vending-fleet-data-updated')
+      );
     }
 
-    return {
-      success: true,
-      machinesCount: store.machines.length,
-      ticketsCount: store.tickets.length
-    };
+    return res;
   },
 
   async getDatabaseInfo() {

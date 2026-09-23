@@ -305,9 +305,26 @@ export const SettingsView: React.FC = () => {
 
   // Purge/Clean Data
   const handlePurgeAll = async () => {
+    const purgeConfirmation =
+      window.prompt(
+        'للتأكيد النهائي اكتب: PURGE_ALL_DATA'
+      )?.trim() || '';
+
+    if (purgeConfirmation !== 'PURGE_ALL_DATA') {
+      showToast(
+        t('error'),
+        'تم إلغاء عملية تفريغ قاعدة البيانات.',
+        'error'
+      );
+      return;
+    }
+
     setIsPurging(true);
     try {
-      await api.purgeDatabase({ deleteCommittedBaseline: purgeDeleteCommitted });
+      await api.purgeDatabase({
+        deleteCommittedBaseline: purgeDeleteCommitted,
+        confirmation: purgeConfirmation
+      });
       showToast(t('success'), 'تم تفريغ كافة البيانات بنجاح، قاعدة البيانات جاهزة الآن لاستقبال البيانات الحقيقية.', 'success');
       setIsPurgeModalOpen(false);
       loadStats();
@@ -341,7 +358,25 @@ export const SettingsView: React.FC = () => {
       try {
         const content = event.target?.result as string;
         const parsed = JSON.parse(content);
-        const result = await api.restoreFullBackup(parsed);
+
+        const restoreConfirmation =
+          window.prompt(
+            'لاستعادة النسخة وكتابة البيانات الحالية اكتب: RESTORE_FULL_BACKUP'
+          )?.trim() || '';
+
+        if (restoreConfirmation !== 'RESTORE_FULL_BACKUP') {
+          showToast(
+            t('error'),
+            'تم إلغاء استعادة النسخة الاحتياطية.',
+            'error'
+          );
+          return;
+        }
+
+        const result = await api.restoreFullBackup(
+          parsed,
+          restoreConfirmation
+        );
         loadStats();
         loadBaselineStatus();
         showToast(t('success'), `تمت استعادة النسخة الاحتياطية من الملف بنجاح! (${result.machinesCount} ماكينة)`, 'success');
@@ -360,9 +395,23 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleResetData = async () => {
+    const resetConfirmation =
+      window.prompt(
+        'لإعادة ضبط قاعدة البيانات اكتب: CLEAR_DATABASE'
+      )?.trim() || '';
+
+    if (resetConfirmation !== 'CLEAR_DATABASE') {
+      showToast(
+        t('error'),
+        'تم إلغاء إعادة ضبط قاعدة البيانات.',
+        'error'
+      );
+      return;
+    }
+
     setIsResetting(true);
     try {
-      await api.resetDatabase();
+      await api.resetDatabase(false, resetConfirmation);
       loadStats();
       loadBaselineStatus();
       showToast(t('success'), 'تمت إعادة ضبط قاعدة البيانات بنجاح!', 'success');

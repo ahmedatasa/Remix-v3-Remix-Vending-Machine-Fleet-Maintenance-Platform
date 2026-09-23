@@ -12,6 +12,7 @@ import { cloudStorage } from './storage/cloudStorage';
 export function createCloudApp(): express.Express {
   const app = express();
 
+  app.disable('x-powered-by');
   // Trust proxy for secure headers and IP resolution
   app.set('trust proxy', 1);
 
