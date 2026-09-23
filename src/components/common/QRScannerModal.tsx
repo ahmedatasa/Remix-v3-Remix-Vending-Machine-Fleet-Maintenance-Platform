@@ -449,15 +449,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           <>
             {/* Camera Viewport */}
             <div className="relative aspect-video rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center overflow-hidden">
-              {cameraActive ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-              ) : null}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`absolute inset-0 w-full h-full object-cover ${
+                  cameraActive ? 'visible' : 'invisible'
+                }`}
+              />
 
               <div className="absolute inset-4 border-2 border-dashed border-amber-500/60 rounded-lg flex items-center justify-center pointer-events-none">
                 <div className="w-full h-0.5 bg-amber-400/80 shadow-lg shadow-amber-500 animate-bounce" />
