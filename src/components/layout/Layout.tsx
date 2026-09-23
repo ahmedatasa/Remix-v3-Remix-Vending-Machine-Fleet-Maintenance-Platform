@@ -117,6 +117,7 @@ export const Layout: React.FC<LayoutProps> = ({
     const clean = code.trim().toUpperCase();
     const found = machines.find(
       m =>
+        m.publicQrToken?.toUpperCase() === clean ||
         m.publicId?.toUpperCase() === clean ||
         m.machineNumber?.toUpperCase() === clean ||
         m.id?.toUpperCase() === clean ||
@@ -130,9 +131,29 @@ export const Layout: React.FC<LayoutProps> = ({
     }
 
     if (targetMode === 'technician') {
-      const machineNum = found ? found.machineNumber : code;
-      onNavigate('public-portal', `${machineNum}?mode=technician`);
-      showToast(isRTL ? 'بوابة الفني الميداني' : 'Technician QR Portal', isRTL ? `تم مسح كود الماكينة #${machineNum}` : `Scanned Machine #${machineNum}`, 'success');
+      const machineToken =
+        found?.publicQrToken ||
+        code;
+
+      const machineNum =
+        found?.machineNumber ||
+        code;
+
+      onNavigate(
+        'technician-portal',
+        machineToken
+      );
+
+      showToast(
+        isRTL
+          ? 'بوابة الفني الميداني'
+          : 'Technician QR Portal',
+        isRTL
+          ? `تم التعرف على الماكينة #${machineNum}`
+          : `Machine #${machineNum} recognized`,
+        'success'
+      );
+
       return;
     }
 

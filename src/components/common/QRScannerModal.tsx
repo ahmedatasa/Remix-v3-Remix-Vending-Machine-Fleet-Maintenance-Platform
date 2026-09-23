@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import jsQR from 'jsqr';
 import { QrCode, Camera, Search, ArrowRight, Wrench, FileText, Monitor, ChevronRight, Video, VideoOff, Package } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -26,6 +27,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [selectedMachinePreview, setSelectedMachinePreview] = useState<Machine | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scanFrameRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -40,34 +43,233 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   }, [isOpen]);
 
   const stopCamera = () => {
+    if (scanFrameRef.current !== null) {
+      cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
+    }
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
     setCameraActive(false);
+    setIsScanning(false);
+  };
+
+  const extractQrToken = (value: string): string => {
+    const raw = String(value || '').trim();
+
+    if (!raw) return '';
+
+    // QR labels may contain a full public/technician URL.
+    if (
+      raw.startsWith('http://') ||
+      raw.startsWith('https://') ||
+      raw.startsWith('/')
+    ) {
+      try {
+        const url = new URL(raw, window.location.origin);
+
+        const queryToken =
+          url.searchParams.get('machineToken') ||
+          url.searchParams.get('token') ||
+          url.searchParams.get('machineId');
+
+        if (queryToken) {
+          return decodeURIComponent(queryToken).trim();
+        }
+
+        const publicMatch =
+          url.pathname.match(/\/public\/m\/([^/?#]+)/i);
+
+        if (publicMatch?.[1]) {
+          return decodeURIComponent(publicMatch[1]).trim();
+        }
+
+        const technicianMatch =
+          url.pathname.match(/\/technician(?:-portal)?\/([^/?#]+)/i);
+
+        if (technicianMatch?.[1]) {
+          return decodeURIComponent(technicianMatch[1]).trim();
+        }
+      } catch {
+        // Fall back to the raw scanned value below.
+      }
+    }
+
+    return raw;
+  };
+
+  const resolveScannedMachine = (value: string): Machine | null => {
+    const token = extractQrToken(value).trim().toUpperCase();
+
+    if (!token) return null;
+
+    return (
+      machines.find(m =>
+        String(m.publicQrToken || '').trim().toUpperCase() === token ||
+        String(m.publicQrId || '').trim().toUpperCase() === token ||
+        String(m.publicId || '').trim().toUpperCase() === token ||
+        String(m.machineNumber || '').trim().toUpperCase() === token
+      ) || null
+    );
+  };
+
+  const beginQrDecodeLoop = () => {
+    const scan = () => {
+      const video = videoRef.current;
+
+      if (
+        !video ||
+        !streamRef.current ||
+        video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+        !video.videoWidth ||
+        !video.videoHeight
+      ) {
+        scanFrameRef.current = requestAnimationFrame(scan);
+        return;
+      }
+
+      try {
+        let canvas = canvasRef.current;
+
+        if (!canvas) {
+          canvas = document.createElement('canvas');
+          canvasRef.current = canvas;
+        }
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const ctx = canvas.getContext('2d', {
+          willReadFrequently: true
+        });
+
+        if (!ctx) {
+          scanFrameRef.current = requestAnimationFrame(scan);
+          return;
+        }
+
+        ctx.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        const imageData = ctx.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        const result = jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height,
+          {
+            inversionAttempts: 'attemptBoth'
+          }
+        );
+
+        if (result?.data) {
+          const machine = resolveScannedMachine(result.data);
+
+          if (machine) {
+            stopCamera();
+            setCameraError(null);
+            setManualCode(extractQrToken(result.data));
+            setSelectedMachinePreview(machine);
+            return;
+          }
+
+          setCameraError(
+            isRTL
+              ? 'تمت قراءة رمز QR، لكنه غير مرتبط بأي ماكينة معتمدة في الأسطول.'
+              : 'QR detected, but it is not linked to an approved fleet machine.'
+          );
+        }
+      } catch (err) {
+        console.warn('QR decoding issue:', err);
+      }
+
+      scanFrameRef.current = requestAnimationFrame(scan);
+    };
+
+    if (scanFrameRef.current !== null) {
+      cancelAnimationFrame(scanFrameRef.current);
+    }
+
+    scanFrameRef.current = requestAnimationFrame(scan);
   };
 
   const startCamera = async () => {
     setCameraError(null);
+
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported in this browser');
+      if (
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        throw new Error(
+          'Camera not supported in this browser'
+        );
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
+
+      stopCamera();
+
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: {
+              ideal: 'environment'
+            },
+            width: {
+              ideal: 1280
+            },
+            height: {
+              ideal: 720
+            }
+          },
+          audio: false
+        });
+
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+
+      const video = videoRef.current;
+
+      if (!video) {
+        stream.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+        throw new Error('Video element is not ready');
       }
+
+      video.srcObject = stream;
+
+      await video.play();
+
       setCameraActive(true);
       setIsScanning(true);
+
+      beginQrDecodeLoop();
+
     } catch (err: any) {
       console.warn('Camera access issue:', err);
-      setCameraError(isRTL ? 'تعذر فتح الكاميرا الحقيقية، تم تفعيل وضع المحاكاة الضوئية' : 'Could not access device camera, simulation mode active');
-      setCameraActive(false);
-      setIsScanning(true);
+
+      stopCamera();
+
+      setCameraError(
+        isRTL
+          ? 'تعذر فتح الكاميرا. تأكد من السماح للموقع باستخدام الكاميرا.'
+          : 'Could not access the camera. Allow camera permission for this site.'
+      );
     }
   };
 
@@ -123,7 +325,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         stopCamera();
         onClose();
       }}
-      title={isRTL ? 'ماسح الـ QR ومحاكاة التفاعل الميداني' : 'QR Scanner & Field Dispatch'}
+      title={isRTL ? 'ماسح QR للماكينات' : 'Machine QR Scanner'}
       subtitle={isRTL ? 'امسح رمز الـ QR الملصق على الماكينة لاتخاذ إجراءات الصيانة أو تسجيل البلاغات' : 'Point camera at physical vending machine QR code or select from fleet'}
       maxWidth="md"
     >
@@ -265,7 +467,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 <>
                   <Camera className="w-8 h-8 text-slate-500 mb-2" />
                   <span className="text-xs text-slate-400 font-mono">
-                    {isScanning ? 'Optical recognition active...' : 'Camera Ready (Auto-Detect QR)'}
+                    {isScanning ? 'QR recognition active...' : 'Camera Ready'}
                   </span>
                 </>
               )}
@@ -303,7 +505,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             {machines.length > 0 && (
               <div>
                 <span className="text-xs font-medium text-slate-400 block mb-2 text-right">
-                  أو اختر ماكينة مباشرة لمحاكاة قراءة الـ QR Code:
+                  أو اختر ماكينة مباشرة بدون استخدام الكاميرا:
                 </span>
                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
                   {machines.slice(0, 8).map(m => (
