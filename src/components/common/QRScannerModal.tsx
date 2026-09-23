@@ -86,10 +86,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     e.preventDefault();
     if (manualCode.trim()) {
       const clean = manualCode.trim().toUpperCase();
-      const match = machines.find(m => 
-        m.machineNumber.toUpperCase() === clean || 
-        m.publicId.toUpperCase() === clean || 
-        (m.publicQrId && m.publicQrId.toUpperCase() === clean)
+      const match = machines.find(m =>
+        m.machineNumber.toUpperCase() === clean ||
+        m.publicId.toUpperCase() === clean ||
+        (m.publicQrId && m.publicQrId.toUpperCase() === clean) ||
+        (m.publicQrToken && m.publicQrToken.toUpperCase() === clean)
       );
       if (match) {
         stopCamera();
@@ -104,7 +105,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
   const handleDirectAction = (targetMode: 'technician' | 'machine' | 'customer' | 'part-request') => {
     if (selectedMachinePreview) {
-      const code = selectedMachinePreview.publicQrId || selectedMachinePreview.publicId || selectedMachinePreview.machineNumber;
+      const code =
+        selectedMachinePreview.publicQrToken ||
+        selectedMachinePreview.publicQrId ||
+        selectedMachinePreview.publicId ||
+        selectedMachinePreview.machineNumber;
       stopCamera();
       onSelectMachine(code, targetMode);
       onClose();
