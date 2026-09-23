@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { MobileCameraCapture } from '../common/MobileCameraCapture';
 import {
   Wrench,
   CheckCircle2,
@@ -845,12 +846,13 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
                     <option value="COMPONENT">صورة القطعة المستبدلة</option>
                   </select>
 
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFileChange}
-                    className="text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-slate-800 file:text-slate-200"
+                  <MobileCameraCapture
+                    disabled={isUploadingEvidence}
+                    onCapture={(dataUrl, mimeType) => {
+                      setEvidenceFile(dataUrl);
+                      setEvidenceMimeType(mimeType);
+                      setUploadSuccess(null);
+                    }}
                   />
                 </div>
 
