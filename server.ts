@@ -2947,8 +2947,153 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Commercial vending product master. This is intentionally separate from
+  // maintenance spare-parts inventory so sales/stock/accounting can evolve safely.
+  const productWriteRoles = ['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'WAREHOUSE_OFFICER'];
+
+  const normalizeCommercialProduct = (body: any) => ({
+    sku: String(body?.sku || '').trim().toUpperCase(),
+    barcode: String(body?.barcode || '').trim(),
+    name: String(body?.name || '').trim(),
+    nameAr: String(body?.nameAr || '').trim(),
+    category: String(body?.category || '').trim(),
+    brand: String(body?.brand || '').trim(),
+    unit: String(body?.unit || 'EA').trim() || 'EA',
+    purchaseCost: Number(body?.purchaseCost ?? 0),
+    sellingPrice: Number(body?.sellingPrice ?? 0),
+    vatPercent: Number(body?.vatPercent ?? 15),
+    supplierId: String(body?.supplierId || '').trim(),
+    shelfLifeDays: Number(body?.shelfLifeDays ?? 0),
+    minStockLevel: Number(body?.minStockLevel ?? 0)
+  });
+
+  const validateCommercialProduct = (store: RuntimeStoreData, input: any, currentId?: string) => {
+    if (!input.sku) return 'PRODUCT_SKU_REQUIRED';
+    if (!input.name && !input.nameAr) return 'PRODUCT_NAME_REQUIRED';
+    const numericValues = [input.purchaseCost, input.sellingPrice, input.vatPercent, input.shelfLifeDays, input.minStockLevel];
+    if (!numericValues.every(Number.isFinite)) return 'PRODUCT_NUMERIC_FIELDS_INVALID';
+    if (numericValues.some((value: number) => value < 0)) return 'PRODUCT_NEGATIVE_VALUE_NOT_ALLOWED';
+    if (input.vatPercent > 100) return 'PRODUCT_VAT_OUT_OF_RANGE';
+
+    const duplicateSku = (store.products || []).some((product: any) =>
+      product.id !== currentId &&
+      product.isDeleted !== true &&
+      String(product.sku || '').toUpperCase() === input.sku
+    );
+    if (duplicateSku) return 'PRODUCT_SKU_ALREADY_EXISTS';
+
+    if (input.barcode) {
+      const duplicateBarcode = (store.products || []).some((product: any) =>
+        product.id !== currentId &&
+        product.isDeleted !== true &&
+        String(product.barcode || '') === input.barcode
+      );
+      if (duplicateBarcode) return 'PRODUCT_BARCODE_ALREADY_EXISTS';
+    }
+
+    if (input.supplierId) {
+      const supplierExists = (store.suppliers || []).some((supplier: any) =>
+        supplier.id === input.supplierId && supplier.isDeleted !== true && supplier.isActive !== false
+      );
+      if (!supplierExists) return 'PRODUCT_SUPPLIER_INVALID';
+    }
+    return null;
+  };
+
+  apiRouter.get('/products', (req, res) => {
+    const store = getStore();
+    const includeInactive = String(req.query.include_inactive || '').toLowerCase() === 'true';
+    const products = (store.products || [])
+      .filter((product: any) => product.isDeleted !== true && (includeInactive || product.isActive !== false))
+      .map((product: any) => ({
+        ...product,
+        supplier: product.supplierId
+          ? (store.suppliers || []).find((supplier: any) => supplier.id === product.supplierId)
+          : undefined
+      }))
+      .sort((a: any, b: any) => String(a.sku || '').localeCompare(String(b.sku || '')));
+    res.json(products);
+  });
+
+  apiRouter.post('/products', requireEnterpriseRole(productWriteRoles), (req, res) => {
+    const store = getStore();
+    const input = normalizeCommercialProduct(req.body);
+    const error = validateCommercialProduct(store, input);
+    if (error) return res.status(400).json({ error });
+
+    const now = new Date().toISOString();
+    const product = {
+      id: `prd-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      ...input,
+      barcode: input.barcode || undefined,
+      name: input.name || input.nameAr,
+      nameAr: input.nameAr || input.name,
+      supplierId: input.supplierId || undefined,
+      isActive: true,
+      isDeleted: false,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    store.products = store.products || [];
+    store.products.push(product);
+    store.auditLogs = store.auditLogs || [];
+    store.auditLogs.unshift({
+      id: `aud-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      action: 'COMMERCIAL_PRODUCT_CREATED',
+      entityName: 'CommercialProduct',
+      entityId: product.id,
+      newValues: { sku: product.sku, name: product.name, sellingPrice: product.sellingPrice },
+      createdAt: now
+    });
+    saveStore(store);
+    res.status(201).json(product);
+  });
+
+  apiRouter.put('/products/:id', requireEnterpriseRole(productWriteRoles), (req, res) => {
+    const store = getStore();
+    const product = (store.products || []).find((item: any) => item.id === req.params.id && item.isDeleted !== true);
+    if (!product) return res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
+
+    const input = normalizeCommercialProduct({ ...product, ...req.body });
+    const error = validateCommercialProduct(store, input, product.id);
+    if (error) return res.status(400).json({ error });
+
+    Object.assign(product, input, {
+      barcode: input.barcode || undefined,
+      name: input.name || input.nameAr,
+      nameAr: input.nameAr || input.name,
+      supplierId: input.supplierId || undefined,
+      updatedAt: new Date().toISOString()
+    });
+    saveStore(store);
+    res.json(product);
+  });
+
+  const setCommercialProductActive = (active: boolean) => (req: express.Request, res: express.Response) => {
+    const store = getStore();
+    const product = (store.products || []).find((item: any) => item.id === req.params.id && item.isDeleted !== true);
+    if (!product) return res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
+    product.isActive = active;
+    product.updatedAt = new Date().toISOString();
+    store.auditLogs = store.auditLogs || [];
+    store.auditLogs.unshift({
+      id: `aud-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      action: active ? 'COMMERCIAL_PRODUCT_REACTIVATED' : 'COMMERCIAL_PRODUCT_DEACTIVATED',
+      entityName: 'CommercialProduct',
+      entityId: product.id,
+      newValues: { sku: product.sku, isActive: active },
+      createdAt: product.updatedAt
+    });
+    saveStore(store);
+    res.json(product);
+  };
+
+  apiRouter.post('/products/:id/deactivate', requireEnterpriseRole(productWriteRoles), setCommercialProductActive(false));
+  apiRouter.post('/products/:id/reactivate', requireEnterpriseRole(productWriteRoles), setCommercialProductActive(true));
+
   // Suppliers
-  apiRouter.get('/suppliers', (req, res) => {
+  apiRouter.get('/suppliers' , (req, res) => {
     const store = getStore();
     res.json(store.suppliers || []);
   });

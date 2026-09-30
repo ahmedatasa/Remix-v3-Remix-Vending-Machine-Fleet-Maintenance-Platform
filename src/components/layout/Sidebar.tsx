@@ -67,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Inventory & Supply Chain
     { id: 'spare-parts', labelKey: 'spareParts', icon: Package, section: 'inventory' },
+    { id: 'products', labelKey: 'products', icon: Package, section: 'inventory' },
     { id: 'inventory', labelKey: 'inventory', icon: Boxes, section: 'inventory' },
     { id: 'part-requests', labelKey: 'partRequests', icon: ClipboardList, section: 'inventory' },
     { id: 'suppliers', labelKey: 'suppliers', icon: Truck, section: 'inventory' },
@@ -86,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const sectionTitles = {
     operations: isRTL ? 'إدارة الأسطول والمواقع' : 'Fleet Operations',
     maintenance: isRTL ? 'الصيانة والدعم الميداني' : 'Field Maintenance',
-    inventory: isRTL ? 'المخزون وقطع الغيار' : 'Inventory & Parts',
+    inventory: isRTL ? 'المخزون والبضاعة وقطع الغيار' : 'Inventory, Products & Parts',
     intelligence: isRTL ? 'التقارير وخط البيانات' : 'Intelligence & Pipeline',
     admin: isRTL ? 'النظام والرقابة' : 'System & Governance'
   };

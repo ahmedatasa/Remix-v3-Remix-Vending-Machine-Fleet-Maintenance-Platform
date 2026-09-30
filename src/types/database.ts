@@ -1010,6 +1010,28 @@ export interface PartUsageRecord {
   date: string;
 }
 
+export interface CommercialProduct {
+  id: string;
+  sku: string;
+  barcode?: string;
+  name: string;
+  nameAr?: string;
+  category?: string;
+  brand?: string;
+  unit?: string;
+  purchaseCost: number;
+  sellingPrice: number;
+  vatPercent?: number;
+  supplierId?: string;
+  supplier?: Supplier;
+  shelfLifeDays?: number;
+  minStockLevel?: number;
+  isActive: boolean;
+  isDeleted?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Supplier {
   id: string;
   code?: string;

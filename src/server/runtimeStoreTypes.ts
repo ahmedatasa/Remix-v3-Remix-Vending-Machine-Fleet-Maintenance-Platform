@@ -44,6 +44,7 @@ export interface RuntimeStoreData {
   technicians: any[];
   categories: any[];
   spareParts: any[];
+  products: any[];
   suppliers: any[];
   partRequests: any[];
   transactions: any[];
