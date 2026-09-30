@@ -313,6 +313,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'spare-parts':
         return hasRole(['MAINTENANCE_MANAGER', 'WAREHOUSE', 'WAREHOUSE_OFFICER', 'TECHNICIAN']);
 
+      case 'products':
       case 'inventory':
         return hasRole(['MAINTENANCE_MANAGER', 'WAREHOUSE', 'WAREHOUSE_OFFICER']);
 

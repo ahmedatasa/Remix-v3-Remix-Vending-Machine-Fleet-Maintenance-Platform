@@ -1,6 +1,6 @@
 import {
   Machine, Ticket, Location, Building, Floor, Technician, SparePart,
-  SparePartCategory, InventoryTransaction, SparePartRequest, Supplier,
+  SparePartCategory, InventoryTransaction, SparePartRequest, Supplier, CommercialProduct,
   AuditLog, User, UserRole, MachineModel, MachineStatus, TicketStatus, TicketPriority,
   FaultCategory, TechnicianStatus, PartRequestStatus, DataQualityStatus,
   ImportBatch, ImportRowEntity, NormalizedMachineRecord, ImportCommitOptions,
@@ -7055,6 +7055,33 @@ export const api = {
       pendingRequestsCount,
       categoryBreakdown
     };
+  },
+
+  // Commercial vending products (separate from maintenance spare parts)
+  async getProducts(includeInactive = true) {
+    return await apiFetch<CommercialProduct[]>(includeInactive ? '/products?include_inactive=true' : '/products');
+  },
+
+  async createProduct(product: Partial<CommercialProduct>) {
+    return await apiFetch<CommercialProduct>('/products', {
+      method: 'POST',
+      body: JSON.stringify(product)
+    });
+  },
+
+  async updateProduct(id: string, updates: Partial<CommercialProduct>) {
+    return await apiFetch<CommercialProduct>(`/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  },
+
+  async deactivateProduct(id: string) {
+    return await apiFetch<CommercialProduct>(`/products/${id}/deactivate`, { method: 'POST' });
+  },
+
+  async reactivateProduct(id: string) {
+    return await apiFetch<CommercialProduct>(`/products/${id}/reactivate`, { method: 'POST' });
   },
 
   // Suppliers

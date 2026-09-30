@@ -12,6 +12,7 @@ export type NavigationTab =
   | 'technician-detail'
   | 'maintenance'
   | 'spare-parts'
+  | 'products'
   | 'inventory'
   | 'part-requests'
   | 'suppliers'

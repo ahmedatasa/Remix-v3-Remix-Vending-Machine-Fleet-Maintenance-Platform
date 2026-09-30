@@ -46,6 +46,7 @@ function createEmptyRuntimeStore(storeId?: string): RuntimeStoreData {
     technicians: [],
     categories: [],
     spareParts: [],
+    products: [],
     suppliers: [],
     partRequests: [],
     transactions: [],
@@ -233,6 +234,7 @@ export class RuntimeStoreManager {
         migratedStore.technicians = normalizeEntityRevisions(Array.isArray(legacyData.technicians) ? legacyData.technicians : []);
         migratedStore.categories = normalizeEntityRevisions(Array.isArray(legacyData.categories) ? legacyData.categories : []);
         migratedStore.spareParts = normalizeEntityRevisions(Array.isArray(legacyData.spareParts) ? legacyData.spareParts : []);
+        migratedStore.products = normalizeEntityRevisions(Array.isArray(legacyData.products) ? legacyData.products : []);
         migratedStore.suppliers = normalizeEntityRevisions(Array.isArray(legacyData.suppliers) ? legacyData.suppliers : []);
         migratedStore.partRequests = normalizeEntityRevisions(Array.isArray(legacyData.partRequests) ? legacyData.partRequests : []);
         migratedStore.transactions = normalizeEntityRevisions(Array.isArray(legacyData.transactions) ? legacyData.transactions : []);
@@ -349,6 +351,7 @@ export class RuntimeStoreManager {
         newStore.technicians = normalizeEntityRevisions(Array.isArray(parsedBaseline.technicians) ? parsedBaseline.technicians : []);
         newStore.categories = normalizeEntityRevisions(Array.isArray(parsedBaseline.categories) ? parsedBaseline.categories : []);
         newStore.spareParts = normalizeEntityRevisions(Array.isArray(parsedBaseline.spareParts) ? parsedBaseline.spareParts : []);
+        newStore.products = normalizeEntityRevisions(Array.isArray(parsedBaseline.products) ? parsedBaseline.products : []);
         newStore.suppliers = normalizeEntityRevisions(Array.isArray(parsedBaseline.suppliers) ? parsedBaseline.suppliers : []);
         newStore.users = normalizeEntityRevisions(Array.isArray(parsedBaseline.users) ? parsedBaseline.users : []);
         newStore.importBatches = Array.isArray(parsedBaseline.importBatches) ? parsedBaseline.importBatches : [];
@@ -429,6 +432,7 @@ export class RuntimeStoreManager {
             if (!Array.isArray(parsed.technicians)) parsed.technicians = [];
             if (!Array.isArray(parsed.categories)) parsed.categories = [];
             if (!Array.isArray(parsed.spareParts)) parsed.spareParts = [];
+            if (!Array.isArray(parsed.products)) parsed.products = [];
             if (!Array.isArray(parsed.suppliers)) parsed.suppliers = [];
             if (!Array.isArray(parsed.partRequests)) parsed.partRequests = [];
             if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
@@ -462,6 +466,7 @@ export class RuntimeStoreManager {
             parsed.technicians = normalizeEntityRevisions(parsed.technicians);
             parsed.categories = normalizeEntityRevisions(parsed.categories);
             parsed.spareParts = normalizeEntityRevisions(parsed.spareParts);
+            parsed.products = normalizeEntityRevisions(parsed.products);
             parsed.suppliers = normalizeEntityRevisions(parsed.suppliers);
             parsed.partRequests = normalizeEntityRevisions(parsed.partRequests);
             parsed.transactions = normalizeEntityRevisions(parsed.transactions);
@@ -646,6 +651,7 @@ export class RuntimeStoreManager {
       'technicians',
       'categories',
       'spareParts',
+      'products',
       'suppliers',
       'partRequests',
       'transactions',
