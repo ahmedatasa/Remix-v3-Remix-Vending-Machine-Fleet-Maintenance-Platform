@@ -11,6 +11,7 @@ import {
   fetchCloudMachineLocationSyncAudit
 } from './src/server/cloudMachineLocationSyncClient';
 import { mainToCloudLocationSyncWorker } from './src/server/mainToCloudLocationSyncWorker';
+import { createCommercialInventoryRouter } from './src/server/commercialInventoryRoutes';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -3091,6 +3092,57 @@ async function startServer() {
 
   apiRouter.post('/products/:id/deactivate', requireEnterpriseRole(productWriteRoles), setCommercialProductActive(false));
   apiRouter.post('/products/:id/reactivate', requireEnterpriseRole(productWriteRoles), setCommercialProductActive(true));
+
+  // Safe product deletion: only products with no commercial inventory history can be removed.
+  // The delete is soft (isDeleted=true) so audit/history integrity is preserved.
+  apiRouter.delete('/products/:id', requireEnterpriseRole(productWriteRoles), (req, res) => {
+    const store = getStore();
+    const product = (store.products || []).find((item: any) => item.id === req.params.id && item.isDeleted !== true);
+    if (!product) return res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
+
+    const batches = Array.isArray((store as any).commercialInventoryBatches)
+      ? (store as any).commercialInventoryBatches.filter((item: any) => item.productId === product.id)
+      : [];
+    const movements = Array.isArray((store as any).commercialInventoryMovements)
+      ? (store as any).commercialInventoryMovements.filter((item: any) => item.productId === product.id)
+      : [];
+
+    if (batches.length > 0 || movements.length > 0) {
+      return res.status(409).json({
+        error: 'PRODUCT_HAS_INVENTORY_HISTORY',
+        message: 'Product cannot be deleted because inventory history exists. Deactivate it instead.',
+        referenceCounts: { batches: batches.length, movements: movements.length }
+      });
+    }
+
+    const now = new Date().toISOString();
+    const actor = (req as any).user || {};
+    const oldValues = { sku: product.sku, name: product.name, isActive: product.isActive !== false };
+    product.isDeleted = true;
+    product.isActive = false;
+    product.deletedAt = now;
+    product.deletedBy = actor.id || undefined;
+    product.updatedAt = now;
+
+    store.auditLogs = store.auditLogs || [];
+    store.auditLogs.unshift({
+      id: `aud-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+      action: 'COMMERCIAL_PRODUCT_DELETED',
+      entityName: 'CommercialProduct',
+      entityId: product.id,
+      oldValues,
+      newValues: { isDeleted: true, isActive: false },
+      userId: actor.id || undefined,
+      userName: actor.fullName || actor.name || actor.email || undefined,
+      createdAt: now
+    });
+
+    saveStore(store);
+    res.json({ success: true, id: product.id });
+  });
+
+  // Commercial vending inventory, batches, expiry control and stock ledger.
+  apiRouter.use('/commercial-inventory', createCommercialInventoryRouter({ getStore, saveStore }));
 
   // Suppliers
   apiRouter.get('/suppliers' , (req, res) => {

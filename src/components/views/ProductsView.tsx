@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit2, Package, Plus, Power } from 'lucide-react';
+import { Edit2, Package, Plus, Power, Trash2 } from 'lucide-react';
 import { DataTable, Column } from '../common/DataTable';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
@@ -112,6 +112,32 @@ export const ProductsView: React.FC<ProductsViewProps> = () => {
     }
   };
 
+  const deleteProduct = async (product: CommercialProduct) => {
+    const label = isRTL ? (product.nameAr || product.name || product.sku) : (product.name || product.nameAr || product.sku);
+    const confirmed = window.confirm(
+      isRTL
+        ? `حذف المنتج «${label}»؟\n\nسيتم الحذف فقط إذا لم توجد له أي حركة أو دفعة مخزون. إذا وُجد تاريخ مخزون يجب إيقاف المنتج بدلاً من حذفه.`
+        : `Delete product “${label}”?\n\nDeletion is allowed only when the product has no inventory batch or movement history. Otherwise deactivate it instead.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.deleteProduct(product.id);
+      showToast(t('success'), isRTL ? 'تم حذف المنتج بنجاح' : 'Product deleted successfully', 'success');
+      await loadData();
+    } catch (err: any) {
+      const message = String(err?.message || '');
+      const hasHistory = message.includes('PRODUCT_HAS_INVENTORY_HISTORY');
+      showToast(
+        hasHistory ? (isRTL ? 'لا يمكن حذف المنتج' : 'Product cannot be deleted') : t('error'),
+        hasHistory
+          ? (isRTL ? 'يوجد للمنتج سجل مخزون أو حركات. استخدم إيقاف المنتج للحفاظ على السجل.' : 'This product has inventory history. Deactivate it instead to preserve the ledger.')
+          : (message || 'Failed to delete product'),
+        hasHistory ? 'warning' : 'error'
+      );
+    }
+  };
+
   const columns: Column<CommercialProduct>[] = [
     { key: 'sku', header: 'SKU', sortable: true, render: row => (
       <div className="flex items-center gap-3"><Package className="w-4 h-4 text-emerald-400" /><div><div className="font-mono text-xs font-bold text-slate-100">{row.sku}</div><div className="text-[10px] text-slate-500">{row.barcode || 'No barcode'}</div></div></div>
@@ -125,7 +151,7 @@ export const ProductsView: React.FC<ProductsViewProps> = () => {
     { key: 'shelfLifeDays', header: isRTL ? 'الصلاحية' : 'Shelf Life', render: row => <span className="text-xs">{row.shelfLifeDays ? `${row.shelfLifeDays} ${isRTL ? 'يوم' : 'days'}` : '—'}</span> },
     { key: 'isActive', header: isRTL ? 'الحالة' : 'Status', render: row => <span className={row.isActive === false ? 'text-amber-400 text-xs' : 'text-emerald-400 text-xs'}>{row.isActive === false ? (isRTL ? 'غير نشط' : 'INACTIVE') : (isRTL ? 'نشط' : 'ACTIVE')}</span> },
     { key: 'actions', header: t('actions'), render: row => canManageInventory ? (
-      <div className="flex gap-1"><button onClick={() => openEdit(row)} className="p-1.5 text-slate-400 hover:text-blue-400"><Edit2 className="w-4 h-4" /></button><button onClick={() => toggleActive(row)} className="p-1.5 text-slate-400 hover:text-amber-400"><Power className="w-4 h-4" /></button></div>
+      <div className="flex gap-1"><button onClick={() => openEdit(row)} className="p-1.5 text-slate-400 hover:text-blue-400" title={isRTL ? 'تعديل' : 'Edit'}><Edit2 className="w-4 h-4" /></button><button onClick={() => toggleActive(row)} className="p-1.5 text-slate-400 hover:text-amber-400" title={row.isActive === false ? (isRTL ? 'تنشيط' : 'Reactivate') : (isRTL ? 'إيقاف' : 'Deactivate')}><Power className="w-4 h-4" /></button><button onClick={() => deleteProduct(row)} className="p-1.5 text-slate-400 hover:text-red-400" title={isRTL ? 'حذف' : 'Delete'}><Trash2 className="w-4 h-4" /></button></div>
     ) : null }
   ];
 
