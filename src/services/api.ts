@@ -1,6 +1,8 @@
 import {
   Machine, Ticket, Location, Building, Floor, Technician, SparePart,
   SparePartCategory, InventoryTransaction, SparePartRequest, Supplier, CommercialProduct,
+  CommercialInventoryBatch, CommercialInventoryMovement, CommercialInventorySummary,
+  CommercialInventoryReceiptInput, CommercialInventoryAdjustmentInput,
   AuditLog, User, UserRole, MachineModel, MachineStatus, TicketStatus, TicketPriority,
   FaultCategory, TechnicianStatus, PartRequestStatus, DataQualityStatus,
   ImportBatch, ImportRowEntity, NormalizedMachineRecord, ImportCommitOptions,
@@ -7082,6 +7084,45 @@ export const api = {
 
   async reactivateProduct(id: string) {
     return await apiFetch<CommercialProduct>(`/products/${id}/reactivate`, { method: 'POST' });
+  },
+
+  async deleteProduct(id: string) {
+    return await apiFetch<{ success: boolean; id: string }>(`/products/${id}`, { method: 'DELETE' });
+  },
+
+  // Commercial Inventory & Expiry
+  async getCommercialInventorySummary() {
+    return await apiFetch<CommercialInventorySummary>('/commercial-inventory/summary');
+  },
+
+  async getCommercialInventoryBatches(includeDepleted = false) {
+    const suffix = includeDepleted ? '?include_depleted=true' : '';
+    return await apiFetch<CommercialInventoryBatch[]>(`/commercial-inventory/batches${suffix}`);
+  },
+
+  async getCommercialInventoryMovements(limit = 200) {
+    return await apiFetch<CommercialInventoryMovement[]>(`/commercial-inventory/movements?limit=${Math.max(1, Math.min(1000, limit))}`);
+  },
+
+  async receiveCommercialInventory(input: CommercialInventoryReceiptInput) {
+    return await apiFetch<{ batch: CommercialInventoryBatch; movement: CommercialInventoryMovement }>('/commercial-inventory/receive', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async adjustCommercialInventory(input: CommercialInventoryAdjustmentInput) {
+    return await apiFetch<{ batch: CommercialInventoryBatch; movement: CommercialInventoryMovement }>('/commercial-inventory/adjust', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async writeOffExpiredCommercialBatch(batchId: string, reason?: string) {
+    return await apiFetch<{ batch: CommercialInventoryBatch; movement: CommercialInventoryMovement }>(`/commercial-inventory/batches/${batchId}/write-off-expired`, {
+      method: 'POST',
+      body: JSON.stringify(reason ? { reason } : {})
+    });
   },
 
   // Suppliers

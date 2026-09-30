@@ -8,6 +8,7 @@ import {
   Wrench,
   CalendarCheck,
   Package,
+  PackageCheck,
   Boxes,
   ClipboardList,
   Truck,
@@ -68,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Inventory & Supply Chain
     { id: 'spare-parts', labelKey: 'spareParts', icon: Package, section: 'inventory' },
     { id: 'products', labelKey: 'products', icon: Package, section: 'inventory' },
+    { id: 'commercial-inventory', labelKey: 'commercialInventory', icon: PackageCheck, section: 'inventory' },
     { id: 'inventory', labelKey: 'inventory', icon: Boxes, section: 'inventory' },
     { id: 'part-requests', labelKey: 'partRequests', icon: ClipboardList, section: 'inventory' },
     { id: 'suppliers', labelKey: 'suppliers', icon: Truck, section: 'inventory' },

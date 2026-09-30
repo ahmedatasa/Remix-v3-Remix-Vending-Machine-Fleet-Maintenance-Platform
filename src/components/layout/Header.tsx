@@ -38,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'maintenance': return t('maintenance');
       case 'spare-parts': return t('spareParts');
       case 'products': return t('products');
+      case 'commercial-inventory': return t('commercialInventory');
       case 'inventory': return t('inventory');
       case 'part-requests': return t('partRequests');
       case 'suppliers': return t('suppliers');
