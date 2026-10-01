@@ -85,6 +85,18 @@ html.light .bg-slate-950\/70 {
 html.light .bg-slate-950\/60 {
   background-color: rgba(248, 250, 252, 0.82) !important;
 }
+html.light .bg-slate-950\/50 {
+  background-color: rgba(248, 250, 252, 0.76) !important;
+}
+html.light .bg-slate-950\/40 {
+  background-color: rgba(248, 250, 252, 0.70) !important;
+}
+html.light .bg-slate-950\/30 {
+  background-color: rgba(248, 250, 252, 0.64) !important;
+}
+html.light .bg-slate-950\/20 {
+  background-color: rgba(248, 250, 252, 0.58) !important;
+}
 html.light .bg-slate-900 {
   background-color: #ffffff !important;
 }
@@ -100,6 +112,21 @@ html.light .bg-slate-900\/80 {
 html.light .bg-slate-900\/70 {
   background-color: rgba(255, 255, 255, 0.86) !important;
 }
+html.light .bg-slate-900\/60 {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+}
+html.light .bg-slate-900\/50 {
+  background-color: rgba(255, 255, 255, 0.76) !important;
+}
+html.light .bg-slate-900\/40 {
+  background-color: rgba(255, 255, 255, 0.70) !important;
+}
+html.light .bg-slate-900\/30 {
+  background-color: rgba(255, 255, 255, 0.64) !important;
+}
+html.light .bg-slate-900\/20 {
+  background-color: rgba(255, 255, 255, 0.58) !important;
+}
 html.light .bg-slate-800 {
   background-color: #f1f5f9 !important;
 }
@@ -112,11 +139,29 @@ html.light .bg-slate-800\/60 {
 html.light .bg-slate-800\/50 {
   background-color: rgba(241, 245, 249, 0.72) !important;
 }
+html.light .bg-slate-800\/40 {
+  background-color: rgba(241, 245, 249, 0.66) !important;
+}
+html.light .bg-slate-800\/30 {
+  background-color: rgba(241, 245, 249, 0.60) !important;
+}
+html.light .bg-slate-800\/20 {
+  background-color: rgba(241, 245, 249, 0.54) !important;
+}
 html.light .bg-slate-700 {
   background-color: #e2e8f0 !important;
 }
 html.light .bg-slate-700\/50 {
   background-color: rgba(226, 232, 240, 0.74) !important;
+}
+html.light .bg-slate-700\/40 {
+  background-color: rgba(226, 232, 240, 0.68) !important;
+}
+html.light .bg-slate-700\/30 {
+  background-color: rgba(226, 232, 240, 0.62) !important;
+}
+html.light .bg-slate-700\/20 {
+  background-color: rgba(226, 232, 240, 0.56) !important;
 }
 
 html.light .text-slate-50,
