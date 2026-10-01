@@ -140,27 +140,101 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
   const [isResolving, setIsResolving] = useState<boolean>(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
 
+  const clearLocalTechnicianSession = (message?: string) => {
+    ++ticketRequest.current;
+
+    setToken('');
+    setTechnician(null);
+    setTickets([]);
+    setSelectedTicket(null);
+    setTicketsError(null);
+    setLogoutError(null);
+    setIsLoadingTickets(false);
+    setLoginError(message || null);
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('vending_tech_token');
+      localStorage.removeItem('vending_tech_profile');
+    }
+  };
+
   // Load technician profile & tickets
   const loadTickets = async () => {
     if (!token) return;
+
     const request = ++ticketRequest.current;
     setIsLoadingTickets(true);
     setTicketsError(null);
+
     try {
       const res = await fetch('/technician/tickets', {
-        headers: { Authorization: `Bearer ${token}` }, cache: 'no-store'
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        cache: 'no-store'
       });
+
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.message || `تعذر تحميل التذاكر (HTTP ${res.status}).`);
-      if (!Array.isArray(data)) throw new Error('استجابة قائمة التذاكر غير صالحة.');
-      if (request === ticketRequest.current) setTickets(data);
+
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          if (request === ticketRequest.current) {
+            clearLocalTechnicianSession(
+              data?.message ||
+                'انتهت جلسة الفني أو أصبحت غير صالحة. يرجى تسجيل الدخول مجدداً.'
+            );
+          }
+          return;
+        }
+
+        if (res.status === 429) {
+          const retryAfter =
+            Number(
+              res.headers.get('Retry-After') ||
+              data?.retryAfterSeconds ||
+              0
+            );
+
+          throw new Error(
+            retryAfter > 0
+              ? `خدمة التذاكر مشغولة مؤقتاً. أعد المحاولة بعد ${retryAfter} ثانية.`
+              : 'خدمة التذاكر مشغولة مؤقتاً. أعد المحاولة بعد قليل.'
+          );
+        }
+
+        if (res.status >= 500) {
+          throw new Error(
+            'خدمة الفنيين غير متاحة مؤقتاً. لم يتم فقد الجلسة أو التذاكر. أعد المحاولة بعد قليل.'
+          );
+        }
+
+        throw new Error(
+          data?.message ||
+            `تعذر تحميل التذاكر (HTTP ${res.status}).`
+        );
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error(
+          'استجابة قائمة التذاكر غير صالحة.'
+        );
+      }
+
+      if (request === ticketRequest.current) {
+        setTickets(data);
+      }
     } catch (err: any) {
       if (request === ticketRequest.current) {
         setTickets([]);
-        setTicketsError(err?.message || 'تعذر الاتصال لتحميل التذاكر.');
+        setTicketsError(
+          err?.message ||
+            'تعذر الاتصال لتحميل التذاكر.'
+        );
       }
     } finally {
-      if (request === ticketRequest.current) setIsLoadingTickets(false);
+      if (request === ticketRequest.current) {
+        setIsLoadingTickets(false);
+      }
     }
   };
 
@@ -223,16 +297,39 @@ export const TechnicianMobilePortal: React.FC<TechnicianMobilePortalProps> = ({
 
   const handleLogout = async () => {
     setLogoutError(null);
+
+    let localLogoutWarning: string | undefined;
+
     try {
-      const res = await fetch('/technician/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok && res.status !== 401) throw new Error('تعذر تأكيد إنهاء الجلسة. حاول تسجيل الخروج مجدداً.');
-      ++ticketRequest.current;
-      setToken(''); setTechnician(null); setTickets([]); setSelectedTicket(null); setTicketsError(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('vending_tech_token');
-        localStorage.removeItem('vending_tech_profile');
+      const res = await fetch(
+        '/technician/logout',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!res.ok && res.status !== 401) {
+        const data =
+          await res.json().catch(() => null);
+
+        localLogoutWarning =
+          `تم تسجيل الخروج من هذا الجهاز، لكن تعذر تأكيد إلغاء الجلسة على الخادم${
+            data?.message ? `: ${data.message}` : '.'
+          }`;
       }
-    } catch (err: any) { setLogoutError(err?.message || 'تعذر تأكيد إنهاء الجلسة.'); }
+    } catch {
+      localLogoutWarning =
+        'تم تسجيل الخروج من هذا الجهاز. تعذر الاتصال بالخادم لتأكيد إلغاء الجلسة، وستنتهي الجلسة الخادمية تلقائياً عند انتهاء صلاحيتها.';
+    } finally {
+      // Never trap the technician in a stale browser session because
+      // of a temporary proxy/network/server failure.
+      clearLocalTechnicianSession(
+        localLogoutWarning
+      );
+    }
   };
 
   // Request GPS from browser (FIX 5: No hardcoded fallback)

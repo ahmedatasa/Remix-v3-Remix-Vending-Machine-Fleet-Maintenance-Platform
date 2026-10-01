@@ -33,14 +33,19 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
   initialTrackingToken,
   onNavigateToAdmin
 }) => {
-  // Navigation sub-state: 'REPORT' | 'TRACK' | 'SUCCESS' | 'INVALID_QR'
-  const [viewMode, setViewMode] = useState<'REPORT' | 'TRACK' | 'SUCCESS' | 'INVALID_QR'>('REPORT');
+  // Navigation sub-state:
+  // INVALID_QR is reserved for an authoritative 404 only.
+  // SERVICE_ERROR is used for transient 429/5xx/network failures.
+  const [viewMode, setViewMode] = useState<
+    'REPORT' | 'TRACK' | 'SUCCESS' | 'INVALID_QR' | 'SERVICE_ERROR'
+  >('REPORT');
   
   // Machine Token & Public Data
   const [token, setToken] = useState<string>(initialToken || '');
   const [machineData, setMachineData] = useState<PublicMachineSummary | null>(null);
   const [isLoadingMachine, setIsLoadingMachine] = useState<boolean>(true);
   const [machineError, setMachineError] = useState<string | null>(null);
+  const [machineLookupAttempt, setMachineLookupAttempt] = useState<number>(0);
 
   // Fault Report Form
   const [category, setCategory] = useState<FaultCategory>('CARD_POS');
@@ -97,7 +102,9 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
     }
   }, []);
 
-  // Fetch sanitized machine info whenever token changes
+  // Fetch sanitized machine info whenever token changes.
+  // Only HTTP 404 means an invalid/unregistered QR.
+  // 429, 5xx and network failures are transient service errors.
   useEffect(() => {
     if (!token) {
       setIsLoadingMachine(false);
@@ -105,37 +112,87 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
     }
 
     let isMounted = true;
-    setIsLoadingMachine(true);
-    setMachineError(null);
 
-    fetch(`/public/m/${encodeURIComponent(token)}`)
-      .then(async (res) => {
+    const loadMachine = async () => {
+      setIsLoadingMachine(true);
+      setMachineError(null);
+
+      try {
+        const res = await fetch(
+          `/public/m/${encodeURIComponent(token)}`,
+          { cache: 'no-store' }
+        );
+
+        const json = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson.message || 'INVALID_QR_TOKEN');
+          const error = new Error(
+            json?.message || `MACHINE_LOOKUP_HTTP_${res.status}`
+          ) as Error & {
+            status?: number;
+            retryAfter?: string | null;
+          };
+
+          error.status = res.status;
+          error.retryAfter = res.headers.get('Retry-After');
+          throw error;
         }
-        return res.json();
-      })
-      .then((data: PublicMachineSummary) => {
-        if (isMounted) {
-          setMachineData(data);
-          setIsLoadingMachine(false);
-          setViewMode('REPORT');
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          console.warn('[PublicPortal] Machine lookup failed:', err.message);
-          setMachineError(err.message);
-          setIsLoadingMachine(false);
+
+        if (!isMounted) return;
+
+        setMachineData(json as PublicMachineSummary);
+        setMachineError(null);
+        setIsLoadingMachine(false);
+        setViewMode('REPORT');
+      } catch (err: any) {
+        if (!isMounted) return;
+
+        console.warn(
+          '[PublicPortal] Machine lookup failed:',
+          err?.message || err
+        );
+
+        setMachineData(null);
+        setIsLoadingMachine(false);
+
+        if (err?.status === 404) {
+          setMachineError(err?.message || 'INVALID_QR_TOKEN');
           setViewMode('INVALID_QR');
+          return;
         }
-      });
+
+        const retryAfterSeconds =
+          Number(err?.retryAfter || 0);
+
+        const waitText =
+          retryAfterSeconds > 0
+            ? ` انتظر ${retryAfterSeconds} ثانية ثم أعد المحاولة.`
+            : '';
+
+        if (err?.status === 429) {
+          setMachineError(
+            `الخدمة مشغولة مؤقتاً بسبب كثرة الطلبات.${waitText}`
+          );
+        } else if (Number(err?.status) >= 500) {
+          setMachineError(
+            'خدمة التحقق من الماكينة غير متاحة مؤقتاً. رمز الـ QR لم يتم اعتباره غير صالح. أعد المحاولة بعد قليل.'
+          );
+        } else {
+          setMachineError(
+            'تعذر الاتصال بخدمة التحقق من الماكينة. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.'
+          );
+        }
+
+        setViewMode('SERVICE_ERROR');
+      }
+    };
+
+    loadMachine();
 
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [token, machineLookupAttempt]);
 
   // Handle Tracking Lookup
   const handleLookupTracking = (searchCode?: string) => {
@@ -336,6 +393,43 @@ export const PublicCustomerPortal: React.FC<PublicCustomerPortalProps> = ({
                 {isArabic ? 'البحث عن بلاغ برقم التتبع' : 'Track an Existing Ticket'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* TRANSIENT SERVICE ERROR - QR itself is not declared invalid */}
+        {viewMode === 'SERVICE_ERROR' && (
+          <div className="bg-slate-900/90 border border-amber-800/60 rounded-2xl p-6 text-center space-y-4 shadow-xl">
+            <div className="w-16 h-16 bg-amber-950/60 border border-amber-800 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-lg font-bold text-white">
+                {isArabic
+                  ? 'تعذر التحقق من الماكينة مؤقتاً'
+                  : 'Machine verification temporarily unavailable'}
+              </h2>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {machineError ||
+                  (isArabic
+                    ? 'حدث انقطاع مؤقت في الخدمة. رمز الـ QR لم يتم اعتباره غير صالح.'
+                    : 'A temporary service interruption occurred. The QR code has not been marked invalid.')}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setMachineLookupAttempt((value) => value + 1)
+              }
+              className="w-full py-3 px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>
+                {isArabic ? 'إعادة المحاولة' : 'Retry'}
+              </span>
+            </button>
           </div>
         )}
 
