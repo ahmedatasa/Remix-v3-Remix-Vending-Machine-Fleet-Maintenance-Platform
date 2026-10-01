@@ -1,5 +1,6 @@
 export * from './database';
 export * from './commercialInventory';
+export * from './machineStock';
 
 export type NavigationTab = 
   | 'dashboard'
@@ -15,6 +16,7 @@ export type NavigationTab =
   | 'spare-parts'
   | 'products'
   | 'commercial-inventory'
+  | 'machine-stock'
   | 'inventory'
   | 'part-requests'
   | 'suppliers'

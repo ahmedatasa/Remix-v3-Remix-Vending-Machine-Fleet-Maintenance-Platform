@@ -8,7 +8,7 @@ interface CommercialInventoryRouteDeps {
   saveStore: (store?: RuntimeStoreData) => void;
 }
 
-const WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'WAREHOUSE_OFFICER'];
+const WRITE_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'WAREHOUSE', 'WAREHOUSE_OFFICER'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function ensureCollections(store: RuntimeStoreData) {

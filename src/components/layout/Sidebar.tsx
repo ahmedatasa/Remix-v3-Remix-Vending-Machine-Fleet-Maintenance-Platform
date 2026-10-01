@@ -70,6 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'spare-parts', labelKey: 'spareParts', icon: Package, section: 'inventory' },
     { id: 'products', labelKey: 'products', icon: Package, section: 'inventory' },
     { id: 'commercial-inventory', labelKey: 'commercialInventory', icon: PackageCheck, section: 'inventory' },
+    { id: 'machine-stock', labelKey: 'machineStock', icon: Boxes, section: 'inventory' },
     { id: 'inventory', labelKey: 'inventory', icon: Boxes, section: 'inventory' },
     { id: 'part-requests', labelKey: 'partRequests', icon: ClipboardList, section: 'inventory' },
     { id: 'suppliers', labelKey: 'suppliers', icon: Truck, section: 'inventory' },

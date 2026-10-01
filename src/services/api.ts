@@ -3,6 +3,8 @@ import {
   SparePartCategory, InventoryTransaction, SparePartRequest, Supplier, CommercialProduct,
   CommercialInventoryBatch, CommercialInventoryMovement, CommercialInventorySummary,
   CommercialInventoryReceiptInput, CommercialInventoryAdjustmentInput,
+  MachineStockRecord, MachineStockMovement, MachineStockSummary, RefillVisit,
+  StartRefillVisitInput, MachineCountInput, MachineRefillInput, MachineReturnInput, MachineWasteInput,
   AuditLog, User, UserRole, MachineModel, MachineStatus, TicketStatus, TicketPriority,
   FaultCategory, TechnicianStatus, PartRequestStatus, DataQualityStatus,
   ImportBatch, ImportRowEntity, NormalizedMachineRecord, ImportCommitOptions,
@@ -7122,6 +7124,73 @@ export const api = {
     return await apiFetch<{ batch: CommercialInventoryBatch; movement: CommercialInventoryMovement }>(`/commercial-inventory/batches/${batchId}/write-off-expired`, {
       method: 'POST',
       body: JSON.stringify(reason ? { reason } : {})
+    });
+  },
+
+  // Machine Stock, Delegate Count & Refill
+  async getMachineStockSummary() {
+    return await apiFetch<MachineStockSummary>('/machine-stock/summary');
+  },
+
+  async getMachineStockRecords(machineId?: string) {
+    const suffix = machineId ? `?machine_id=${encodeURIComponent(machineId)}` : '';
+    return await apiFetch<MachineStockRecord[]>(`/machine-stock/records${suffix}`);
+  },
+
+  async getMachineStockMovements(machineId?: string, limit = 300) {
+    const params = new URLSearchParams();
+    if (machineId) params.set('machine_id', machineId);
+    params.set('limit', String(Math.max(1, Math.min(1000, limit))));
+    return await apiFetch<MachineStockMovement[]>(`/machine-stock/movements?${params.toString()}`);
+  },
+
+  async getRefillVisits(machineId?: string, status?: 'OPEN' | 'COMPLETED') {
+    const params = new URLSearchParams();
+    if (machineId) params.set('machine_id', machineId);
+    if (status) params.set('status', status);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return await apiFetch<RefillVisit[]>(`/machine-stock/visits${suffix}`);
+  },
+
+  async startRefillVisit(input: StartRefillVisitInput) {
+    return await apiFetch<RefillVisit>('/machine-stock/visits', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async countMachineStock(visitId: string, input: MachineCountInput) {
+    return await apiFetch<{ record: MachineStockRecord; movement: MachineStockMovement }>(`/machine-stock/visits/${visitId}/count`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async refillMachineStock(visitId: string, input: MachineRefillInput) {
+    return await apiFetch<{ record: MachineStockRecord; movement: MachineStockMovement; batch: CommercialInventoryBatch }>(`/machine-stock/visits/${visitId}/refill`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async returnMachineStock(visitId: string, input: MachineReturnInput) {
+    return await apiFetch<{ record: MachineStockRecord; movement: MachineStockMovement; batch: CommercialInventoryBatch }>(`/machine-stock/visits/${visitId}/return`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async recordMachineStockWaste(visitId: string, input: MachineWasteInput) {
+    return await apiFetch<{ record: MachineStockRecord; movement: MachineStockMovement }>(`/machine-stock/visits/${visitId}/waste`, {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  },
+
+  async completeRefillVisit(visitId: string, notes?: string) {
+    return await apiFetch<RefillVisit>(`/machine-stock/visits/${visitId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(notes ? { notes } : {})
     });
   },
 

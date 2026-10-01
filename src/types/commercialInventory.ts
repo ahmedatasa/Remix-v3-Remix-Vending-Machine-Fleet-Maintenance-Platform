@@ -11,7 +11,9 @@ export type CommercialInventoryMovementType =
   | 'RECEIPT'
   | 'ADJUSTMENT_IN'
   | 'ADJUSTMENT_OUT'
-  | 'WRITE_OFF_EXPIRED';
+  | 'WRITE_OFF_EXPIRED'
+  | 'MACHINE_REFILL_OUT'
+  | 'MACHINE_RETURN_IN';
 
 export interface CommercialInventoryBatch {
   id: string;
