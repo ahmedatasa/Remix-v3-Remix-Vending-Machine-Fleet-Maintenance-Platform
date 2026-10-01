@@ -15,6 +15,14 @@
     font-family: var(--font-en);
   }
 
+  html.dark {
+    color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
@@ -40,7 +48,140 @@
 }
 
 .light .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.9);
+}
+
+/*
+ * Application light theme bridge.
+ *
+ * The UI was originally authored with explicit Slate dark utility classes.
+ * ThemeContext already toggles html.dark/html.light correctly, but without
+ * light equivalents those fixed utilities keep the entire application dark.
+ * These scoped overrides preserve the existing dark palette while providing
+ * a coherent light palette across legacy and newly added screens.
+ */
+html.light body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+html.light .bg-slate-950 {
+  background-color: #f8fafc !important;
+}
+html.light .bg-slate-950\/95 {
+  background-color: rgba(248, 250, 252, 0.97) !important;
+}
+html.light .bg-slate-950\/90 {
+  background-color: rgba(248, 250, 252, 0.94) !important;
+}
+html.light .bg-slate-950\/80 {
+  background-color: rgba(248, 250, 252, 0.90) !important;
+}
+html.light .bg-slate-950\/70 {
+  background-color: rgba(248, 250, 252, 0.86) !important;
+}
+html.light .bg-slate-950\/60 {
+  background-color: rgba(248, 250, 252, 0.82) !important;
+}
+html.light .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+html.light .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+}
+html.light .bg-slate-900\/90 {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+html.light .bg-slate-900\/80 {
+  background-color: rgba(255, 255, 255, 0.90) !important;
+}
+html.light .bg-slate-900\/70 {
+  background-color: rgba(255, 255, 255, 0.86) !important;
+}
+html.light .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+}
+html.light .bg-slate-800\/80 {
+  background-color: rgba(241, 245, 249, 0.92) !important;
+}
+html.light .bg-slate-800\/60 {
+  background-color: rgba(241, 245, 249, 0.82) !important;
+}
+html.light .bg-slate-800\/50 {
+  background-color: rgba(241, 245, 249, 0.72) !important;
+}
+html.light .bg-slate-700 {
+  background-color: #e2e8f0 !important;
+}
+html.light .bg-slate-700\/50 {
+  background-color: rgba(226, 232, 240, 0.74) !important;
+}
+
+html.light .text-slate-50,
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+html.light .text-slate-400 {
+  color: #475569 !important;
+}
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+html.light .text-slate-600 {
+  color: #475569 !important;
+}
+
+html.light .border-slate-900,
+html.light .border-slate-800 {
+  border-color: #e2e8f0 !important;
+}
+html.light .border-slate-800\/80,
+html.light .border-slate-700\/80,
+html.light .border-slate-700,
+html.light .border-slate-600 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .divide-slate-800 > :not(:last-child),
+html.light .divide-slate-700 > :not(:last-child) {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .placeholder\:text-slate-500::placeholder,
+html.light .placeholder\:text-slate-400::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .hover\:bg-slate-950:hover,
+html.light .hover\:bg-slate-900:hover {
+  background-color: #f1f5f9 !important;
+}
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-700:hover {
+  background-color: #e2e8f0 !important;
+}
+html.light .hover\:text-slate-100:hover,
+html.light .hover\:text-slate-200:hover {
+  color: #0f172a !important;
+}
+
+html.light input,
+html.light select,
+html.light textarea {
+  color-scheme: light;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.5);
 }
