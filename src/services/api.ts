@@ -5,6 +5,7 @@ import {
   CommercialInventoryReceiptInput, CommercialInventoryAdjustmentInput,
   MachineStockRecord, MachineStockMovement, MachineStockSummary, RefillVisit,
   StartRefillVisitInput, MachineCountInput, MachineRefillInput, MachineReturnInput, MachineWasteInput,
+  ManualSalesLedgerRow, ManualSalesSummary, ManualSalesQuery,
   AuditLog, User, UserRole, MachineModel, MachineStatus, TicketStatus, TicketPriority,
   FaultCategory, TechnicianStatus, PartRequestStatus, DataQualityStatus,
   ImportBatch, ImportRowEntity, NormalizedMachineRecord, ImportCommitOptions,
@@ -7192,6 +7193,65 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(notes ? { notes } : {})
     });
+  },
+
+  // Manual Sales Capture Engine — works with no POS data.
+  async getManualSalesLedger(query: ManualSalesQuery = {}) {
+    const params = new URLSearchParams();
+
+    if (query.machineId) {
+      params.set('machine_id', query.machineId);
+    }
+
+    if (query.productId) {
+      params.set('product_id', query.productId);
+    }
+
+    if (query.from) {
+      params.set('from', query.from);
+    }
+
+    if (query.to) {
+      params.set('to', query.to);
+    }
+
+    const suffix =
+      params.toString()
+        ? `?${params.toString()}`
+        : '';
+
+    return await apiFetch<ManualSalesLedgerRow[]>(
+      `/manual-sales/ledger${suffix}`
+    );
+  },
+
+  async getManualSalesSummary(query: ManualSalesQuery = {}) {
+    const params = new URLSearchParams();
+
+    if (query.machineId) {
+      params.set('machine_id', query.machineId);
+    }
+
+    if (query.productId) {
+      params.set('product_id', query.productId);
+    }
+
+    if (query.from) {
+      params.set('from', query.from);
+    }
+
+    if (query.to) {
+      params.set('to', query.to);
+    }
+
+    const suffix =
+      params.toString()
+        ? `?${params.toString()}`
+        : '';
+
+    return await apiFetch<ManualSalesSummary>(
+      `/manual-sales/summary${suffix}`
+    );
   },
 
   // Suppliers

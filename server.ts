@@ -13,6 +13,7 @@ import {
 import { mainToCloudLocationSyncWorker } from './src/server/mainToCloudLocationSyncWorker';
 import { createCommercialInventoryRouter } from './src/server/commercialInventoryRoutes';
 import { createMachineStockRouter } from './src/server/machineStockRoutes';
+import { createManualSalesRouter } from './src/server/manualSalesRoutes';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -3158,6 +3159,10 @@ async function startServer() {
 
   // Per-machine commercial stock, delegate counting and refill visit ledger.
   apiRouter.use('/machine-stock', createMachineStockRouter({ getStore, saveStore }));
+
+  // Read-only estimated sales derived from physical count periods.
+  // Works independently of POS transaction availability.
+  apiRouter.use('/manual-sales', createManualSalesRouter({ getStore }));
 
   // Suppliers
   apiRouter.get('/suppliers' , (req, res) => {

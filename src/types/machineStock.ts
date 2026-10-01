@@ -33,6 +33,12 @@ export interface MachineStockMovement {
   quantityChange: number;
   balanceAfter: number;
   warehouseBatchBalanceAfter?: number;
+
+  // Captured at physical count time so historical estimated sales
+  // are not silently changed by future product price edits.
+  sellingPriceSnapshot?: number;
+  purchaseCostSnapshot?: number;
+
   reason?: string;
   notes?: string;
   actorId?: string;

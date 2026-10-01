@@ -253,6 +253,8 @@ export function createMachineStockRouter(deps: MachineStockRouteDeps) {
       productId,
       quantityChange: delta,
       balanceAfter: countedQuantity,
+      sellingPriceSnapshot: Number(product.sellingPrice || 0),
+      purchaseCostSnapshot: Number(product.purchaseCost || 0),
       reason,
       notes,
       ...actor,
@@ -285,7 +287,8 @@ export function createMachineStockRouter(deps: MachineStockRouteDeps) {
     const notes = String(req.body?.notes || '').trim() || undefined;
     const batch = (store.commercialInventoryBatches || []).find((item: any) => item.id === batchId);
     if (!batch) return res.status(404).json({ error: 'COMMERCIAL_BATCH_NOT_FOUND' });
-    if (!findProduct(store, batch.productId, true)) return res.status(400).json({ error: 'COMMERCIAL_PRODUCT_INVALID' });
+    const product = findProduct(store, batch.productId, true);
+    if (!product) return res.status(400).json({ error: 'COMMERCIAL_PRODUCT_INVALID' });
     if (isExpiredBatch(batch)) return res.status(409).json({ error: 'EXPIRED_BATCH_CANNOT_REFILL_MACHINE' });
     if (!Number.isFinite(quantity) || quantity <= 0) return res.status(400).json({ error: 'REFILL_QUANTITY_INVALID' });
     if (Number(batch.quantityOnHand || 0) < quantity) {
@@ -312,6 +315,8 @@ export function createMachineStockRouter(deps: MachineStockRouteDeps) {
         productId: batch.productId,
         quantityChange: countDelta,
         balanceAfter: countedBefore,
+        sellingPriceSnapshot: Number(product.sellingPrice || 0),
+        purchaseCostSnapshot: Number(product.purchaseCost || 0),
         reason: 'Pre-refill delegate count',
         ...actor,
         createdAt: now
