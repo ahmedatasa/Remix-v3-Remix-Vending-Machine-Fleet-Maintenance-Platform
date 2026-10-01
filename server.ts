@@ -12,6 +12,7 @@ import {
 } from './src/server/cloudMachineLocationSyncClient';
 import { mainToCloudLocationSyncWorker } from './src/server/mainToCloudLocationSyncWorker';
 import { createCommercialInventoryRouter } from './src/server/commercialInventoryRoutes';
+import { createMachineStockRouter } from './src/server/machineStockRoutes';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -2950,7 +2951,7 @@ async function startServer() {
 
   // Commercial vending product master. This is intentionally separate from
   // maintenance spare-parts inventory so sales/stock/accounting can evolve safely.
-  const productWriteRoles = ['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'WAREHOUSE_OFFICER'];
+  const productWriteRoles = ['SUPER_ADMIN', 'ADMIN', 'MAINTENANCE_MANAGER', 'WAREHOUSE', 'WAREHOUSE_OFFICER'];
 
   const normalizeCommercialProduct = (body: any) => ({
     sku: String(body?.sku || '').trim().toUpperCase(),
@@ -3106,12 +3107,23 @@ async function startServer() {
     const movements = Array.isArray((store as any).commercialInventoryMovements)
       ? (store as any).commercialInventoryMovements.filter((item: any) => item.productId === product.id)
       : [];
+    const machineStockRecords = Array.isArray((store as any).machineStockRecords)
+      ? (store as any).machineStockRecords.filter((item: any) => item.productId === product.id)
+      : [];
+    const machineStockMovements = Array.isArray((store as any).machineStockMovements)
+      ? (store as any).machineStockMovements.filter((item: any) => item.productId === product.id)
+      : [];
 
-    if (batches.length > 0 || movements.length > 0) {
+    if (batches.length > 0 || movements.length > 0 || machineStockRecords.length > 0 || machineStockMovements.length > 0) {
       return res.status(409).json({
         error: 'PRODUCT_HAS_INVENTORY_HISTORY',
-        message: 'Product cannot be deleted because inventory history exists. Deactivate it instead.',
-        referenceCounts: { batches: batches.length, movements: movements.length }
+        message: 'Product cannot be deleted because warehouse or machine inventory history exists. Deactivate it instead.',
+        referenceCounts: {
+          batches: batches.length,
+          movements: movements.length,
+          machineStockRecords: machineStockRecords.length,
+          machineStockMovements: machineStockMovements.length
+        }
       });
     }
 
@@ -3143,6 +3155,9 @@ async function startServer() {
 
   // Commercial vending inventory, batches, expiry control and stock ledger.
   apiRouter.use('/commercial-inventory', createCommercialInventoryRouter({ getStore, saveStore }));
+
+  // Per-machine commercial stock, delegate counting and refill visit ledger.
+  apiRouter.use('/machine-stock', createMachineStockRouter({ getStore, saveStore }));
 
   // Suppliers
   apiRouter.get('/suppliers' , (req, res) => {

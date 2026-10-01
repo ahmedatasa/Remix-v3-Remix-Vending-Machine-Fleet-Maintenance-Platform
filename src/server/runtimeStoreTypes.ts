@@ -47,6 +47,9 @@ export interface RuntimeStoreData {
   products: any[];
   commercialInventoryBatches?: any[];
   commercialInventoryMovements?: any[];
+  machineStockRecords?: any[];
+  machineStockMovements?: any[];
+  refillVisits?: any[];
   suppliers: any[];
   partRequests: any[];
   transactions: any[];
