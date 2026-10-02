@@ -667,6 +667,27 @@ export const SalesView: React.FC<SalesViewProps> = () => {
         />
       </div>
 
+      {!loading && summary.totalPeriods === 0 && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+            <div>
+              <div className="text-sm font-semibold text-slate-100">
+                {isRTL
+                  ? 'لا توجد فترة مبيعات مكتملة بعد'
+                  : 'No completed sales period yet'}
+              </div>
+
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                {isRTL
+                  ? 'أول جرد لنفس المنتج والماكينة ينشئ خط الأساس فقط. تظهر المبيعات بعد تسجيل جرد جديد لنفس المنتج في زيارة لاحقة مختلفة.'
+                  : 'The first physical count establishes the baseline only. Sales appear after the same product is counted again during a later, different visit.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={applyFilters}
         className="bg-slate-900 border border-slate-800 rounded-xl p-4"
