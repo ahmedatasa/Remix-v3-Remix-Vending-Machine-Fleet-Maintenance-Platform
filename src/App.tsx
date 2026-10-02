@@ -23,6 +23,7 @@ import { ProductsView } from './components/views/ProductsView';
 import { CommercialInventoryView } from './components/views/CommercialInventoryView';
 import { MachineStockView } from './components/views/MachineStockView';
 import { SalesView } from './components/views/SalesView';
+import { PosTerminalsView } from './components/views/PosTerminalsView';
 import { InventoryView } from './components/views/InventoryView';
 import { PartRequestsView } from './components/views/PartRequestsView';
 import { SuppliersView } from './components/views/SuppliersView';
@@ -182,6 +183,7 @@ const AppContent: React.FC = () => {
             {activeTab === 'commercial-inventory' && <CommercialInventoryView onNavigate={handleNavigate} />}
             {activeTab === 'machine-stock' && <MachineStockView onNavigate={handleNavigate} />}
             {activeTab === 'sales' && <SalesView onNavigate={handleNavigate} />}
+            {activeTab === 'pos-terminals' && <PosTerminalsView onNavigate={handleNavigate} />}
             {activeTab === 'inventory' && <InventoryView onNavigate={handleNavigate} />}
             {activeTab === 'part-requests' && <PartRequestsView onNavigate={handleNavigate} />}
             {activeTab === 'suppliers' && <SuppliersView onNavigate={handleNavigate} />}

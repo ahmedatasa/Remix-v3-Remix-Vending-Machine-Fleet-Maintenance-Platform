@@ -20,6 +20,7 @@ export type NavigationTab =
   | 'commercial-inventory'
   | 'machine-stock'
   | 'sales'
+  | 'pos-terminals'
   | 'inventory'
   | 'part-requests'
   | 'suppliers'

@@ -302,6 +302,11 @@ export function createPosTerminalRouter(
       WRITE_ROLES
     );
 
+  // POS terminal registry and mapping are administrative configuration.
+  // Transaction import will use internal mapping logic later; browser API
+  // access remains restricted to system administrators.
+  router.use(requireWriteRole);
+
   router.get('/summary', (_req, res) => {
     const store =
       ensureCollections(deps.getStore());

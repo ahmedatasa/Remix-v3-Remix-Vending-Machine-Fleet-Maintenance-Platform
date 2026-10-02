@@ -338,6 +338,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       case 'reports':
         return hasRole(['MAINTENANCE_MANAGER', 'MANAGEMENT', 'FACILITY_MANAGER', 'VIEWER']);
 
+      case 'pos-terminals':
       case 'import-export':
       case 'import-history':
       case 'users':
