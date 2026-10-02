@@ -132,6 +132,31 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
     [visits]
   );
 
+  const currentVisitCountedProductIds = useMemo(
+    () => new Set(
+      movements
+        .filter(movement =>
+          !!openVisit &&
+          movement.visitId === openVisit.id &&
+          movement.type === 'COUNT_RECONCILIATION'
+        )
+        .map(movement => movement.productId)
+    ),
+    [movements, openVisit]
+  );
+
+  const selectedRefillBatch = useMemo(
+    () => batches.find(batch => batch.id === refillDraft.batchId),
+    [batches, refillDraft.batchId]
+  );
+
+  const selectedRefillProductId =
+    selectedRefillBatch?.productId || '';
+
+  const selectedRefillProductAlreadyCounted =
+    !!selectedRefillProductId &&
+    currentVisitCountedProductIds.has(selectedRefillProductId);
+
   const productMap = useMemo(
     () => new Map(products.map(product => [product.id, product])),
     [products]
@@ -169,6 +194,14 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
   const submitCount = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!openVisit) return;
+
+    const hadEarlierVisitCount = movements.some(
+      movement =>
+        movement.type === 'COUNT_RECONCILIATION' &&
+        movement.productId === countDraft.productId &&
+        movement.visitId !== openVisit.id
+    );
+
     setSubmitting(true);
     try {
       await api.countMachineStock(openVisit.id, {
@@ -179,7 +212,21 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
       });
       setCountOpen(false);
       setCountDraft({ productId: '', countedQuantity: 0, reason: '', notes: '' });
-      showToast(isRTL ? 'تم تسجيل الجرد' : 'Count saved', isRTL ? 'تم حفظ الرصيد الفعلي وتسجيل فرق الجرد' : 'Physical count and variance recorded', 'success');
+      showToast(
+        isRTL ? 'تم تسجيل الجرد' : 'Count saved',
+        hadEarlierVisitCount
+          ? (
+              isRTL
+                ? 'تم تسجيل الجرد وإغلاق فترة مبيعات منذ الزيارة السابقة.'
+                : 'Count recorded and the sales period since the previous visit is now closed.'
+            )
+          : (
+              isRTL
+                ? 'تم إنشاء خط الأساس لهذا المنتج. ستُحسب المبيعات عند الجرد في زيارة لاحقة.'
+                : 'Baseline established. Sales will be calculated when this product is counted on a later visit.'
+            ),
+        'success'
+      );
       await finishMutation();
     } catch (error: any) {
       showToast(isRTL ? 'خطأ' : 'Error', error?.message || 'Failed to save count', 'error');
@@ -191,12 +238,38 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
   const submitRefill = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!openVisit) return;
+
+    if (!selectedRefillBatch) {
+      showToast(
+        isRTL ? 'تنبيه' : 'Warning',
+        isRTL ? 'اختر دفعة المخزن أولاً.' : 'Select a warehouse batch first.',
+        'warning'
+      );
+      return;
+    }
+
+    if (
+      !selectedRefillProductAlreadyCounted &&
+      refillDraft.countedBefore === ''
+    ) {
+      showToast(
+        isRTL ? 'الجرد مطلوب أولاً' : 'Count required first',
+        isRTL
+          ? 'يجب تسجيل الكمية الفعلية الموجودة قبل تنفيذ التعبئة.'
+          : 'Record the physical quantity before refilling this product.',
+        'warning'
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       await api.refillMachineStock(openVisit.id, {
         batchId: refillDraft.batchId,
         quantity: Number(refillDraft.quantity),
-        countedBefore: refillDraft.countedBefore === '' ? undefined : Number(refillDraft.countedBefore),
+        countedBefore: selectedRefillProductAlreadyCounted
+          ? undefined
+          : Number(refillDraft.countedBefore),
         notes: refillDraft.notes || undefined
       });
       setRefillOpen(false);
@@ -314,6 +387,14 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
             <div className="text-sm font-bold text-slate-100">{isRTL ? 'الماكينة' : 'Machine'} #{selectedMachine.machineNumber}</div>
             <div className="text-xs text-slate-400 mt-1">{selectedMachine.machineType} · {selectedMachine.serialNumber || 'No serial'}</div>
             <div className="text-[11px] mt-2">{openVisit ? <span className="text-emerald-400">{isRTL ? `زيارة مفتوحة: ${openVisit.id}` : `Open visit: ${openVisit.id}`}</span> : <span className="text-slate-500">{isRTL ? 'لا توجد زيارة مفتوحة' : 'No open visit'}</span>}</div>
+
+            {openVisit && (
+              <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200 leading-relaxed">
+                {isRTL
+                  ? 'ترتيب العمل: 1) جرد الكمية الموجودة قبل التعبئة → 2) التعبئة → 3) المرتجع أو التالف إن وجد → 4) إنهاء الزيارة. المبيعات تظهر عند وجود جرد لنفس المنتج في زيارتين مختلفتين.'
+                  : 'Workflow: 1) Count stock before refill → 2) Refill → 3) Record return/waste if needed → 4) Complete visit. Sales appear after the same product has physical counts in two different visits.'}
+              </div>
+            )}
           </div>
           {canManageInventory && (
             <div className="flex flex-wrap gap-2">
@@ -321,8 +402,8 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
                 <Button size="sm" variant="primary" onClick={() => setStartOpen(true)}>{isRTL ? 'بدء زيارة' : 'Start Visit'}</Button>
               ) : (
                 <>
-                  <Button size="sm" variant="secondary" onClick={() => setCountOpen(true)}>{isRTL ? 'تسجيل جرد' : 'Count'}</Button>
-                  <Button size="sm" variant="primary" onClick={() => setRefillOpen(true)}>{isRTL ? 'تعبئة' : 'Refill'}</Button>
+                  <Button size="sm" variant="secondary" onClick={() => setCountOpen(true)}>{isRTL ? '1. تسجيل جرد' : '1. Count'}</Button>
+                  <Button size="sm" variant="primary" onClick={() => setRefillOpen(true)}>{isRTL ? '2. تعبئة' : '2. Refill'}</Button>
                   <Button size="sm" variant="secondary" onClick={() => setReturnOpen(true)}>{isRTL ? 'مرتجع' : 'Return'}</Button>
                   <Button size="sm" variant="secondary" onClick={() => setWasteOpen(true)}>{isRTL ? 'تالف' : 'Waste'}</Button>
                   <Button size="sm" variant="primary" onClick={completeVisit}>{isRTL ? 'إنهاء الزيارة' : 'Complete Visit'}</Button>
@@ -352,7 +433,33 @@ export const MachineStockView: React.FC<MachineStockViewProps> = () => {
       </Modal>
 
       <Modal isOpen={refillOpen} onClose={() => setRefillOpen(false)} title={isRTL ? 'تعبئة الماكينة من المخزن' : 'Refill Machine from Warehouse'}>
-        <form onSubmit={submitRefill} className="space-y-3"><Field label={isRTL ? 'دفعة المخزن *' : 'Warehouse Batch *'}><select required value={refillDraft.batchId} onChange={e => setRefillDraft({ ...refillDraft, batchId: e.target.value })} className={inputClass}><option value="">{isRTL ? 'اختر الدفعة' : 'Select batch'}</option>{eligibleBatches.map(batch => { const product = batch.product || productMap.get(batch.productId); return <option key={batch.id} value={batch.id}>{product?.sku} — {isRTL ? (product?.nameAr || product?.name) : (product?.name || product?.nameAr)} — LOT {batch.lotNumber} — QTY {batch.quantityOnHand}</option>; })}</select></Field><NumberField label={isRTL ? 'كمية التعبئة *' : 'Refill Quantity *'} value={refillDraft.quantity} onChange={value => setRefillDraft({ ...refillDraft, quantity: value })} min={1} /><Field label={isRTL ? 'الجرد قبل التعبئة (اختياري)' : 'Count Before Refill (optional)'}><input type="number" min="0" value={refillDraft.countedBefore} onChange={e => setRefillDraft({ ...refillDraft, countedBefore: e.target.value })} className={inputClass} /></Field><Field label={isRTL ? 'ملاحظات' : 'Notes'}><input value={refillDraft.notes} onChange={e => setRefillDraft({ ...refillDraft, notes: e.target.value })} className={inputClass} /></Field><SubmitRow onCancel={() => setRefillOpen(false)} loading={submitting} isRTL={isRTL} submitLabel={isRTL ? 'تنفيذ التعبئة' : 'Refill'} /></form>
+        <form onSubmit={submitRefill} className="space-y-3"><Field label={isRTL ? 'دفعة المخزن *' : 'Warehouse Batch *'}><select required value={refillDraft.batchId} onChange={e => setRefillDraft({ ...refillDraft, batchId: e.target.value, countedBefore: '' })} className={inputClass}><option value="">{isRTL ? 'اختر الدفعة' : 'Select batch'}</option>{eligibleBatches.map(batch => { const product = batch.product || productMap.get(batch.productId); return <option key={batch.id} value={batch.id}>{product?.sku} — {isRTL ? (product?.nameAr || product?.name) : (product?.name || product?.nameAr)} — LOT {batch.lotNumber} — QTY {batch.quantityOnHand}</option>; })}</select></Field><NumberField label={isRTL ? 'كمية التعبئة *' : 'Refill Quantity *'} value={refillDraft.quantity} onChange={value => setRefillDraft({ ...refillDraft, quantity: value })} min={1} />{selectedRefillBatch && (
+          selectedRefillProductAlreadyCounted
+            ? (
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-300">
+                  {isRTL
+                    ? 'تم تسجيل الجرد لهذا المنتج في الزيارة الحالية. يمكن تنفيذ التعبئة الآن.'
+                    : 'This product has already been counted in the current visit. Refill can proceed.'}
+                </div>
+              )
+            : (
+                <Field label={isRTL ? 'الجرد الفعلي قبل التعبئة *' : 'Physical Count Before Refill *'}>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    value={refillDraft.countedBefore}
+                    onChange={e => setRefillDraft({ ...refillDraft, countedBefore: e.target.value })}
+                    className={inputClass}
+                  />
+                  <p className="text-[10px] text-amber-400 mt-1">
+                    {isRTL
+                      ? 'هذا الجرد يُسجل أولاً كخط أساس/إغلاق فترة المبيعات ثم تتم التعبئة.'
+                      : 'This count is recorded first as the baseline/sales-period closing count, then the refill is applied.'}
+                  </p>
+                </Field>
+              )
+        )}<Field label={isRTL ? 'ملاحظات' : 'Notes'}><input value={refillDraft.notes} onChange={e => setRefillDraft({ ...refillDraft, notes: e.target.value })} className={inputClass} /></Field><SubmitRow onCancel={() => setRefillOpen(false)} loading={submitting} isRTL={isRTL} submitLabel={isRTL ? 'تنفيذ التعبئة' : 'Refill'} /></form>
       </Modal>
 
       <Modal isOpen={returnOpen} onClose={() => setReturnOpen(false)} title={isRTL ? 'إرجاع بضاعة إلى المخزن' : 'Return Stock to Warehouse'}>

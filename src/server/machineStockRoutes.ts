@@ -235,6 +235,25 @@ export function createMachineStockRouter(deps: MachineStockRouteDeps) {
       return res.status(400).json({ error: 'COUNT_QUANTITY_INVALID' });
     }
 
+    const operationalMovementAlreadyRecorded =
+      (store.machineStockMovements || []).some((item: any) =>
+        item.visitId === visit.id &&
+        item.productId === productId &&
+        (
+          item.type === 'REFILL_IN' ||
+          item.type === 'RETURN_TO_WAREHOUSE' ||
+          item.type === 'WASTE'
+        )
+      );
+
+    if (operationalMovementAlreadyRecorded) {
+      return res.status(409).json({
+        error: 'COUNT_MUST_PRECEDE_STOCK_MOVEMENTS',
+        message:
+          'Physical count must be recorded before refill, return or waste for this product in the current visit.'
+      });
+    }
+
     const actor = actorFromRequest(req);
     const now = new Date().toISOString();
     const record = getStockRecord(store, visit.machineId, productId, true);
@@ -296,6 +315,31 @@ export function createMachineStockRouter(deps: MachineStockRouteDeps) {
     }
     if (countedBefore !== undefined && (!Number.isFinite(countedBefore) || countedBefore < 0)) {
       return res.status(400).json({ error: 'COUNT_QUANTITY_INVALID' });
+    }
+
+    const hasCountInCurrentVisit =
+      (store.machineStockMovements || []).some((item: any) =>
+        item.visitId === visit.id &&
+        item.productId === batch.productId &&
+        item.type === 'COUNT_RECONCILIATION'
+      );
+
+    if (!hasCountInCurrentVisit && countedBefore === undefined) {
+      return res.status(409).json({
+        error: 'COUNT_REQUIRED_BEFORE_REFILL',
+        productId: batch.productId,
+        message:
+          'Record the physical quantity before refilling this product.'
+      });
+    }
+
+    if (hasCountInCurrentVisit && countedBefore !== undefined) {
+      return res.status(409).json({
+        error: 'COUNT_ALREADY_RECORDED_FOR_PRODUCT',
+        productId: batch.productId,
+        message:
+          'A physical count already exists for this product in the current visit.'
+      });
     }
 
     const actor = actorFromRequest(req);
