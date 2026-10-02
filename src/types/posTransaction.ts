@@ -17,6 +17,36 @@ export type PosImportSourceType =
   | 'XLSX'
   | 'UNKNOWN';
 
+export interface PosParsedFileColumn {
+  key: string;
+  originalHeader: string;
+  columnIndex: number;
+}
+
+export interface PosParsedFileResponse {
+  sourceFileName: string;
+  sourceType: 'CSV' | 'XLSX';
+
+  fileSizeBytes: number;
+
+  sheetNames: string[];
+  selectedSheet: string;
+
+  // Physical 1-based worksheet row number.
+  headerRow: number;
+
+  detectedColumns:
+    PosParsedFileColumn[];
+
+  rowCount: number;
+
+  rows:
+    Array<Record<string, unknown>>;
+
+  // Phase 6C-B parsing is memory-only.
+  persisted: false;
+}
+
 export interface PosTransactionColumnMapping {
   transactionDateTime: string;
   terminalReference: string;

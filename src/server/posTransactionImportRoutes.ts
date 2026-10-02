@@ -16,6 +16,11 @@ import type {
   PosTransactionPreviewStatus
 } from '../types/posTransaction';
 
+import {
+  parsePosTransactionFile,
+  PosTransactionFileParseError
+} from './posTransactionFileParser';
+
 interface PosTransactionImportRouteDeps {
   getStore: () => RuntimeStoreData;
 }
@@ -486,6 +491,133 @@ createPosTransactionImportRouter(
    * No machine/terminal data is modified.
    */
   router.use(requireAdmin);
+
+  /*
+   * Phase 6C-B:
+   * Parse CSV/XLSX in memory only.
+   *
+   * Browser/client sends raw file bytes.
+   * Nothing is written to RuntimeStore.
+   */
+  router.post(
+    '/parse-file',
+
+    express.raw({
+      type: [
+        'application/octet-stream',
+        'text/csv',
+        'application/csv',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ],
+
+      limit: '10mb'
+    }),
+
+    (req, res) => {
+      const fileName =
+        cleanString(
+          req.query.file_name
+        );
+
+      if (!fileName) {
+        return res.status(400).json({
+          error:
+            'POS_IMPORT_FILE_NAME_REQUIRED'
+        });
+      }
+
+      if (
+        !Buffer.isBuffer(
+          req.body
+        ) ||
+        req.body.length === 0
+      ) {
+        return res.status(400).json({
+          error:
+            'POS_IMPORT_FILE_BODY_REQUIRED'
+        });
+      }
+
+      const sheetName =
+        cleanString(
+          req.query.sheet_name
+        ) || undefined;
+
+      const headerRowRaw =
+        cleanString(
+          req.query.header_row
+        );
+
+      let headerRow:
+        number | undefined;
+
+      if (headerRowRaw) {
+        headerRow =
+          Number(
+            headerRowRaw
+          );
+
+        if (
+          !Number.isInteger(
+            headerRow
+          ) ||
+          headerRow < 1
+        ) {
+          return res.status(400).json({
+            error:
+              'POS_IMPORT_HEADER_ROW_INVALID'
+          });
+        }
+      }
+
+      try {
+        const result =
+          parsePosTransactionFile(
+            fileName,
+            req.body,
+            {
+              sheetName,
+              headerRow
+            }
+          );
+
+        return res.json(
+          result
+        );
+      } catch (error) {
+        if (
+          error instanceof
+          PosTransactionFileParseError
+        ) {
+          return res
+            .status(
+              error.httpStatus
+            )
+            .json({
+              error:
+                error.code,
+
+              ...(error.details
+                ? {
+                    details:
+                      error.details
+                  }
+                : {})
+            });
+        }
+
+        console.error(
+          '[POS Import] File parse failed:',
+          error
+        );
+
+        return res.status(400).json({
+          error:
+            'POS_IMPORT_FILE_PARSE_FAILED'
+        });
+      }
+    }
+  );
 
   router.post(
     '/preview',
