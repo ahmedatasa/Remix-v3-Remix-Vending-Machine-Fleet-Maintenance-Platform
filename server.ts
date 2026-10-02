@@ -14,6 +14,7 @@ import { mainToCloudLocationSyncWorker } from './src/server/mainToCloudLocationS
 import { createCommercialInventoryRouter } from './src/server/commercialInventoryRoutes';
 import { createMachineStockRouter } from './src/server/machineStockRoutes';
 import { createManualSalesRouter } from './src/server/manualSalesRoutes';
+import { createPosTerminalRouter } from './src/server/posTerminalRoutes';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -3163,6 +3164,10 @@ async function startServer() {
   // Read-only estimated sales derived from physical count periods.
   // Works independently of POS transaction availability.
   apiRouter.use('/manual-sales', createManualSalesRouter({ getStore }));
+
+  // Optional POS terminal registry and historical terminal-to-machine mapping.
+  // No POS transaction data is required for normal system operation.
+  apiRouter.use('/pos-terminals', createPosTerminalRouter({ getStore, saveStore }));
 
   // Suppliers
   apiRouter.get('/suppliers' , (req, res) => {

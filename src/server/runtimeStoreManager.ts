@@ -47,6 +47,8 @@ function createEmptyRuntimeStore(storeId?: string): RuntimeStoreData {
     categories: [],
     spareParts: [],
     products: [],
+    posTerminals: [],
+    posTerminalMappings: [],
     suppliers: [],
     partRequests: [],
     transactions: [],

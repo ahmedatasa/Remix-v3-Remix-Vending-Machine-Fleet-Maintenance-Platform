@@ -6,6 +6,8 @@ import {
   MachineStockRecord, MachineStockMovement, MachineStockSummary, RefillVisit,
   StartRefillVisitInput, MachineCountInput, MachineRefillInput, MachineReturnInput, MachineWasteInput,
   ManualSalesLedgerRow, ManualSalesSummary, ManualSalesQuery,
+  PosTerminal, PosTerminalMapping, PosTerminalSummary, PosTerminalResolution,
+  PosTerminalCreateInput, PosTerminalUpdateInput, PosTerminalAssignInput, PosTerminalUnassignInput,
   AuditLog, User, UserRole, MachineModel, MachineStatus, TicketStatus, TicketPriority,
   FaultCategory, TechnicianStatus, PartRequestStatus, DataQualityStatus,
   ImportBatch, ImportRowEntity, NormalizedMachineRecord, ImportCommitOptions,
@@ -7251,6 +7253,146 @@ export const api = {
 
     return await apiFetch<ManualSalesSummary>(
       `/manual-sales/summary${suffix}`
+    );
+  },
+
+  // POS Terminal Registry & Historical Machine Mapping.
+  async getPosTerminalSummary() {
+    return await apiFetch<PosTerminalSummary>(
+      '/pos-terminals/summary'
+    );
+  },
+
+  async getPosTerminals(includeInactive = true) {
+    return await apiFetch<PosTerminal[]>(
+      includeInactive
+        ? '/pos-terminals?include_inactive=true'
+        : '/pos-terminals'
+    );
+  },
+
+  async getPosTerminal(id: string) {
+    return await apiFetch<
+      PosTerminal & {
+        mappingHistory: PosTerminalMapping[];
+      }
+    >(
+      `/pos-terminals/${encodeURIComponent(id)}`
+    );
+  },
+
+  async createPosTerminal(
+    input: PosTerminalCreateInput
+  ) {
+    return await apiFetch<PosTerminal>(
+      '/pos-terminals',
+      {
+        method: 'POST',
+        body: JSON.stringify(input)
+      }
+    );
+  },
+
+  async updatePosTerminal(
+    id: string,
+    input: PosTerminalUpdateInput
+  ) {
+    return await apiFetch<PosTerminal>(
+      `/pos-terminals/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input)
+      }
+    );
+  },
+
+  async getPosTerminalMappings(
+    query: {
+      terminalId?: string;
+      machineId?: string;
+    } = {}
+  ) {
+    const params =
+      new URLSearchParams();
+
+    if (query.terminalId) {
+      params.set(
+        'terminal_id',
+        query.terminalId
+      );
+    }
+
+    if (query.machineId) {
+      params.set(
+        'machine_id',
+        query.machineId
+      );
+    }
+
+    const suffix =
+      params.toString()
+        ? `?${params.toString()}`
+        : '';
+
+    return await apiFetch<
+      PosTerminalMapping[]
+    >(
+      `/pos-terminals/mappings${suffix}`
+    );
+  },
+
+  async assignPosTerminal(
+    terminalId: string,
+    input: PosTerminalAssignInput
+  ) {
+    return await apiFetch<{
+      mapping: PosTerminalMapping;
+      previousMapping: PosTerminalMapping | null;
+      unchanged?: boolean;
+    }>(
+      `/pos-terminals/${encodeURIComponent(terminalId)}/assign`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input)
+      }
+    );
+  },
+
+  async unassignPosTerminal(
+    terminalId: string,
+    input: PosTerminalUnassignInput = {}
+  ) {
+    return await apiFetch<
+      PosTerminalMapping
+    >(
+      `/pos-terminals/${encodeURIComponent(terminalId)}/unassign`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input)
+      }
+    );
+  },
+
+  async resolvePosTerminal(
+    terminalReference: string,
+    at?: string
+  ) {
+    const params =
+      new URLSearchParams();
+
+    params.set(
+      'terminal_reference',
+      terminalReference
+    );
+
+    if (at) {
+      params.set('at', at);
+    }
+
+    return await apiFetch<
+      PosTerminalResolution
+    >(
+      `/pos-terminals/resolve?${params.toString()}`
     );
   },
 

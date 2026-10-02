@@ -50,6 +50,12 @@ export interface RuntimeStoreData {
   machineStockRecords?: any[];
   machineStockMovements?: any[];
   refillVisits?: any[];
+
+  // Optional POS integration.
+  // The system remains fully operational when these collections are empty.
+  posTerminals?: any[];
+  posTerminalMappings?: any[];
+
   suppliers: any[];
   partRequests: any[];
   transactions: any[];

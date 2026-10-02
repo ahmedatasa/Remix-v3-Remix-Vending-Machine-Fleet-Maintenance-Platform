@@ -2,6 +2,7 @@ export * from './database';
 export * from './commercialInventory';
 export * from './machineStock';
 export * from './manualSales';
+export * from './posTerminal';
 
 export type NavigationTab = 
   | 'dashboard'
