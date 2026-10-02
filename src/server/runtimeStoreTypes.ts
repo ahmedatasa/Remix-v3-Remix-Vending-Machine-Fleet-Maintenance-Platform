@@ -56,6 +56,11 @@ export interface RuntimeStoreData {
   posTerminals?: any[];
   posTerminalMappings?: any[];
 
+  // Phase 6C-ready optional collections.
+  // Preview does NOT write to either collection.
+  posTransactions?: any[];
+  posImportBatches?: any[];
+
   suppliers: any[];
   partRequests: any[];
   transactions: any[];

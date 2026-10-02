@@ -15,6 +15,7 @@ import { createCommercialInventoryRouter } from './src/server/commercialInventor
 import { createMachineStockRouter } from './src/server/machineStockRoutes';
 import { createManualSalesRouter } from './src/server/manualSalesRoutes';
 import { createPosTerminalRouter } from './src/server/posTerminalRoutes';
+import { createPosTransactionImportRouter } from './src/server/posTransactionImportRoutes';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -3168,6 +3169,10 @@ async function startServer() {
   // Optional POS terminal registry and historical terminal-to-machine mapping.
   // No POS transaction data is required for normal system operation.
   apiRouter.use('/pos-terminals', createPosTerminalRouter({ getStore, saveStore }));
+
+  // Phase 6C-A: read-only POS transaction import preview.
+  // No import batch or transaction is persisted by this router yet.
+  apiRouter.use('/pos-transactions', createPosTransactionImportRouter({ getStore }));
 
   // Suppliers
   apiRouter.get('/suppliers' , (req, res) => {
